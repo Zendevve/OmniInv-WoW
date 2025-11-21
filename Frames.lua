@@ -297,20 +297,43 @@ function Frames:Update()
                 PickupContainerItem(data.bagID, data.slotID)
             end)
             
-            -- Tooltip
+            -- Tooltip with dynamic shift comparison
             btn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:SetBagItem(self.itemData.bagID, self.itemData.slotID)
                 
-                -- Shift+Hover: Show comparison tooltip
+                -- Show comparison if shift is already held
                 if IsShiftKeyDown() then
                     GameTooltip_ShowCompareItem()
                 end
                 
                 GameTooltip:Show()
+                
+                -- Track shift key state while hovering
+                self.isHovering = true
+                self.lastShiftState = IsShiftKeyDown()
             end)
-            btn:SetScript("OnLeave", function() 
+            
+            btn:SetScript("OnLeave", function(self) 
+                self.isHovering = false
                 GameTooltip:Hide()
+            end)
+            
+            -- OnUpdate to detect shift key changes while hovering
+            btn:SetScript("OnUpdate", function(self, elapsed)
+                if self.isHovering then
+                    local shiftDown = IsShiftKeyDown()
+                    if shiftDown ~= self.lastShiftState then
+                        self.lastShiftState = shiftDown
+                        -- Refresh tooltip
+                        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                        GameTooltip:SetBagItem(self.itemData.bagID, self.itemData.slotID)
+                        if shiftDown then
+                            GameTooltip_ShowCompareItem()
+                        end
+                        GameTooltip:Show()
+                    end
+                end
             end)
             btn:Show()
             
