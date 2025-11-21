@@ -246,6 +246,34 @@ function Frames:Update()
                 if not btn.IconBorder then
                     btn.IconBorder = _G[btn:GetName() .. "IconQuestTexture"] or btn:CreateTexture(nil, "OVERLAY")
                 end
+                
+                -- Create separate Quality Border (to avoid conflicting with Quest Border)
+                if not btn.QualityBorder then
+                    btn.QualityBorder = btn:CreateTexture(nil, "OVERLAY")
+                    btn.QualityBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+                    btn.QualityBorder:SetBlendMode("ADD")
+                    btn.QualityBorder:SetPoint("CENTER")
+                    btn.QualityBorder:SetSize(ITEM_SIZE * 1.6, ITEM_SIZE * 1.6)
+                    btn.QualityBorder:Hide()
+                end
+
+                -- Explicit Click Handler for reliable Drag-and-Drop / Placement
+                btn:SetScript("OnClick", function(self, button)
+                    if CursorHasItem() then
+                        -- If cursor has item, drop it into this slot
+                        PickupContainerItem(self:GetParent():GetID(), self:GetID())
+                    else
+                        -- Otherwise, let the template handle standard interactions (Pickup, Use, Link)
+                        -- We can manually trigger the template's OnClick if needed, but usually
+                        -- ContainerFrameItemButton_OnClick(self, button) is what we want.
+                        ContainerFrameItemButton_OnClick(self, button)
+                    end
+                end)
+                
+                -- Explicit Drag Handler
+                btn:SetScript("OnReceiveDrag", function(self)
+                    PickupContainerItem(self:GetParent():GetID(), self:GetID())
+                end)
 
                 self.buttons[btnIdx] = btn
             else
@@ -264,13 +292,17 @@ function Frames:Update()
             
             -- Data
             btn:SetID(itemData.slotID)
-            -- btn.bagID = itemData.bagID -- Not needed for template, but good for debug
             
             SetItemButtonTexture(btn, itemData.texture)
             SetItemButtonCount(btn, itemData.count)
             
             -- Quality/Quest Border
             local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemData.bagID, itemData.slotID)
+            
+            -- Reset borders
+            btn.IconBorder:Hide()
+            if btn.QualityBorder then btn.QualityBorder:Hide() end
+            
             if questId and not isActive then
                 btn.IconBorder:SetTexture(TEXTURE_ITEM_QUEST_BANG)
                 btn.IconBorder:SetVertexColor(1, 1, 1)
@@ -281,11 +313,10 @@ function Frames:Update()
                 btn.IconBorder:Show()
             elseif itemData.quality and itemData.quality > 1 then
                 local r, g, b = GetItemQualityColor(itemData.quality)
-                btn.IconBorder:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
-                btn.IconBorder:SetVertexColor(r, g, b)
-                btn.IconBorder:Show()
-            else
-                btn.IconBorder:Hide()
+                if btn.QualityBorder then
+                    btn.QualityBorder:SetVertexColor(r, g, b)
+                    btn.QualityBorder:Show()
+                end
             end
             
             -- Cooldown
