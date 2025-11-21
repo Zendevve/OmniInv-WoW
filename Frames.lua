@@ -92,6 +92,28 @@ function Frames:Init()
     self.content = CreateFrame("Frame", nil, self.scrollFrame)
     self.content:SetSize(350, 1000) -- Height will be dynamic
     self.scrollFrame:SetScrollChild(self.content)
+    
+    -- Drop-anywhere functionality
+    self.content:SetScript("OnReceiveDrag", function()
+        if CursorHasItem() then
+            -- Find first empty slot in bags 0-4
+            for bagID = 0, 4 do
+                local numSlots = GetContainerNumSlots(bagID)
+                for slotID = 1, numSlots do
+                    local itemInfo = GetContainerItemInfo(bagID, slotID)
+                    if not itemInfo then
+                        -- Empty slot found, place item here
+                        PickupContainerItem(bagID, slotID)
+                        -- Trigger immediate re-sort
+                        C_Timer.After(0.1, function()
+                            Frames:Update()
+                        end)
+                        return
+                    end
+                end
+            end
+        end
+    end)
 
     self.buttons = {}
     self.headers = {}
@@ -257,23 +279,13 @@ function Frames:Update()
                     btn.QualityBorder:Hide()
                 end
 
-                -- Explicit Click Handler for reliable Drag-and-Drop / Placement
-                btn:SetScript("OnClick", function(self, button)
-                    if CursorHasItem() then
-                        -- If cursor has item, drop it into this slot
-                        PickupContainerItem(self:GetParent():GetID(), self:GetID())
-                    else
-                        -- Otherwise, let the template handle standard interactions (Pickup, Use, Link)
-                        -- We can manually trigger the template's OnClick if needed, but usually
-                        -- ContainerFrameItemButton_OnClick(self, button) is what we want.
-                        ContainerFrameItemButton_OnClick(self, button)
-                    end
-                end)
+                -- Register for Drag and Clicks to ensure Template handles them
+                btn:RegisterForDrag("LeftButton")
+                btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
                 
-                -- Explicit Drag Handler
-                btn:SetScript("OnReceiveDrag", function(self)
-                    PickupContainerItem(self:GetParent():GetID(), self:GetID())
-                end)
+                -- Note: We DO NOT set OnClick or OnReceiveDrag scripts here.
+                -- We rely entirely on ContainerFrameItemButtonTemplate to handle
+                -- pickup, placement, and usage securely.
 
                 self.buttons[btnIdx] = btn
             else
