@@ -222,7 +222,7 @@ function Frames:Update()
         for i, itemData in ipairs(catItems) do
             local btn = self.buttons[btnIdx]
             if not btn then
-                btn = CreateFrame("Button", "ZenBagsItem"..btnIdx, self.content, "ItemButtonTemplate")
+                btn = CreateFrame("Button", "ZenBagsItem"..btnIdx, self.content, "ContainerFrameItemButtonTemplate")
                 btn:SetSize(ITEM_SIZE, ITEM_SIZE)
                 self.buttons[btnIdx] = btn
             end
@@ -234,8 +234,12 @@ function Frames:Update()
             btn:SetPoint("TOPLEFT", col * (ITEM_SIZE + PADDING), -yOffset - (row * (ITEM_SIZE + PADDING)))
             
             -- Data
+            btn:SetID(itemData.slotID)
+            btn.bagID = itemData.bagID
+            
             SetItemButtonTexture(btn, itemData.texture)
             SetItemButtonCount(btn, itemData.count)
+            
             -- Quality Border
             if itemData.quality and itemData.quality > 1 then
                 local r, g, b = GetItemQualityColor(itemData.quality)
@@ -261,11 +265,16 @@ function Frames:Update()
             -- Store item data reference
             btn.itemData = itemData
             
+            -- Secure Attributes for Right-Click (Use Item)
+            -- We use a macro to securely use the specific bag/slot
+            btn:SetAttribute("type2", "macro")
+            btn:SetAttribute("macrotext2", "/use " .. itemData.bagID .. " " .. itemData.slotID)
+            
             -- Register for clicks and drag
             btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             btn:RegisterForDrag("LeftButton")
             
-            -- Click Handler
+            -- Click Handler (Left-Click only, Right-Click handled by SecureActionButton macro)
             btn:SetScript("OnClick", function(self, button, down)
                 local data = self.itemData
                 if button == "LeftButton" then
@@ -279,9 +288,6 @@ function Frames:Update()
                         -- Left-click: Pick up item
                         PickupContainerItem(data.bagID, data.slotID)
                     end
-                elseif button == "RightButton" then
-                    -- Right-click: Use item
-                    UseContainerItem(data.bagID, data.slotID)
                 end
             end)
             
