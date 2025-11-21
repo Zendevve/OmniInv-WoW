@@ -54,35 +54,35 @@ function Frames:Init()
     self.moneyFrame:SetSize(250, 25)
     self.moneyFrame:SetPoint("BOTTOM", self.mainFrame, "BOTTOM", 0, 10)
     
-    -- Gold
+    -- Gold (leftmost)
+    self.goldText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.goldText:SetPoint("LEFT", self.moneyFrame, "LEFT", 0, 0)
+    self.goldText:SetText("0")
+    
     self.goldIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.goldIcon:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
     self.goldIcon:SetSize(16, 16)
-    self.goldIcon:SetPoint("RIGHT", self.moneyFrame, "RIGHT", 0, 0)
+    self.goldIcon:SetPoint("LEFT", self.goldText, "RIGHT", 3, 0)
     
-    self.goldText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.goldText:SetPoint("RIGHT", self.goldIcon, "LEFT", -3, 0)
-    self.goldText:SetText("0")
+    -- Silver (middle)
+    self.silverText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.silverText:SetPoint("LEFT", self.goldIcon, "RIGHT", 8, 0)
+    self.silverText:SetText("0")
     
-    -- Silver
     self.silverIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.silverIcon:SetTexture("Interface\\MoneyFrame\\UI-SilverIcon")
     self.silverIcon:SetSize(16, 16)
-    self.silverIcon:SetPoint("RIGHT", self.goldText, "LEFT", -8, 0)
+    self.silverIcon:SetPoint("LEFT", self.silverText, "RIGHT", 3, 0)
     
-    self.silverText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.silverText:SetPoint("RIGHT", self.silverIcon, "LEFT", -3, 0)
-    self.silverText:SetText("0")
+    -- Copper (rightmost)
+    self.copperText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.copperText:SetPoint("LEFT", self.silverIcon, "RIGHT", 8, 0)
+    self.copperText:SetText("0")
     
-    -- Copper
     self.copperIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.copperIcon:SetTexture("Interface\\MoneyFrame\\UI-CopperIcon")
     self.copperIcon:SetSize(16, 16)
-    self.copperIcon:SetPoint("RIGHT", self.silverText, "LEFT", -8, 0)
-    
-    self.copperText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.copperText:SetPoint("RIGHT", self.copperIcon, "LEFT", -3, 0)
-    self.copperText:SetText("0")
+    self.copperIcon:SetPoint("LEFT", self.copperText, "RIGHT", 3, 0)
 
     -- Scroll Frame (for scrolling through sections)
     self.scrollFrame = CreateFrame("ScrollFrame", "ZenBagsScrollFrame", self.mainFrame, "UIPanelScrollFrameTemplate")
