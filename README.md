@@ -23,7 +23,7 @@ ZenBags brings zen to your inventory management with blazing-fast performance, i
 ### Clean Interface
 - **Single Unified Bag**: All your bags in one convenient window
 - **Real-time Search**: Instantly filter items as you type
-- **Space Counter**: Always know how much room you have left
+- **Space Counter**: Always know how much space you have left
 - **Money Display**: Gold, silver, copper - clearly visible
 
 ### Secure & Reliable
@@ -92,7 +92,7 @@ ZenBags/
 
 ## Configuration
 
-Currently configured via `Config.lua`. GUI settings panel coming in Phase 2.
+Currently configured via `Config.lua`. GUI settings panel coming in Phase 2!
 
 **Default Settings:**
 ```lua
@@ -177,5 +177,7 @@ MIT License - See LICENSE file for details
 
 ---
 
-**Made with care for the WotLK community**  
-*Bringing zen to your inventory since 2025*
+<p align="center">
+  <strong>Made with care for the WotLK community</strong><br>
+  <sub>Bringing zen to your inventory since 2025</sub>
+</p>
