@@ -5,8 +5,17 @@
 ## Version: 0.1
 ## SavedVariables: ZenBagsDB
 
+# Core System
 Core.lua
+Config.lua
+Pools.lua
+
+# Utilities
+Utils.lua
+
+# Data & Logic
 Categories.lua
 Inventory.lua
-Frames.lua
-Utils.lua
+
+# UI Widgets
+widgets\Frame.lua
