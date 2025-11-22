@@ -15,6 +15,11 @@ Inventory.items = {}
 Inventory.updatePending = false
 Inventory.bucketDelay = 0.1  -- 100ms delay for coalescing events
 
+-- Dirty flag system for incremental updates
+Inventory.dirtySlots = {}
+Inventory.previousState = {}  -- bagID:slotID -> {link, count, texture}
+Inventory.forceFullUpdate = false
+
 function Inventory:Init()
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
@@ -43,6 +48,7 @@ end
 
 function Inventory:ScanBags()
     wipe(self.items)
+    local newState = {}
     
     -- Helper to scan a list of bags
     local function scanList(bagList, locationType)
@@ -51,7 +57,16 @@ function Inventory:ScanBags()
             for slotID = 1, numSlots do
                 local texture, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID = GetContainerItemInfo(bagID, slotID)
                 
+                local key = bagID .. ":" .. slotID
+                
+                -- Track current state
                 if link then
+                    newState[key] = {
+                        link = link,
+                        count = count,
+                        texture = texture
+                    }
+                    
                     table.insert(self.items, {
                         bagID = bagID,
                         slotID = slotID,
@@ -64,6 +79,24 @@ function Inventory:ScanBags()
                         category = NS.Categories:GetCategory(link)
                     })
                 end
+                
+                -- Compare with previous state to detect changes
+                local prev = self.previousState[key]
+                local curr = newState[key]
+                
+                -- Mark dirty if changed
+                if not prev and curr then
+                    -- New item
+                    self:MarkDirty(bagID, slotID)
+                elseif prev and not curr then
+                    -- Item removed
+                    self:MarkDirty(bagID, slotID)
+                elseif prev and curr then
+                    -- Check if item changed (different link or count)
+                    if prev.link ~= curr.link or prev.count ~= curr.count then
+                        self:MarkDirty(bagID, slotID)
+                    end
+                end
             end
         end
     end
@@ -71,6 +104,9 @@ function Inventory:ScanBags()
     scanList(BAGS, "bags")
     -- scanList({KEYRING}, "keyring") 
     -- scanList(BANK, "bank")
+    
+    -- Update previous state for next comparison
+    self.previousState = newState
     
     -- Sort
     table.sort(self.items, function(a, b) return NS.Categories:CompareItems(a, b) end)
@@ -85,4 +121,25 @@ end
 
 function Inventory:GetItems()
     return self.items
+end
+
+function Inventory:MarkDirty(bagID, slotID)
+    local key = bagID .. ":" .. (slotID or "all")
+    self.dirtySlots[key] = true
+end
+
+function Inventory:GetDirtySlots()
+    return self.dirtySlots
+end
+
+function Inventory:ClearDirtySlots()
+    wipe(self.dirtySlots)
+end
+
+function Inventory:NeedsFullUpdate()
+    return self.forceFullUpdate
+end
+
+function Inventory:SetFullUpdate(value)
+    self.forceFullUpdate = value
 end

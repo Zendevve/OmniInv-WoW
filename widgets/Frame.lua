@@ -144,6 +144,7 @@ function Frames:Init()
 
     self.buttons = {}
     self.headers = {}
+    self.lastSearch = ""  -- Track search changes for dirty flag system
 end
 
 function Frames:Toggle()
@@ -156,7 +157,8 @@ end
 
 function Frames:Show()
     self.mainFrame:Show()
-    self:Update()
+    NS.Inventory:SetFullUpdate(true)  -- Force full update on show
+    self:Update(true)
 end
 
 function Frames:Hide()
@@ -206,14 +208,27 @@ function Frames:UpdateMoney()
     self.copperText:SetText(copper)
 end
 
-function Frames:Update()
+function Frames:Update(fullUpdate)
     if not self.mainFrame:IsShown() then return end
+    
+    -- Check if search changed
+    local query = self.searchBox:GetText():lower()
+    local searchChanged = (self.lastSearch ~= query)
+    self.lastSearch = query
+    
+    -- Check if inventory changed
+    local dirtySlots = NS.Inventory:GetDirtySlots()
+    local hasDirtySlots = next(dirtySlots) ~= nil
+    
+    -- Skip update if nothing changed
+    if not fullUpdate and not searchChanged and not hasDirtySlots and not NS.Inventory:NeedsFullUpdate() then
+        return
+    end
 
     local allItems = NS.Inventory:GetItems()
     local items = {}
     
     -- Filter
-    local query = self.searchBox:GetText():lower()
     if query == "" then
         items = allItems
     else
@@ -391,4 +406,8 @@ function Frames:Update()
     
     -- Update money display
     self:UpdateMoney()
+    
+    -- Clear dirty flags after successful update
+    NS.Inventory:ClearDirtySlots()
+    NS.Inventory:SetFullUpdate(false)
 end
