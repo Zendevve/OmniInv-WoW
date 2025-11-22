@@ -1,4 +1,4 @@
-local addonName, NS = ...
+local addonName, NS = ..
 
 NS.Config = {}
 
@@ -11,6 +11,7 @@ local defaults = {
     padding = 5,
     showTooltips = true,
     enableSearch = true,
+    collapsedSections = {},  -- Track which category sections are collapsed
 }
 
 function NS.Config:Init()
@@ -30,6 +31,25 @@ end
 
 function NS.Config:Set(key, value)
     ZenBagsDB[key] = value
+end
+
+function NS.Config:IsSectionCollapsed(categoryName)
+    if not ZenBagsDB.collapsedSections then
+        ZenBagsDB.collapsedSections = {}
+    end
+    return ZenBagsDB.collapsedSections[categoryName] == true
+end
+
+function NS.Config:ToggleSectionCollapsed(categoryName)
+    if not ZenBagsDB.collapsedSections then
+        ZenBagsDB.collapsedSections = {}
+    end
+    
+    if ZenBagsDB.collapsedSections[categoryName] then
+        ZenBagsDB.collapsedSections[categoryName] = nil
+    else
+        ZenBagsDB.collapsedSections[categoryName] = true
+    end
 end
 
 function NS.Config:GetDefaults()

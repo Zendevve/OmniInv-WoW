@@ -138,16 +138,24 @@ function NS.Pools:Init()
         end
     )
     
-    -- Section header pool (for future use)
+    
+    -- Section header pool - clickable buttons for collapse/expand
     self:CreatePool("SectionHeader",
         function()
-            local f = CreateFrame("Frame")
-            f:SetSize(200, 20)
+            local btn = CreateFrame("Button")
+            btn:SetSize(350, 20)
+            btn:EnableMouse(true)
             
-            f.text = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            f.text:SetPoint("LEFT")
+            -- Collapse/expand icon
+            btn.icon = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            btn.icon:SetPoint("LEFT", 0, 0)
+            btn.icon:SetText("▼")
             
-            return f
+            -- Category text
+            btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalLeft")
+            btn.text:SetPoint("LEFT", 20, 0)
+            
+            return btn
         end,
         function(header)
             header:Show()
@@ -155,6 +163,9 @@ function NS.Pools:Init()
         function(header)
             header:Hide()
             header.text:SetText("")
+            header:SetScript("OnClick", nil)
+            header:SetScript("OnEnter", nil)
+            header:SetScript("OnLeave", nil)
         end
     )
 end
