@@ -11,13 +11,16 @@ eventFrame:RegisterEvent("PLAYER_LOGIN")
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
     if event == "ADDON_LOADED" and arg1 == addonName then
-        -- Initialize DB defaults
-        if not ZenBagsDB.settings then
-            ZenBagsDB.settings = {
-                scale = 1.0,
-                columns = 10,
-            }
+        -- Initialize Config (must be first)
+        if NS.Config then
+            NS.Config:Init()
         end
+        
+        -- Initialize Pools (must be before other modules)
+        if NS.Pools then
+            NS.Pools:Init()
+        end
+        
         print("|cFF00FF00ZenBags|r loaded. Type /zb to toggle.")
         
     elseif event == "PLAYER_LOGIN" then
