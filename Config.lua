@@ -55,3 +55,11 @@ end
 function NS.Config:GetDefaults()
     return defaults
 end
+
+function NS.Config:Reset()
+    for k, v in pairs(defaults) do
+        ZenBagsDB[k] = v
+    end
+    -- Preserve collapsed sections if desired, or reset them too
+    -- ZenBagsDB.collapsedSections = {} 
+end

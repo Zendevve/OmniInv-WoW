@@ -19,3 +19,4 @@ Inventory.lua
 
 # UI Widgets
 widgets\Frame.lua
+widgets\Settings.lua

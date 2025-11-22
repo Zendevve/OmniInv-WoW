@@ -87,6 +87,23 @@ function Frames:Init()
     self.mainFrame.closeBtn:SetPoint("TOPRIGHT", -5, -5)
     self.mainFrame.closeBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
     
+    -- Settings Button (Gear Icon)
+    self.settingsBtn = CreateFrame("Button", nil, self.mainFrame)
+    self.settingsBtn:SetSize(16, 16)
+    self.settingsBtn:SetPoint("RIGHT", self.mainFrame.closeBtn, "LEFT", -5, 0)
+    self.settingsBtn:SetNormalTexture("Interface\\GossipFrame\\BinderGossipIcon")
+    self.settingsBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
+    self.settingsBtn:SetScript("OnClick", function()
+        NS.Settings:Toggle()
+    end)
+    self.settingsBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Settings")
+        GameTooltip:Show()
+    end)
+    self.settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    self.settingsBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
+    
     -- Space Counter
     self.spaceCounter = self.mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.spaceCounter:SetPoint("TOPLEFT", self.mainFrame.title, "TOPRIGHT", 10, 0)
@@ -397,20 +414,19 @@ function Frames:Update(fullUpdate)
         self.mainFrame.title:SetText("ZenBags - Bank")
     end
     
-    -- Filter by View (keep all items, track matches for highlighting)
+    -- Filter by View and Search
     for _, item in ipairs(allItems) do
         -- Filter by location (bags vs bank)
         if item.location == self.currentView then
-            -- Check if item matches search (but don't filter out)\n            item.searchMatch = false  -- Default to no match
+            -- Filter by search query
             if query == "" then
-                item.searchMatch = true  -- Empty search = all match
+                table.insert(items, item)
             else
                 local name = GetItemInfo(item.link)
                 if name and name:lower():find(query, 1, true) then
-                    item.searchMatch = true
+                    table.insert(items, item)
                 end
             end
-            table.insert(items, item)
         end
     end
 
@@ -624,25 +640,6 @@ function Frames:Update(fullUpdate)
 
                 -- Store item data reference
                 btn.itemData = itemData
-                
-                -- Search Highlighting: Dim non-matching items
-                -- Get icon texture properly (WoW template creates it with button name + "Icon")
-                local iconTexture = btn.icon or _G[btn:GetName() .. "Icon"]
-                if iconTexture then
-                    if itemData.searchMatch then
-                        -- Matching item - bright and normal
-                        iconTexture:SetAlpha(1.0)
-                        iconTexture:SetDesaturated(false)
-                        print("ZenBags: Highlighting MATCH for " .. (GetItemInfo(itemData.link) or "unknown"))
-                    else
-                        -- Non-matching item - dimmed and desaturated
-                        iconTexture:SetAlpha(0.35)
-                        iconTexture:SetDesaturated(true)
-                        print("ZenBags: Dimming NON-MATCH for " .. (GetItemInfo(itemData.link) or "unknown"))
-                    end
-                else
-                    print("ZenBags: NO ICON TEXTURE for button " .. tostring(btn:GetName()))
-                end
                 
                 -- Standard Template handles clicks now!
                 -- We only need to ensure the button is shown
