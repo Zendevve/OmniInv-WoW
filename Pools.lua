@@ -98,16 +98,17 @@ end
 -- Initialize built-in pools
 function NS.Pools:Init()
     -- Item button pool
+    local buttonSerial = 0
     self:CreatePool("ItemButton",
         function()
-            local btn = CreateFrame("Button", nil, nil, "ContainerFrameItemButtonTemplate")
+            buttonSerial = buttonSerial + 1
+            local name = "ZenBagsPooledButton" .. buttonSerial
+            local btn = CreateFrame("Button", name, nil, "ContainerFrameItemButtonTemplate")
             btn:SetSize(37, 37)
             
-            -- Initialize child frames
-            if not btn.IconBorder then
-                btn.IconBorder = _G[btn:GetName() and (btn:GetName() .. "IconQuestTexture")] 
-                    or btn:CreateTexture(nil, "OVERLAY")
-            end
+            -- Initialize child frames (template creates these with $parent prefix)
+            btn.icon = _G[name .. "Icon"]
+            btn.IconBorder = _G[name .. "IconQuestTexture"] or btn:CreateTexture(nil, "OVERLAY")
             
             -- Quality border
             if not btn.QualityBorder then
