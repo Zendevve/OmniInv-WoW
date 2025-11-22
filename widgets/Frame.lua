@@ -49,16 +49,23 @@ function Frames:Init()
     
     self.mainFrame:Hide()
 
-    -- Header Background (subtle semi-transparent)
+    -- Header Background (inset from frame border)
     self.headerBg = self.mainFrame:CreateTexture(nil, "BACKGROUND")
-    self.headerBg:SetTexture(0, 0, 0, 0.6) -- More subtle black with transparency
-    self.headerBg:SetPoint("TOPLEFT", 0, 0)
-    self.headerBg:SetPoint("TOPRIGHT", 0, 0)
-    self.headerBg:SetHeight(65)
+    self.headerBg:SetTexture(0, 0, 0, 0.5) -- Subtle black with transparency
+    self.headerBg:SetPoint("TOPLEFT", 12, -12)
+    self.headerBg:SetPoint("TOPRIGHT", -12, -12)
+    self.headerBg:SetHeight(55)
+    
+    -- Header Separator Line
+    self.headerSeparator = self.mainFrame:CreateTexture(nil, "OVERLAY")
+    self.headerSeparator:SetTexture(0.3, 0.3, 0.3, 0.8) -- Gray line
+    self.headerSeparator:SetPoint("TOPLEFT", 12, -67)
+    self.headerSeparator:SetPoint("TOPRIGHT", -12, -67)
+    self.headerSeparator:SetHeight(1)
 
     -- Title
     self.mainFrame.title = self.mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    self.mainFrame.title:SetPoint("TOP", 0, -12)
+    self.mainFrame.title:SetPoint("TOP", 0, -20)
     self.mainFrame.title:SetText("ZenBags")
 
     -- Close Button
@@ -72,9 +79,9 @@ function Frames:Init()
 
     -- Search Box (custom with icon for Classic compatibility)
     self.searchBox = CreateFrame("EditBox", nil, self.mainFrame, "InputBoxTemplate")
-    self.searchBox:SetPoint("TOPLEFT", 15, -38)
-    self.searchBox:SetPoint("TOPRIGHT", -30, -38)
-    self.searchBox:SetHeight(22)
+    self.searchBox:SetPoint("TOPLEFT", 20, -42)
+    self.searchBox:SetPoint("TOPRIGHT", -38, -42)
+    self.searchBox:SetHeight(20)
     self.searchBox:SetAutoFocus(false)
     self.searchBox:SetScript("OnTextChanged", function(self)
         NS.Frames:Update()
@@ -127,7 +134,7 @@ function Frames:Init()
 
     -- Scroll Frame (for scrolling through sections)
     self.scrollFrame = CreateFrame("ScrollFrame", "ZenBagsScrollFrame", self.mainFrame, "UIPanelScrollFrameTemplate")
-    self.scrollFrame:SetPoint("TOPLEFT", 15, -80)
+    self.scrollFrame:SetPoint("TOPLEFT", 15, -78)
     self.scrollFrame:SetPoint("BOTTOMRIGHT", -35, 70)
 
     self.content = CreateFrame("Frame", nil, self.scrollFrame)
