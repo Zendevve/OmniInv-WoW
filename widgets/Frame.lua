@@ -22,6 +22,7 @@ function Frames:Init()
     self.mainFrame:SetMovable(true)
     self.mainFrame:SetResizable(true) -- Enable resizing
     self.mainFrame:SetMinResize(300, 300)
+    self.mainFrame:SetClampedToScreen(true) -- Prevent frame and tooltips from going off-screen
     self.mainFrame:RegisterForDrag("LeftButton")
     self.mainFrame:SetScript("OnDragStart", self.mainFrame.StartMoving)
     self.mainFrame:SetScript("OnDragStop", self.mainFrame.StopMovingOrSizing)
