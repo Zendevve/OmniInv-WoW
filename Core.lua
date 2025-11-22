@@ -22,40 +22,6 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         end
         
         print("|cFF00FF00ZenBags|r loaded. Type /zb to toggle.")
-        
-    elseif event == "PLAYER_LOGIN" then
-        -- Initialize modules
-        if NS.Inventory then NS.Inventory:Init() end
-        if NS.Frames then NS.Frames:Init() end
-        if NS.Utils then NS.Utils:Init() end
-        
-        -- Close any default bags that might be open
-        CloseBackpack()
-        for i = 1, NUM_BAG_SLOTS do
-            CloseBag(i)
-        end
-
-        -- Overwrite Global Bag Functions to redirect to ZenBags
-        function ToggleAllBags()
-            if NS.Frames then NS.Frames:Toggle() end
-        end
-
-        function OpenAllBags(force)
-            if NS.Frames then NS.Frames:Show() end
-        end
-
-        function CloseAllBags()
-            if NS.Frames then NS.Frames:Hide() end
-        end
-
-        function ToggleBackpack()
-            if NS.Frames then NS.Frames:Toggle() end
-        end
-
-        function OpenBackpack()
-            if NS.Frames then NS.Frames:Show() end
-        end
-
 ```lua
 -- Namespace
 local addonName, NS = ...
