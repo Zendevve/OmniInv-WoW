@@ -310,8 +310,13 @@ function Frames:Update(fullUpdate)
         -- Check collapsed state
         local isCollapsed = NS.Config:IsSectionCollapsed(cat)
         
-        -- Set icon and text
-        hdr.icon:SetText(isCollapsed and "▶" or "▼")
+        -- Set icon texture
+        if isCollapsed then
+            hdr.icon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+        else
+            hdr.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+        end
+        
         hdr.text:SetText(cat .. " (" .. #catItems .. ")")
         
         -- Click handler to toggle
@@ -323,11 +328,9 @@ function Frames:Update(fullUpdate)
         -- Hover effects
         hdr:SetScript("OnEnter", function(self)
             self.text:SetTextColor(1, 1, 0)  -- Yellow
-            self.icon:SetTextColor(1, 1, 0)
         end)
         hdr:SetScript("OnLeave", function(self)
             self.text:SetTextColor(1, 1, 1)  -- White
-            self.icon:SetTextColor(1, 1, 1)
         end)
         
         hdr:Show()
