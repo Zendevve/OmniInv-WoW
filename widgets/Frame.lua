@@ -355,6 +355,7 @@ function Frames:Hide()
     self.mainFrame:Hide()
 end
 
+
 function Frames:UpdateSpaceCounter()
     local totalSlots = 0
     local usedSlots = 0
@@ -369,18 +370,12 @@ function Frames:UpdateSpaceCounter()
 
     -- Count slots
     for _, bagID in ipairs(bagsToCount) do
-        local numSlots = GetContainerNumSlots(bagID)
-        totalSlots = totalSlots + numSlots
-
-        for slotID = 1, numSlots do
-            local itemLink = GetContainerItemLink(bagID, slotID)
-            if itemLink then
-                usedSlots = usedSlots + 1
-            end
-        end
+        local size = NS.Data:GetBagSize(bagID)
+        local free, _ = NS.Data:GetFreeSlots(bagID)
+        totalSlots = totalSlots + size
+        usedSlots = usedSlots + (size - free)
     end
 
-    local freeSlots = totalSlots - usedSlots
     local percentFull = totalSlots > 0 and (usedSlots / totalSlots) * 100 or 0
 
     -- Color coding based on fullness
@@ -395,7 +390,7 @@ function Frames:UpdateSpaceCounter()
 end
 
 function Frames:UpdateMoney()
-    local money = GetMoney()
+    local money = NS.Data:GetMoney()
 
     local gold = math.floor(money / 10000)
     local silver = math.floor((money % 10000) / 100)
