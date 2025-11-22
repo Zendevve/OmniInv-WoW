@@ -410,29 +410,56 @@ function Frames:Update(fullUpdate)
     end
     wipe(self.headers)
 
-    -- Dynamic column calculation
+    -- Dynamic column calculation (Masonry Layout)
     local width = self.mainFrame:GetWidth()
     local availableWidth = width - 60 -- Padding (left+right+scrollbar)
-    local cols = math.floor((availableWidth + PADDING) / (ITEM_SIZE + PADDING))
-    if cols < 1 then cols = 1 end
     
-    -- Centering offset
-    local gridWidth = cols * ITEM_SIZE + (cols - 1) * PADDING
-    local xOffset = (availableWidth - gridWidth) / 2
-    if xOffset < 0 then xOffset = 0 end
+    -- Determine number of section columns
+    local MIN_SECTION_WIDTH = 300
+    local numSectionCols = math.floor(availableWidth / MIN_SECTION_WIDTH)
+    if numSectionCols < 1 then numSectionCols = 1 end
+    
+    local sectionWidth = availableWidth / numSectionCols
+    
+    -- Calculate item columns per section
+    local itemCols = math.floor((sectionWidth - PADDING) / (ITEM_SIZE + PADDING))
+    if itemCols < 1 then itemCols = 1 end
+    
+    -- Calculate centering offset within each section
+    local sectionGridWidth = itemCols * ITEM_SIZE + (itemCols - 1) * PADDING
+    local sectionXOffset = (sectionWidth - sectionGridWidth) / 2
+    if sectionXOffset < 0 then sectionXOffset = 0 end
+
+    -- Masonry State
+    local colHeights = {}
+    for i = 1, numSectionCols do colHeights[i] = 0 end
 
     -- Render Sections
-    local yOffset = 0
     local btnIdx = 1
     
     for _, cat in ipairs(sortedCats) do
         local catItems = groups[cat]
         
+        -- Find shortest column
+        local minHeight = colHeights[1]
+        local minCol = 1
+        for i = 2, numSectionCols do
+            if colHeights[i] < minHeight then
+                minHeight = colHeights[i]
+                minCol = i
+            end
+        end
+        
+        -- Calculate Section Position
+        local sectionX = (minCol - 1) * sectionWidth
+        local sectionY = minHeight
+        
         -- Header - use pooled interactive button
         local headerPool = NS.Pools:GetPool("SectionHeader")
         local hdr = headerPool:Acquire()
         hdr:SetParent(self.content)
-        hdr:SetPoint("TOPLEFT", xOffset, -yOffset)
+        -- Align header with the grid start (looks cleaner)
+        hdr:SetPoint("TOPLEFT", sectionX + sectionXOffset, -sectionY)
         
         -- Check collapsed state
         local isCollapsed = NS.Config:IsSectionCollapsed(cat)
@@ -467,7 +494,7 @@ function Frames:Update(fullUpdate)
         hdr:Show()
         table.insert(self.headers, hdr)
         
-        yOffset = yOffset + 20 -- Header height
+        local currentSectionHeight = 20 -- Header height
 
         -- Items Grid
         if not isCollapsed then
@@ -491,12 +518,15 @@ function Frames:Update(fullUpdate)
                     btn:SetParent(dummyBag)
                 end
 
-                -- Grid Position (Relative to content frame, not the dummy bag)
-                local row = math.floor((i - 1) / cols)
-                local col = (i - 1) % cols
+                -- Grid Position within Section
+                local row = math.floor((i - 1) / itemCols)
+                local col = (i - 1) % itemCols
+                
+                local itemX = sectionX + sectionXOffset + col * (ITEM_SIZE + PADDING)
+                local itemY = sectionY + currentSectionHeight + row * (ITEM_SIZE + PADDING)
                 
                 btn:ClearAllPoints()
-                btn:SetPoint("TOPLEFT", self.content, "TOPLEFT", xOffset + col * (ITEM_SIZE + PADDING), -yOffset - (row * (ITEM_SIZE + PADDING)))
+                btn:SetPoint("TOPLEFT", self.content, "TOPLEFT", itemX, -itemY)
                 
                 -- Data
                 btn:SetID(itemData.slotID)
@@ -558,16 +588,21 @@ function Frames:Update(fullUpdate)
             end
 
             -- Calculate section height
-            local numRows = math.ceil(#catItems / cols)
-            local sectionHeight = numRows * (ITEM_SIZE + PADDING)
-            yOffset = yOffset + sectionHeight + SECTION_PADDING
-        else
-            -- Collapsed: just add padding
-            yOffset = yOffset + SECTION_PADDING
+            local numRows = math.ceil(#catItems / itemCols)
+            local gridHeight = numRows * (ITEM_SIZE + PADDING)
+            currentSectionHeight = currentSectionHeight + gridHeight
         end
+        
+        -- Update column height
+        colHeights[minCol] = colHeights[minCol] + currentSectionHeight + SECTION_PADDING
     end
     
-    self.content:SetHeight(yOffset)
+    -- Set content height to max column height
+    local maxColHeight = 0
+    for _, h in ipairs(colHeights) do
+        if h > maxColHeight then maxColHeight = h end
+    end
+    self.content:SetHeight(maxColHeight)
     
     -- Update space counter
     self:UpdateSpaceCounter()
