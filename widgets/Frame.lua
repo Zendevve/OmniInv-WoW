@@ -46,12 +46,12 @@ function Frames:Init()
     
     self.mainFrame:Hide()
 
-    -- Header Background (inset from frame border)
+    -- Header Background (inset from frame border) - Only covers title area
     self.headerBg = self.mainFrame:CreateTexture(nil, "BACKGROUND")
     self.headerBg:SetTexture(0, 0, 0, 0.5) -- Subtle black with transparency
     self.headerBg:SetPoint("TOPLEFT", 12, -12)
     self.headerBg:SetPoint("TOPRIGHT", -12, -12)
-    self.headerBg:SetHeight(55)
+    self.headerBg:SetHeight(30) -- Only covers title and close button
     
     -- Make header draggable (create invisible button for dragging)
     self.headerDragArea = CreateFrame("Button", nil, self.mainFrame)
@@ -65,8 +65,8 @@ function Frames:Init()
     -- Header Separator Line
     self.headerSeparator = self.mainFrame:CreateTexture(nil, "OVERLAY")
     self.headerSeparator:SetTexture(0.3, 0.3, 0.3, 0.8) -- Gray line
-    self.headerSeparator:SetPoint("TOPLEFT", 12, -67)
-    self.headerSeparator:SetPoint("TOPRIGHT", -12, -67)
+    self.headerSeparator:SetPoint("TOPLEFT", 12, -42)
+    self.headerSeparator:SetPoint("TOPRIGHT", -12, -42)
     self.headerSeparator:SetHeight(1)
 
     -- Title
@@ -74,19 +74,20 @@ function Frames:Init()
     self.mainFrame.title:SetPoint("TOP", 0, -20)
     self.mainFrame.title:SetText("ZenBags")
 
-    -- Close Button
+    -- Close Button (raised frame level to be above drag area)
     self.mainFrame.closeBtn = CreateFrame("Button", nil, self.mainFrame, "UIPanelCloseButton")
     self.mainFrame.closeBtn:SetPoint("TOPRIGHT", -5, -5)
+    self.mainFrame.closeBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
     
     -- Space Counter
     self.spaceCounter = self.mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.spaceCounter:SetPoint("TOPLEFT", self.mainFrame.title, "TOPRIGHT", 10, 0)
     self.spaceCounter:SetText("0/0")
 
-    -- Search Box (custom with icon for Classic compatibility)
+    -- Search Box (sticky, below header, NOT in scroll frame)
     self.searchBox = CreateFrame("EditBox", nil, self.mainFrame, "InputBoxTemplate")
-    self.searchBox:SetPoint("TOPLEFT", 20, -42)
-    self.searchBox:SetPoint("TOPRIGHT", -38, -42)
+    self.searchBox:SetPoint("TOPLEFT", 20, -48)
+    self.searchBox:SetPoint("TOPRIGHT", -38, -48)
     self.searchBox:SetHeight(20)
     self.searchBox:SetAutoFocus(false)
     self.searchBox:SetScript("OnTextChanged", function(self)
@@ -138,7 +139,7 @@ function Frames:Init()
     self.copperIcon:SetSize(16, 16)
     self.copperIcon:SetPoint("LEFT", self.copperText, "RIGHT", 3, 0)
 
-    -- Scroll Frame (for scrolling through sections)
+    -- Scroll Frame (starts below sticky search bar)
     self.scrollFrame = CreateFrame("ScrollFrame", "ZenBagsScrollFrame", self.mainFrame, "UIPanelScrollFrameTemplate")
     self.scrollFrame:SetPoint("TOPLEFT", 15, -78)
     self.scrollFrame:SetPoint("BOTTOMRIGHT", -35, 40) -- Balanced spacing - no overlap, minimal waste
