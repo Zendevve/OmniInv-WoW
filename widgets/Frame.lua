@@ -269,8 +269,17 @@ function Frames:Update(fullUpdate)
     end
     wipe(self.buttons)
     
-    -- Reset headers
-    for _, hdr in pairs(self.headers) do hdr:Hide() end
+    -- Release headers back to pool
+    local headerPool = NS.Pools:GetPool("SectionHeader")
+    if headerPool then
+        for i = #self.headers, 1, -1 do
+            local hdr = self.headers[i]
+            if hdr then
+                headerPool:Release(hdr)
+            end
+        end
+    end
+    wipe(self.headers)
 
     -- Dummy Bag Getter
     function Frames:GetDummyBag(bagID)
@@ -292,20 +301,42 @@ function Frames:Update(fullUpdate)
     for _, cat in ipairs(sortedCats) do
         local catItems = groups[cat]
         
-        -- Header
-        local hdr = self.headers[hdrIdx]
-        if not hdr then
-            hdr = self.content:CreateFontString(nil, "OVERLAY", "GameFontNormalLeft")
-            self.headers[hdrIdx] = hdr
-        end
+        -- Header - use pooled interactive button
+        local headerPool = NS.Pools:GetPool("SectionHeader")
+        local hdr = headerPool:Acquire()
+        hdr:SetParent(self.content)
         hdr:SetPoint("TOPLEFT", 0, -yOffset)
-        hdr:SetText(cat .. " (" .. #catItems .. ")")
+        
+        -- Check collapsed state
+        local isCollapsed = NS.Config:IsSectionCollapsed(cat)
+        
+        -- Set icon and text
+        hdr.icon:SetText(isCollapsed and "▶" or "▼")
+        hdr.text:SetText(cat .. " (" .. #catItems .. ")")
+        
+        -- Click handler to toggle
+        hdr:SetScript("OnClick", function()
+            NS.Config:ToggleSectionCollapsed(cat)
+            NS.Frames:Update(true)  -- Force full redraw
+        end)
+        
+        -- Hover effects
+        hdr:SetScript("OnEnter", function(self)
+            self.text:SetTextColor(1, 1, 0)  -- Yellow
+            self.icon:SetTextColor(1, 1, 0)
+        end)
+        hdr:SetScript("OnLeave", function(self)
+            self.text:SetTextColor(1, 1, 1)  -- White
+            self.icon:SetTextColor(1, 1, 1)
+        end)
+        
         hdr:Show()
-        hdrIdx = hdrIdx + 1
+        table.insert(self.headers, hdr)
         
         yOffset = yOffset + 20 -- Header height
 
-        -- Items Grid
+        -- Items Grid - only render if not collapsed
+        if not isCollapsed then
         for i, itemData in ipairs(catItems) do
             local btn = self.buttons[btnIdx]
             
@@ -394,9 +425,15 @@ function Frames:Update(fullUpdate)
 
         
         -- Calculate section height
-        local numRows = math.ceil(#catItems / COLS_PER_SECTION)
-        local sectionHeight = numRows * (ITEM_SIZE + PADDING)
-        yOffset = yOffset + sectionHeight + SECTION_PADDING
+        if not isCollapsed then
+            local numRows = math.ceil(#catItems / COLS_PER_SECTION)
+            local sectionHeight = numRows * (ITEM_SIZE + PADDING)
+            yOffset = yOffset + sectionHeight + SECTION_PADDING
+        else
+            -- Collapsed: just add padding
+            yOffset = yOffset + SECTION_PADDING
+        end
+        end  -- Close if not isCollapsed
     end
     
     self.content:SetHeight(yOffset)
