@@ -164,6 +164,15 @@ function Inventory:GetCachedBankItems()
     return {}
 end
 
+function Inventory:HasCachedBankItems()
+    if ZenBagsDB and ZenBagsDB.bankCache then
+        local charKey = UnitName("player") .. " - " .. GetRealmName()
+        local cache = ZenBagsDB.bankCache[charKey]
+        return cache and #cache > 0
+    end
+    return false
+end
+
 function Inventory:MarkDirty(bagID, slotID)
     local key = bagID .. ":" .. (slotID or "all")
     self.dirtySlots[key] = true
