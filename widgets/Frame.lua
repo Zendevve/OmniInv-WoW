@@ -186,7 +186,11 @@ function Frames:SwitchView(view)
     else
         self.inventoryTab:Enable()
         self.bankTab:Disable()
-        self.mainFrame.title:SetText("ZenBags - Bank")
+        if NS.Inventory.isBankOpen then
+            self.mainFrame.title:SetText("ZenBags - Bank")
+        else
+            self.mainFrame.title:SetText("ZenBags - Bank (Offline)")
+        end
     end
     
     NS.Inventory:SetFullUpdate(true)
@@ -281,6 +285,31 @@ function Frames:Update(fullUpdate)
 
     local allItems = NS.Inventory:GetItems()
     local items = {}
+    
+    -- If viewing bank and bank is closed, load cached items
+    local isOfflineBank = (self.currentView == "bank" and not NS.Inventory.isBankOpen)
+    if isOfflineBank then
+        local cachedItems = NS.Inventory:GetCachedBankItems()
+        -- Merge cached items into allItems for processing
+        -- Note: We create a new list to avoid modifying the live inventory
+        local combinedItems = {}
+        -- Only include non-bank items from live inventory (if any, though usually we filter)
+        for _, item in ipairs(allItems) do
+            if item.location ~= "bank" then
+                table.insert(combinedItems, item)
+            end
+        end
+        -- Add cached bank items
+        for _, item in ipairs(cachedItems) do
+            table.insert(combinedItems, item)
+        end
+        allItems = combinedItems
+        
+        -- Update title to indicate offline
+        self.mainFrame.title:SetText("ZenBags - Bank (Offline)")
+    elseif self.currentView == "bank" then
+        self.mainFrame.title:SetText("ZenBags - Bank")
+    end
     
     -- Filter by View and Search
     for _, item in ipairs(allItems) do

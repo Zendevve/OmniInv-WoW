@@ -55,8 +55,9 @@ function Inventory:Init()
         elseif event == "BANKFRAME_CLOSED" then
             Inventory.isBankOpen = false
             if NS.Frames then 
-                NS.Frames:HideBankTab()
-                NS.Frames:SwitchView("bags") -- Force back to bags
+                -- Don't hide bank tab or switch view!
+                -- Just update to show offline state
+                NS.Frames:Update(true)
             end
         end
     end)
@@ -135,11 +136,32 @@ function Inventory:ScanBags()
         local charKey = UnitName("player") .. " - " .. GetRealmName()
         ZenBagsDB.characters = ZenBagsDB.characters or {}
         ZenBagsDB.characters[charKey] = self.items
+        
+        -- Cache bank items specifically if bank is open
+        if self.isBankOpen then
+            ZenBagsDB.bankCache = ZenBagsDB.bankCache or {}
+            ZenBagsDB.bankCache[charKey] = {}
+            
+            -- Filter only bank items for cache
+            for _, item in ipairs(self.items) do
+                if item.location == "bank" then
+                    table.insert(ZenBagsDB.bankCache[charKey], item)
+                end
+            end
+        end
     end
 end
 
 function Inventory:GetItems()
     return self.items
+end
+
+function Inventory:GetCachedBankItems()
+    if ZenBagsDB and ZenBagsDB.bankCache then
+        local charKey = UnitName("player") .. " - " .. GetRealmName()
+        return ZenBagsDB.bankCache[charKey] or {}
+    end
+    return {}
 end
 
 function Inventory:MarkDirty(bagID, slotID)
