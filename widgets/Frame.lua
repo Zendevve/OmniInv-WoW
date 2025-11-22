@@ -145,6 +145,52 @@ function Frames:Init()
     self.buttons = {}
     self.headers = {}
     self.lastSearch = ""  -- Track search changes for dirty flag system
+    
+    self.currentView = "bags" -- "bags" or "bank"
+    self:CreateTabs()
+end
+
+function Frames:CreateTabs()
+    -- Inventory Tab
+    self.inventoryTab = CreateFrame("Button", nil, self.mainFrame, "UIPanelButtonTemplate")
+    self.inventoryTab:SetSize(80, 22)
+    self.inventoryTab:SetPoint("BOTTOMLEFT", 15, 40)
+    self.inventoryTab:SetText("Inventory")
+    self.inventoryTab:SetScript("OnClick", function() self:SwitchView("bags") end)
+    self.inventoryTab:Disable() -- Default selected
+    
+    -- Bank Tab
+    self.bankTab = CreateFrame("Button", nil, self.mainFrame, "UIPanelButtonTemplate")
+    self.bankTab:SetSize(80, 22)
+    self.bankTab:SetPoint("LEFT", self.inventoryTab, "RIGHT", 5, 0)
+    self.bankTab:SetText("Bank")
+    self.bankTab:SetScript("OnClick", function() self:SwitchView("bank") end)
+    self.bankTab:Hide() -- Hidden by default until bank opens
+end
+
+function Frames:ShowBankTab()
+    self.bankTab:Show()
+end
+
+function Frames:HideBankTab()
+    self.bankTab:Hide()
+end
+
+function Frames:SwitchView(view)
+    self.currentView = view
+    
+    if view == "bags" then
+        self.inventoryTab:Disable()
+        self.bankTab:Enable()
+        self.mainFrame.title:SetText("ZenBags")
+    else
+        self.inventoryTab:Enable()
+        self.bankTab:Disable()
+        self.mainFrame.title:SetText("ZenBags - Bank")
+    end
+    
+    NS.Inventory:SetFullUpdate(true)
+    self:Update(true)
 end
 
 function Frames:Toggle()
@@ -169,8 +215,16 @@ function Frames:UpdateSpaceCounter()
     local totalSlots = 0
     local usedSlots = 0
     
-    -- Count slots in bags 0-4
-    for bagID = 0, 4 do
+    -- Determine which bags to count based on view
+    local bagsToCount = {}
+    if self.currentView == "bank" then
+        bagsToCount = {-1, 5, 6, 7, 8, 9, 10, 11}
+    else
+        bagsToCount = {0, 1, 2, 3, 4}
+    end
+
+    -- Count slots
+    for _, bagID in ipairs(bagsToCount) do
         local numSlots = GetContainerNumSlots(bagID)
         totalSlots = totalSlots + numSlots
         
@@ -228,14 +282,18 @@ function Frames:Update(fullUpdate)
     local allItems = NS.Inventory:GetItems()
     local items = {}
     
-    -- Filter
-    if query == "" then
-        items = allItems
-    else
-        for _, item in ipairs(allItems) do
-            local name = GetItemInfo(item.link)
-            if name and name:lower():find(query, 1, true) then
+    -- Filter by View and Search
+    for _, item in ipairs(allItems) do
+        -- Filter by location (bags vs bank)
+        if item.location == self.currentView then
+            -- Filter by search query
+            if query == "" then
                 table.insert(items, item)
+            else
+                local name = GetItemInfo(item.link)
+                if name and name:lower():find(query, 1, true) then
+                    table.insert(items, item)
+                end
             end
         end
     end

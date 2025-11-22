@@ -24,8 +24,12 @@ function Inventory:Init()
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
     self.frame:RegisterEvent("PLAYER_MONEY")
+    self.frame:RegisterEvent("BANKFRAME_OPENED")
+    self.frame:RegisterEvent("BANKFRAME_CLOSED")
+    self.frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+    
     self.frame:SetScript("OnEvent", function(self, event, arg1)
-        if event == "BAG_UPDATE" then
+        if event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
             -- Event Bucketing: Coalesce rapid-fire BAG_UPDATE events
             -- This reduces updates from ~50/sec to ~10/sec during looting
             if not Inventory.updatePending then
@@ -40,6 +44,19 @@ function Inventory:Init()
             -- Update money display
             if NS.Frames and NS.Frames.mainFrame and NS.Frames.mainFrame:IsShown() then
                 NS.Frames:UpdateMoney()
+            end
+        elseif event == "BANKFRAME_OPENED" then
+            Inventory.isBankOpen = true
+            Inventory:ScanBags()
+            if NS.Frames then 
+                NS.Frames:ShowBankTab()
+                NS.Frames:Update(true)
+            end
+        elseif event == "BANKFRAME_CLOSED" then
+            Inventory.isBankOpen = false
+            if NS.Frames then 
+                NS.Frames:HideBankTab()
+                NS.Frames:SwitchView("bags") -- Force back to bags
             end
         end
     end)
@@ -103,7 +120,9 @@ function Inventory:ScanBags()
 
     scanList(BAGS, "bags")
     -- scanList({KEYRING}, "keyring") 
-    -- scanList(BANK, "bank")
+    if self.isBankOpen then
+        scanList(BANK, "bank")
+    end
     
     -- Update previous state for next comparison
     self.previousState = newState
