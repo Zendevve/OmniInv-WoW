@@ -11,6 +11,7 @@ Data.KEYRING = -2
 -- State
 Data.cache = {} -- Cached item data per character
 Data.isBankOpen = false
+Data.selectedCharacter = nil -- nil = current character, otherwise character key
 
 -- =============================================================================
 -- Initialization
@@ -21,6 +22,9 @@ function Data:Init()
     if ZenBagsDB and ZenBagsDB.cache then
         self.cache = ZenBagsDB.cache
     end
+
+    -- Default to current character
+    self.selectedCharacter = nil
 end
 
 -- =============================================================================
@@ -44,17 +48,19 @@ end
 -- @param bag number Bag ID
 -- @return boolean
 function Data:IsCached(bag)
+    -- If viewing another character, EVERYTHING is cached
+    if self:IsViewingOtherCharacter() then
+        return true
+    end
+
     -- Bank bags are cached when bank is closed
     if self:IsBankBag(bag) then
         return not self.isBankOpen
     end
-    
-    -- Inventory bags are always live
+
+    -- Inventory bags are always live for current character
     return false
 end
-
---- Get live item info from WoW API
--- @param bag number
 -- @param slot number
 -- @return link, count, texture, quality, isLocked, itemID
 function Data:GetLiveItemInfo(bag, slot)
@@ -69,16 +75,16 @@ end
 function Data:GetCachedItemInfo(bag, slot)
     local charKey = self:GetCharacterKey()
     local bagData = self.cache[charKey] and self.cache[charKey][bag]
-    
+
     if not bagData then
         return nil, nil, nil, nil, nil, nil
     end
-    
+
     local itemData = bagData[slot]
     if not itemData then
         return nil, nil, nil, nil, nil, nil
     end
-    
+
     return itemData.link, itemData.count, itemData.texture, itemData.quality, false, itemData.itemID
 end
 
@@ -134,33 +140,33 @@ end
 -- This should be called whenever bags are scanned
 function Data:UpdateCache()
     local charKey = self:GetCharacterKey()
-    
+
     -- Initialize cache structure
     if not ZenBagsDB then
         ZenBagsDB = {}
     end
     ZenBagsDB.cache = ZenBagsDB.cache or {}
     ZenBagsDB.cache[charKey] = ZenBagsDB.cache[charKey] or {}
-    
+
     -- Scan all bags
     local bagList = {}
     for _, bag in ipairs(self.BAGS) do
         table.insert(bagList, bag)
     end
-    
+
     if self.isBankOpen then
         for _, bag in ipairs(self.BANK) do
             table.insert(bagList, bag)
         end
     end
-    
+
     for _, bag in ipairs(bagList) do
         local numSlots = GetContainerNumSlots(bag)
         ZenBagsDB.cache[charKey][bag] = {size = numSlots}
-        
+
         for slot = 1, numSlots do
             local texture, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID = GetContainerItemInfo(bag, slot)
-            
+
             if link then
                 ZenBagsDB.cache[charKey][bag][slot] = {
                     link = link,
@@ -174,7 +180,7 @@ function Data:UpdateCache()
             end
         end
     end
-    
+
     -- Update in-memory cache reference
     self.cache = ZenBagsDB.cache
 end
@@ -182,6 +188,17 @@ end
 --- Get the character key for cache storage
 -- @return string
 function Data:GetCharacterKey()
+    -- If a specific character is selected, use that
+    if self.selectedCharacter then
+        return self.selectedCharacter
+    end
+    -- Otherwise use current character
+    return UnitName("player") .. " - " .. GetRealmName()
+end
+
+--- Get the current player's character key
+-- @return string
+function Data:GetCurrentCharacterKey()
     return UnitName("player") .. " - " .. GetRealmName()
 end
 
@@ -200,16 +217,53 @@ function Data:IsBankOpen()
     return self.isBankOpen
 end
 
+--- Get cached inventory items (bags 0-4) in Inventory-compatible format
+-- @return table Array of item data
+function Data:GetCachedInventoryItems()
+    local charKey = self:GetCharacterKey()
+    local items = {}
+
+    if not self.cache[charKey] then
+        return items
+    end
+
+    -- Iterate through inventory bags
+    for _, bag in ipairs(self.BAGS) do
+        local bagData = self.cache[charKey][bag]
+        if bagData then
+            for slot = 1, (bagData.size or 0) do
+                local itemData = bagData[slot]
+                if itemData then
+                    -- Build item in same format as Inventory.lua
+                    table.insert(items, {
+                        bagID = bag,
+                        slotID = slot,
+                        link = itemData.link,
+                        texture = itemData.texture,
+                        count = itemData.count,
+                        quality = itemData.quality,
+                        itemID = itemData.itemID,
+                        location = "bags",
+                        category = NS.Categories:GetCategory(itemData.link)
+                    })
+                end
+            end
+        end
+    end
+
+    return items
+end
+
 --- Get cached bank items in Inventory-compatible format
 -- @return table Array of item data
 function Data:GetCachedBankItems()
     local charKey = self:GetCharacterKey()
     local items = {}
-    
+
     if not self.cache[charKey] then
         return items
     end
-    
+
     -- Iterate through all bank bags
     for _, bag in ipairs(self.BANK) do
         local bagData = self.cache[charKey][bag]
@@ -233,7 +287,7 @@ function Data:GetCachedBankItems()
             end
         end
     end
-    
+
     return items
 end
 
@@ -244,7 +298,7 @@ function Data:HasCachedBankItems()
     if not self.cache[charKey] then
         return false
     end
-    
+
     -- Check if any bank bag has items
     for _, bag in ipairs(self.BANK) do
         local bagData = self.cache[charKey][bag]
@@ -256,6 +310,59 @@ function Data:HasCachedBankItems()
             end
         end
     end
-    
+
     return false
+end
+
+-- =============================================================================
+-- Character Selection
+-- =============================================================================
+
+--- Set the selected character to view
+-- @param charKey string Character key ("Name - Realm") or nil for current character
+function Data:SetSelectedCharacter(charKey)
+    self.selectedCharacter = charKey
+end
+
+--- Get the currently selected character
+-- @return string Character key or nil if viewing current character
+function Data:GetSelectedCharacter()
+    return self.selectedCharacter
+end
+
+--- Check if viewing another character (not the current logged-in character)
+-- @return boolean
+function Data:IsViewingOtherCharacter()
+    return self.selectedCharacter ~= nil
+end
+
+--- Get list of available characters (all characters with cached data)
+-- @return table Array of {name="CharName", realm="RealmName", key="CharName - RealmName", isCurrent=boolean}
+function Data:GetAvailableCharacters()
+    local chars = {}
+    local currentKey = self:GetCurrentCharacterKey()
+
+    if ZenBagsDB and ZenBagsDB.cache then
+        for charKey, cacheData in pairs(ZenBagsDB.cache) do
+            -- Parse character key
+            local name, realm = charKey:match("^(.+) %- (.+)$")
+            if name and realm then
+                table.insert(chars, {
+                    name = name,
+                    realm = realm,
+                    key = charKey,
+                    isCurrent = (charKey == currentKey)
+                })
+            end
+        end
+    end
+
+    -- Sort: current character first, then alphabetically
+    table.sort(chars, function(a, b)
+        if a.isCurrent then return true end
+        if b.isCurrent then return false end
+        return a.name < b.name
+    end)
+
+    return chars
 end

@@ -20,7 +20,7 @@ function Frames:Init()
     self.mainFrame:SetMovable(true)
     self.mainFrame:SetResizable(true) -- Enable resizing
     self.mainFrame:SetMinResize(300, 300)
-    
+
     -- Resize Handle
     local resizeButton = CreateFrame("Button", nil, self.mainFrame)
     resizeButton:SetSize(16, 16)
@@ -28,7 +28,7 @@ function Frames:Init()
     resizeButton:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     resizeButton:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     resizeButton:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    
+
     resizeButton:SetScript("OnMouseDown", function(self, button)
         self:GetParent():StartSizing("BOTTOMRIGHT")
     end)
@@ -36,7 +36,7 @@ function Frames:Init()
         self:GetParent():StopMovingOrSizing()
         NS.Frames:Update(true) -- Force update on resize end
     end)
-    
+
     -- Throttled resize updates
     local resizeThrottle = nil
     self.mainFrame:SetScript("OnSizeChanged", function()
@@ -49,7 +49,7 @@ function Frames:Init()
             end)
         end
     end)
-    
+
     self.mainFrame:Hide()
 
     -- Header Background (inset from frame border) - Only covers title area
@@ -58,7 +58,7 @@ function Frames:Init()
     self.headerBg:SetPoint("TOPLEFT", 12, -12)
     self.headerBg:SetPoint("TOPRIGHT", -12, -12)
     self.headerBg:SetHeight(30) -- Only covers title and close button
-    
+
     -- Make header draggable (create invisible button for dragging)
     self.headerDragArea = CreateFrame("Button", nil, self.mainFrame)
     self.headerDragArea:SetPoint("TOPLEFT", 12, -12)
@@ -67,7 +67,7 @@ function Frames:Init()
     self.headerDragArea:RegisterForDrag("LeftButton")
     self.headerDragArea:SetScript("OnDragStart", function() self.mainFrame:StartMoving() end)
     self.headerDragArea:SetScript("OnDragStop", function() self.mainFrame:StopMovingOrSizing() end)
-    
+
     -- Header Separator Line
     self.headerSeparator = self.mainFrame:CreateTexture(nil, "OVERLAY")
     self.headerSeparator:SetTexture(0.3, 0.3, 0.3, 0.8) -- Gray line
@@ -84,7 +84,7 @@ function Frames:Init()
     self.mainFrame.closeBtn = CreateFrame("Button", nil, self.mainFrame, "UIPanelCloseButton")
     self.mainFrame.closeBtn:SetPoint("TOPRIGHT", -5, -5)
     self.mainFrame.closeBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
-    
+
     -- Settings Button (Gear Icon)
     self.settingsBtn = CreateFrame("Button", nil, self.mainFrame)
     self.settingsBtn:SetSize(16, 16)
@@ -101,10 +101,55 @@ function Frames:Init()
     end)
     self.settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     self.settingsBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
-    
+
+    -- Character Dropdown Button (Top Left)
+    self.charButton = CreateFrame("Button", "ZenBagsCharButton", self.mainFrame)
+    self.charButton:SetSize(100, 18)
+    self.charButton:SetPoint("TOPLEFT", 12, -8) -- Aligned with top-left padding
+    self.charButton:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10)
+
+    -- Dropdown arrow texture
+    local arrowTex = self.charButton:CreateTexture(nil, "ARTWORK")
+    arrowTex:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
+    arrowTex:SetSize(16, 16)
+    arrowTex:SetPoint("RIGHT", -2, 0)
+    self.charButton.arrow = arrowTex
+
+    -- Character name text
+    local charText = self.charButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    charText:SetPoint("RIGHT", arrowTex, "LEFT", -2, 0)
+    charText:SetJustifyH("RIGHT")
+    charText:SetText(UnitName("player")) -- Start with current character
+    self.charButton.text = charText
+
+    -- Button background (subtle)
+    local bg = self.charButton:CreateTexture(nil, "BACKGROUND")
+    bg:SetAllPoints()
+    bg:SetTexture(0.2, 0.2, 0.2, 0.3)
+    bg:Hide()
+    self.charButton.bg = bg
+
+    -- Hover effect
+    self.charButton:SetScript("OnEnter", function(self)
+        self.bg:Show()
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Switch Character")
+        GameTooltip:AddLine("View bags from other characters on this realm", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    self.charButton:SetScript("OnLeave", function(self)
+        self.bg:Hide()
+        GameTooltip:Hide()
+    end)
+
+    -- Click to show dropdown
+    self.charButton:SetScript("OnClick", function()
+        NS.Frames:ShowCharacterDropdown()
+    end)
+
     -- Space Counter
     self.spaceCounter = self.mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.spaceCounter:SetPoint("TOPLEFT", self.mainFrame.title, "TOPRIGHT", 10, 0)
+    self.spaceCounter:SetPoint("LEFT", self.charButton, "RIGHT", 10, 0)
     self.spaceCounter:SetText("0/0")
 
     -- Search Box (sticky, below header, NOT in scroll frame)
@@ -122,14 +167,14 @@ function Frames:Init()
             end
         end
     end)
-    
+
     -- Search Icon (magnifying glass)
     local searchIcon = self.searchBox:CreateTexture(nil, "OVERLAY")
     searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
     searchIcon:SetSize(14, 14)
     searchIcon:SetPoint("LEFT", self.searchBox, "LEFT", 3, 0)
     searchIcon:SetVertexColor(0.6, 0.6, 0.6) -- Gray color
-    
+
     -- Adjust text inset to make room for icon
     self.searchBox:SetTextInsets(20, 10, 0, 0)
 
@@ -137,32 +182,32 @@ function Frames:Init()
     self.moneyFrame = CreateFrame("Frame", nil, self.mainFrame)
     self.moneyFrame:SetSize(250, 25)
     self.moneyFrame:SetPoint("BOTTOMLEFT", self.mainFrame, "BOTTOMLEFT", 15, 18) -- Closer to bottom with good spacing
-    
+
     -- Gold (leftmost)
     self.goldText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.goldText:SetPoint("LEFT", self.moneyFrame, "LEFT", 0, 0)
     self.goldText:SetText("0")
-    
+
     self.goldIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.goldIcon:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
     self.goldIcon:SetSize(16, 16)
     self.goldIcon:SetPoint("LEFT", self.goldText, "RIGHT", 3, 0)
-    
+
     -- Silver (middle)
     self.silverText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.silverText:SetPoint("LEFT", self.goldIcon, "RIGHT", 8, 0)
     self.silverText:SetText("0")
-    
+
     self.silverIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.silverIcon:SetTexture("Interface\\MoneyFrame\\UI-SilverIcon")
     self.silverIcon:SetSize(16, 16)
     self.silverIcon:SetPoint("LEFT", self.silverText, "RIGHT", 3, 0)
-    
+
     -- Copper (rightmost)
     self.copperText = self.moneyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.copperText:SetPoint("LEFT", self.silverIcon, "RIGHT", 8, 0)
     self.copperText:SetText("0")
-    
+
     self.copperIcon = self.moneyFrame:CreateTexture(nil, "ARTWORK")
     self.copperIcon:SetTexture("Interface\\MoneyFrame\\UI-CopperIcon")
     self.copperIcon:SetSize(16, 16)
@@ -176,14 +221,14 @@ function Frames:Init()
     self.content = CreateFrame("Frame", nil, self.scrollFrame)
     self.content:SetSize(350, 1000) --Height will be dynamic
     self.scrollFrame:SetScrollChild(self.content)
-    
+
     -- Drop-anywhere background button (AdiBags pattern)
     -- This button sits behind all item buttons and catches drag-and-drop
     local dropButton = CreateFrame("Button", nil, self.content)
     dropButton:SetAllPoints(self.content)
     dropButton:EnableMouse(true)
     dropButton:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    
+
     dropButton:SetScript("OnReceiveDrag", function()
         if CursorHasItem() then
             -- Find first empty slot in bags 0-4
@@ -204,7 +249,7 @@ function Frames:Init()
             end
         end
     end)
-    
+
     dropButton:SetScript("OnClick", function()
         -- Also handle click when dragging
         if CursorHasItem() then
@@ -223,13 +268,13 @@ function Frames:Init()
             end
         end
     end)
-    
+
     self.dropButton = dropButton
 
     self.buttons = {}
     self.headers = {}
     self.lastSearch = ""  -- Track search changes for dirty flag system
-    
+
     self.currentView = "bags" -- "bags" or "bank"
     self:CreateTabs()
 end
@@ -245,7 +290,7 @@ function Frames:CreateTabs()
     self.inventoryTab:SetText("Inventory")
     self.inventoryTab:SetScript("OnClick", function() self:SwitchView("bags") end)
     table.insert(self.mainFrame.Tabs, self.inventoryTab)
-    
+
     -- Tab 2: Bank
     self.bankTab = CreateFrame("Button", "$parentTab2", self.mainFrame, "CharacterFrameTabButtonTemplate")
     self.bankTab:SetID(2)
@@ -253,10 +298,10 @@ function Frames:CreateTabs()
     self.bankTab:SetText("Bank")
     self.bankTab:SetScript("OnClick", function() self:SwitchView("bank") end)
     table.insert(self.mainFrame.Tabs, self.bankTab)
-    
+
     PanelTemplates_SetNumTabs(self.mainFrame, 2)
     PanelTemplates_SetTab(self.mainFrame, 1)
-    
+
     -- Show bank tab if we have cached data
     if NS.Data:HasCachedBankItems() then
         self.bankTab:Show()
@@ -275,7 +320,7 @@ end
 
 function Frames:SwitchView(view)
     self.currentView = view
-    
+
     if view == "bags" then
         PanelTemplates_SetTab(self.mainFrame, 1)
         self.mainFrame.title:SetText("ZenBags")
@@ -287,7 +332,7 @@ function Frames:SwitchView(view)
             self.mainFrame.title:SetText("ZenBags - Bank (Offline)")
         end
     end
-    
+
     NS.Inventory:SetFullUpdate(true)
     self:Update(true)
 end
@@ -313,7 +358,7 @@ end
 function Frames:UpdateSpaceCounter()
     local totalSlots = 0
     local usedSlots = 0
-    
+
     -- Determine which bags to count based on view
     local bagsToCount = {}
     if self.currentView == "bank" then
@@ -326,7 +371,7 @@ function Frames:UpdateSpaceCounter()
     for _, bagID in ipairs(bagsToCount) do
         local numSlots = GetContainerNumSlots(bagID)
         totalSlots = totalSlots + numSlots
-        
+
         for slotID = 1, numSlots do
             local itemLink = GetContainerItemLink(bagID, slotID)
             if itemLink then
@@ -334,10 +379,10 @@ function Frames:UpdateSpaceCounter()
             end
         end
     end
-    
+
     local freeSlots = totalSlots - usedSlots
     local percentFull = totalSlots > 0 and (usedSlots / totalSlots) * 100 or 0
-    
+
     -- Color coding based on fullness
     local color = "|cFF00FF00" -- Green
     if percentFull > 90 then
@@ -345,20 +390,64 @@ function Frames:UpdateSpaceCounter()
     elseif percentFull > 70 then
         color = "|cFFFFFF00" -- Yellow
     end
-    
+
     self.spaceCounter:SetText(color .. usedSlots .. "/" .. totalSlots .. "|r")
 end
 
 function Frames:UpdateMoney()
     local money = GetMoney()
-    
+
     local gold = math.floor(money / 10000)
     local silver = math.floor((money % 10000) / 100)
     local copper = money % 100
-    
+
     self.goldText:SetText(gold)
     self.silverText:SetText(silver)
     self.copperText:SetText(copper)
+end
+
+-- Show character selection dropdown
+function Frames:ShowCharacterDropdown()
+    local chars = NS.Data:GetAvailableCharacters()
+
+    -- Build dropdown menu
+    local menu = {}
+    for _, charData in ipairs(chars) do
+        local displayName = charData.name
+        if charData.isCurrent then
+            displayName = displayName .. " (Current)"
+        end
+
+        table.insert(menu, {
+            text = displayName,
+            notCheckable = true,
+            func = function()
+                -- Set selected character
+                if charData.isCurrent then
+                    NS.Data:SetSelectedCharacter(nil) -- nil = current character
+                else
+                    NS.Data:SetSelectedCharacter(charData.key)
+                end
+
+                -- Update button text
+                self.charButton.text:SetText(charData.name)
+
+                -- Update title to show viewing another character
+                if NS.Data:IsViewingOtherCharacter() then
+                    local viewName = self.currentView == "bank" and "Bank" or "Bags"
+                    self.mainFrame.title:SetText("ZenBags - " .. charData.name .. " (" .. viewName .. ")")
+                else
+                    self.mainFrame.title:SetText("ZenBags")
+                end
+
+                -- Force full update
+                self:Update(true)
+            end
+        })
+    end
+
+    -- Show dropdown at cursor
+    EasyMenu(menu, CreateFrame("Frame", "ZenBagsCharDropdown", UIParent, "UIDropDownMenuTemplate"), "cursor", 0, 0, "MENU")
 end
 
 -- Dummy Bag Getter
@@ -375,50 +464,62 @@ end
 
 function Frames:Update(fullUpdate)
     if not self.mainFrame:IsShown() then return end
-    
+
     -- Check if search changed
     local query = self.searchBox:GetText():lower()
     local searchChanged = (self.lastSearch ~= query)
     self.lastSearch = query
-    
+
     -- Check if inventory changed
     local dirtySlots = NS.Inventory:GetDirtySlots()
     local hasDirtySlots = next(dirtySlots) ~= nil
-    
+
     -- Skip update if nothing changed
     if not fullUpdate and not searchChanged and not hasDirtySlots and not NS.Inventory:NeedsFullUpdate() then
         return
     end
 
-    local allItems = NS.Inventory:GetItems()
-    local items = {}
-    
-    -- If viewing bank and bank is closed, load cached items
-    local isOfflineBank = (self.currentView == "bank" and not NS.Data:IsBankOpen())
-    if isOfflineBank then
-        local cachedItems = NS.Data:GetCachedBankItems()
-        -- Merge cached items into allItems for processing
-        -- Note: We create a new list to avoid modifying the live inventory
-        local combinedItems = {}
-        -- Only include non-bank items from live inventory (if any, though usually we filter)
-        for _, item in ipairs(allItems) do
-            if item.location ~= "bank" then
+    local allItems = {}
+
+    -- If viewing another character, load EVERYTHING from cache
+    if NS.Data:IsViewingOtherCharacter() then
+        local bagItems = NS.Data:GetCachedInventoryItems()
+        local bankItems = NS.Data:GetCachedBankItems()
+
+        for _, item in ipairs(bagItems) do table.insert(allItems, item) end
+        for _, item in ipairs(bankItems) do table.insert(allItems, item) end
+
+    else
+        -- Viewing current character: Load live items + cached offline bank
+        allItems = NS.Inventory:GetItems()
+
+        -- If viewing bank and bank is closed, load cached items
+        local isOfflineBank = (self.currentView == "bank" and not NS.Data:IsBankOpen())
+        if isOfflineBank then
+            local cachedItems = NS.Data:GetCachedBankItems()
+            -- Merge cached items into allItems for processing
+            -- Note: We create a new list to avoid modifying the live inventory
+            local combinedItems = {}
+            -- Only include non-bank items from live inventory (if any, though usually we filter)
+            for _, item in ipairs(allItems) do
+                if item.location ~= "bank" then
+                    table.insert(combinedItems, item)
+                end
+            end
+            -- Add cached bank items
+            for _, item in ipairs(cachedItems) do
                 table.insert(combinedItems, item)
             end
+            allItems = combinedItems
+
+            -- Update title to indicate offline
+            self.mainFrame.title:SetText("ZenBags - Bank (Offline)")
+        elseif self.currentView == "bank" then
+            self.mainFrame.title:SetText("ZenBags - Bank")
         end
-        -- Add cached bank items
-        for _, item in ipairs(cachedItems) do
-            table.insert(combinedItems, item)
-        end
-        allItems = combinedItems
-        
-        -- Update title to indicate offline
-        self.mainFrame.title:SetText("ZenBags - Bank (Offline)")
-    elseif self.currentView == "bank" then
-        self.mainFrame.title:SetText("ZenBags - Bank")
     end
-    
-    -- Filter by View and Search
+
+    local items = {}
     for _, item in ipairs(allItems) do
         -- Filter by location (bags vs bank)
         if item.location == self.currentView then
@@ -462,7 +563,7 @@ function Frames:Update(fullUpdate)
         end
     end
     wipe(self.buttons)
-    
+
     -- Release headers back to pool
     local headerPool = NS.Pools:GetPool("SectionHeader")
     if headerPool then
@@ -479,21 +580,21 @@ function Frames:Update(fullUpdate)
     -- Get settings from Config
     local ITEM_SIZE = NS.Config:Get("itemSize")
     local PADDING = NS.Config:Get("padding")
-    
+
     local width = self.mainFrame:GetWidth()
     local availableWidth = width - 60 -- Padding (left+right+scrollbar)
-    
+
     -- Determine number of section columns
     local MIN_SECTION_WIDTH = 300
     local numSectionCols = math.floor(availableWidth / MIN_SECTION_WIDTH)
     if numSectionCols < 1 then numSectionCols = 1 end
-    
+
     local sectionWidth = availableWidth / numSectionCols
-    
+
     -- Calculate item columns per section
     local itemCols = math.floor((sectionWidth - PADDING) / (ITEM_SIZE + PADDING))
     if itemCols < 1 then itemCols = 1 end
-    
+
     -- Calculate centering offset within each section
     local sectionGridWidth = itemCols * ITEM_SIZE + (itemCols - 1) * PADDING
     local sectionXOffset = (sectionWidth - sectionGridWidth) / 2
@@ -505,10 +606,10 @@ function Frames:Update(fullUpdate)
 
     -- Render Sections
     local btnIdx = 1
-    
+
     for _, cat in ipairs(sortedCats) do
         local catItems = groups[cat]
-        
+
         -- Find shortest column
         local minHeight = colHeights[1]
         local minCol = 1
@@ -518,40 +619,40 @@ function Frames:Update(fullUpdate)
                 minCol = i
             end
         end
-        
+
         -- Calculate Section Position
         local sectionX = (minCol - 1) * sectionWidth
         local sectionY = minHeight
-        
+
         -- Header - use pooled interactive button
         local headerPool = NS.Pools:GetPool("SectionHeader")
         local hdr = headerPool:Acquire()
         hdr:SetParent(self.content)
         -- Align header with the grid start (looks cleaner)
         hdr:SetPoint("TOPLEFT", sectionX + sectionXOffset, -sectionY)
-        
+
         -- Check collapsed state
         local isCollapsed = NS.Config:IsSectionCollapsed(cat)
-        
+
         -- Set icon texture
         if isCollapsed then
             hdr.icon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
         else
             hdr.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
         end
-        
+
         hdr.text:SetText(cat .. " (" .. #catItems .. ")")
-        
+
         -- Ensure header is clickable and on top
         hdr:SetFrameLevel(self.content:GetFrameLevel() + 10)
         hdr:RegisterForClicks("AnyUp")
-        
+
         -- Click handler to toggle
         hdr:SetScript("OnClick", function(self, button)
             NS.Config:ToggleSectionCollapsed(cat)
             NS.Frames:Update(true)  -- Force full redraw
         end)
-        
+
         -- Hover effects
         hdr:SetScript("OnEnter", function(self)
             self.text:SetTextColor(1, 1, 0)  -- Yellow
@@ -559,28 +660,28 @@ function Frames:Update(fullUpdate)
         hdr:SetScript("OnLeave", function(self)
             self.text:SetTextColor(1, 1, 1)  -- White
         end)
-        
+
         hdr:Show()
         table.insert(self.headers, hdr)
-        
+
         local currentSectionHeight = 20 -- Header height
 
         -- Items Grid
         if not isCollapsed then
             for i, itemData in ipairs(catItems) do
                 local btn = self.buttons[btnIdx]
-                
+
                 -- Get the dummy bag frame for this item's bag
                 local dummyBag = self:GetDummyBag(itemData.bagID)
-                
+
                 -- Object Pooling: Acquire button from pool
                 local pool = NS.Pools:GetPool("ItemButton")
                 btn = pool:Acquire()
-                
+
                 -- Parent the button to the dummy bag so GetParent():GetID() returns the bag ID
                 btn:SetParent(dummyBag)
                 btn:SetSize(ITEM_SIZE, ITEM_SIZE)
-                
+
                 self.buttons[btnIdx] = btn
                 -- Re-parent if bag changed
                 if btn:GetParent() ~= dummyBag then
@@ -590,40 +691,40 @@ function Frames:Update(fullUpdate)
                 -- Grid Position within Section
                 local row = math.floor((i - 1) / itemCols)
                 local col = (i - 1) % itemCols
-                
+
                 local itemX = sectionX + sectionXOffset + col * (ITEM_SIZE + PADDING)
                 local itemY = sectionY + currentSectionHeight + row * (ITEM_SIZE + PADDING)
-                
+
                 btn:ClearAllPoints()
                 btn:SetPoint("TOPLEFT", self.content, "TOPLEFT", itemX, -itemY)
-                
+
                 -- Data
                 btn:SetID(itemData.slotID)
-                
+
                 -- Handle Offline vs Live Tooltips
                 -- Use Data Layer to determine if this bag is cached
                 local isCached = NS.Data:IsCached(itemData.bagID)
-                
+
                 if isCached then
                     btn.dummyOverlay:Show()
                     btn.dummyOverlay.itemLink = itemData.link
                 else
                     btn.dummyOverlay:Hide()
                 end
-                
+
                 -- Store data for search highlighting
                 btn.itemLink = itemData.link
-                
+
                 SetItemButtonTexture(btn, itemData.texture)
                 SetItemButtonCount(btn, itemData.count)
-                
+
                 -- Quality/Quest Border
                 local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemData.bagID, itemData.slotID)
-                
+
                 -- Reset borders
                 btn.IconBorder:Hide()
                 if btn.QualityBorder then btn.QualityBorder:Hide() end
-                
+
                 if questId and not isActive then
                     btn.IconBorder:SetTexture(TEXTURE_ITEM_QUEST_BANG)
                     btn.IconBorder:SetVertexColor(1, 1, 1)
@@ -641,7 +742,7 @@ function Frames:Update(fullUpdate)
                         btn.qualityR, btn.qualityG, btn.qualityB = r, g, b
                     end
                 end
-                
+
                 -- Cooldown
                 if btn.cooldown then
                     ContainerFrame_UpdateCooldown(itemData.bagID, btn)
@@ -652,7 +753,7 @@ function Frames:Update(fullUpdate)
                     end
                     ContainerFrame_UpdateCooldown(itemData.bagID, btn)
                 end
-                
+
                 -- Junk Overlay
                 if not btn.junkIcon then
                     btn.junkIcon = btn:CreateTexture(nil, "OVERLAY")
@@ -664,11 +765,11 @@ function Frames:Update(fullUpdate)
 
                 -- Store item data reference
                 btn.itemData = itemData
-                
+
                 -- Standard Template handles clicks now!
                 -- We only need to ensure the button is shown
                 btn:Show()
-                
+
                 btnIdx = btnIdx + 1
             end
 
@@ -677,24 +778,24 @@ function Frames:Update(fullUpdate)
             local gridHeight = numRows * (ITEM_SIZE + PADDING)
             currentSectionHeight = currentSectionHeight + gridHeight
         end
-        
+
         -- Update column height
         colHeights[minCol] = colHeights[minCol] + currentSectionHeight + SECTION_PADDING
     end
-    
+
     -- Set content height to max column height
     local maxColHeight = 0
     for _, h in ipairs(colHeights) do
         if h > maxColHeight then maxColHeight = h end
     end
     self.content:SetHeight(maxColHeight)
-    
+
     -- Update space counter
     self:UpdateSpaceCounter()
-    
+
     -- Update money display
     self:UpdateMoney()
-    
+
     -- Clear dirty flags after successful update
     NS.Inventory:ClearDirtySlots()
     NS.Inventory:SetFullUpdate(false)
