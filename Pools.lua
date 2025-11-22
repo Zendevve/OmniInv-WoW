@@ -146,10 +146,11 @@ function NS.Pools:Init()
             btn:SetSize(350, 20)
             btn:EnableMouse(true)
             
-            -- Collapse/expand icon
-            btn.icon = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            -- Collapse/expand icon (Texture instead of FontString)
+            btn.icon = btn:CreateTexture(nil, "OVERLAY")
+            btn.icon:SetSize(16, 16)
             btn.icon:SetPoint("LEFT", 0, 0)
-            btn.icon:SetText("▼")
+            btn.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
             
             -- Category text
             btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalLeft")
@@ -163,6 +164,7 @@ function NS.Pools:Init()
         function(header)
             header:Hide()
             header.text:SetText("")
+            header.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up") -- Reset to default
             header:SetScript("OnClick", nil)
             header:SetScript("OnEnter", nil)
             header:SetScript("OnLeave", nil)
