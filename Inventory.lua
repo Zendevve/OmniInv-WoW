@@ -11,16 +11,26 @@ local BANK = {-1, 5, 6, 7, 8, 9, 10, 11}
 -- Storage for scanned items
 Inventory.items = {}
 
+-- Event bucketing to reduce spam
+Inventory.updatePending = false
+Inventory.bucketDelay = 0.1  -- 100ms delay for coalescing events
+
 function Inventory:Init()
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
     self.frame:RegisterEvent("PLAYER_MONEY")
     self.frame:SetScript("OnEvent", function(self, event, arg1)
         if event == "BAG_UPDATE" then
-            -- For now, we just re-scan everything on any update. 
-            -- Optimization: Only scan the updated bag (arg1).
-            Inventory:ScanBags()
-            if NS.Frames then NS.Frames:Update() end
+            -- Event Bucketing: Coalesce rapid-fire BAG_UPDATE events
+            -- This reduces updates from ~50/sec to ~10/sec during looting
+            if not Inventory.updatePending then
+                Inventory.updatePending = true
+                C_Timer.After(Inventory.bucketDelay, function()
+                    Inventory:ScanBags()
+                    if NS.Frames then NS.Frames:Update() end
+                    Inventory.updatePending = false
+                end)
+            end
         elseif event == "PLAYER_MONEY" then
             -- Update money display
             if NS.Frames and NS.Frames.mainFrame and NS.Frames.mainFrame:IsShown() then
