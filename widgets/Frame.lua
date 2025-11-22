@@ -165,7 +165,14 @@ function Frames:CreateTabs()
     self.bankTab:SetPoint("LEFT", self.inventoryTab, "RIGHT", 5, 0)
     self.bankTab:SetText("Bank")
     self.bankTab:SetScript("OnClick", function() self:SwitchView("bank") end)
-    self.bankTab:Hide() -- Hidden by default until bank opens
+    self.bankTab:SetScript("OnClick", function() self:SwitchView("bank") end)
+    
+    -- Show bank tab if we have cached data
+    if NS.Inventory:HasCachedBankItems() then
+        self.bankTab:Show()
+    else
+        self.bankTab:Hide()
+    end
 end
 
 function Frames:ShowBankTab()
