@@ -320,7 +320,9 @@ function Frames:Update(fullUpdate)
         hdr.text:SetText(cat .. " (" .. #catItems .. ")")
         
         -- Click handler to toggle
-        hdr:SetScript("OnClick", function()
+        hdr:RegisterForClicks("LeftButtonUp")
+        hdr:SetScript("OnClick", function(self, button)
+            print("ZenBags: Header clicked!", cat) -- Debug print
             NS.Config:ToggleSectionCollapsed(cat)
             NS.Frames:Update(true)  -- Force full redraw
         end)
