@@ -155,8 +155,6 @@ function NS.Pools:Init()
             btn.dummyOverlay = dummy
             
             return btn
-            
-            return btn
         end,
         function(btn)
             -- OnAcquire
