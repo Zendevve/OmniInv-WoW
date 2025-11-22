@@ -3,8 +3,6 @@ local addonName, NS = ...
 NS.Frames = {}
 local Frames = NS.Frames
 
-local ITEM_SIZE = 37
-local PADDING = 5
 local SECTION_PADDING = 20
 
 function Frames:Init()
@@ -472,6 +470,10 @@ function Frames:Update(fullUpdate)
     wipe(self.headers)
 
     -- Dynamic column calculation (Masonry Layout)
+    -- Get settings from Config
+    local ITEM_SIZE = NS.Config:Get("itemSize")
+    local PADDING = NS.Config:Get("padding")
+    
     local width = self.mainFrame:GetWidth()
     local availableWidth = width - 60 -- Padding (left+right+scrollbar)
     
@@ -591,6 +593,7 @@ function Frames:Update(fullUpdate)
                 
                 -- Data
                 btn:SetID(itemData.slotID)
+                btn.itemLink = itemData.link -- Store link for tooltips
                 
                 SetItemButtonTexture(btn, itemData.texture)
                 SetItemButtonCount(btn, itemData.count)

@@ -124,6 +124,26 @@ function NS.Pools:Init()
             btn:RegisterForDrag("LeftButton")
             btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
             
+            -- Custom Tooltip Handler (fixes offline bank items)
+            btn:SetScript("OnEnter", function(self)
+                if not NS.Config:Get("showTooltips") then return end
+                
+                -- Try default behavior first
+                ContainerFrameItemButton_OnEnter(self)
+                
+                -- If default didn't show tooltip (e.g. offline bank), try manual link
+                if not GameTooltip:IsShown() and self.itemLink then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetHyperlink(self.itemLink)
+                    GameTooltip:Show()
+                end
+            end)
+            
+            btn:SetScript("OnLeave", function(self)
+                ContainerFrameItemButton_OnLeave(self)
+                GameTooltip:Hide()
+            end)
+            
             return btn
         end,
         function(btn)
