@@ -160,9 +160,16 @@ function Data:UpdateCache()
         end
     end
 
+    -- Update money cache
+    ZenBagsDB.cache[charKey].money = GetMoney()
+
     for _, bag in ipairs(bagList) do
         local numSlots = GetContainerNumSlots(bag)
-        ZenBagsDB.cache[charKey][bag] = {size = numSlots}
+        local freeSlots, bagFamily = GetContainerNumFreeSlots(bag)
+        ZenBagsDB.cache[charKey][bag] = {
+            size = numSlots,
+            family = bagFamily
+        }
 
         for slot = 1, numSlots do
             local texture, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID = GetContainerItemInfo(bag, slot)
@@ -315,8 +322,48 @@ function Data:HasCachedBankItems()
 end
 
 -- =============================================================================
--- Character Selection
+-- Extended Data API (Money, Free Slots, Bag Types)
 -- =============================================================================
+
+--- Get player money (copper)
+-- @return number
+function Data:GetMoney()
+    if self:IsViewingOtherCharacter() then
+        local charKey = self:GetCharacterKey()
+        return (self.cache[charKey] and self.cache[charKey].money) or 0
+    end
+    return GetMoney()
+end
+
+--- Get number of free slots in a bag
+-- @param bag number
+-- @return number freeSlots, number bagFamily
+function Data:GetFreeSlots(bag)
+    if self:IsCached(bag) then
+        local charKey = self:GetCharacterKey()
+        local bagData = self.cache[charKey] and self.cache[charKey][bag]
+        if bagData then
+            -- Calculate free slots from cached data
+            local size = bagData.size or 0
+            local used = 0
+            for slot = 1, size do
+                if bagData[slot] then used = used + 1 end
+            end
+            return size - used, bagData.family or 0
+        end
+        return 0, 0
+    else
+        return GetContainerNumFreeSlots(bag)
+    end
+end
+
+--- Get bag family type
+-- @param bag number
+-- @return number
+function Data:GetBagType(bag)
+    local _, family = self:GetFreeSlots(bag)
+    return family
+end
 
 --- Set the selected character to view
 -- @param charKey string Character key ("Name - Realm") or nil for current character
