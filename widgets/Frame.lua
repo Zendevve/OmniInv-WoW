@@ -607,6 +607,22 @@ function Frames:Update(fullUpdate)
                 SetItemButtonTexture(btn, itemData.texture)
                 SetItemButtonCount(btn, itemData.count)
                 
+                -- Search Highlighting
+                local query = self.searchBox:GetText():lower()
+                if query and query ~= "" then
+                    local itemName = itemData.link:match("%[(.-)%]")
+                    if itemName and itemName:lower():find(query, 1, true) then
+                        btn:SetAlpha(1.0)
+                        btn.IconBorder:SetVertexColor(1, 1, 1) -- Reset border color
+                    else
+                        btn:SetAlpha(0.2) -- Dim non-matches
+                        btn.IconBorder:SetVertexColor(0.5, 0.5, 0.5) -- Dim border
+                    end
+                else
+                    btn:SetAlpha(1.0)
+                    btn.IconBorder:SetVertexColor(1, 1, 1) -- Reset
+                end
+                
                 -- Quality/Quest Border
                 local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemData.bagID, itemData.slotID)
                 
