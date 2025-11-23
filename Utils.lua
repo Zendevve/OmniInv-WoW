@@ -20,6 +20,7 @@ local COLORS = {
     BLUE    = {0.20, 0.60, 1.00, 1.00},
     RED     = {0.80, 0.20, 0.20, 1.00},
 }
+Utils.COLORS = COLORS
 
 function Utils:CreateBackdrop(f)
     f:SetBackdrop({
