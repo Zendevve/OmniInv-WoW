@@ -162,8 +162,8 @@ function Frames:Init()
 
     -- Character name text
     local charText = self.charButton:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    charText:SetPoint("RIGHT", arrowTex, "LEFT", -2, 0)
-    charText:SetJustifyH("RIGHT")
+    charText:SetPoint("LEFT", 4, 0)
+    charText:SetJustifyH("LEFT")
     charText:SetText(UnitName("player")) -- Start with current character
     self.charButton.text = charText
 
@@ -532,6 +532,21 @@ function Frames:ShowCharacterDropdown()
 
     -- Show dropdown at cursor
     EasyMenu(menu, CreateFrame("Frame", "ZenBagsCharDropdown", UIParent, "UIDropDownMenuTemplate"), "cursor", 0, 0, "MENU")
+
+    -- Apply flat dark styling to the dropdown
+    C_Timer.After(0.01, function()
+        local dropdown = _G["DropDownList1"]
+        if dropdown then
+            dropdown:SetBackdrop({
+                bgFile = "Interface\\Buttons\\WHITE8X8",
+                edgeFile = "Interface\\Buttons\\WHITE8X8",
+                tile = false,
+                edgeSize = 1,
+            })
+            dropdown:SetBackdropColor(0.12, 0.12, 0.12, 0.95)
+            dropdown:SetBackdropBorderColor(0.2, 0.2, 0.2, 1)
+        end
+    end)
 end
 
 -- Dummy Bag Getter
