@@ -16,7 +16,7 @@ local defaults = {
 
 function NS.Config:Init()
     ZenBagsDB = ZenBagsDB or {}
-    
+
     -- Merge defaults
     for k, v in pairs(defaults) do
         if ZenBagsDB[k] == nil then
@@ -44,7 +44,7 @@ function NS.Config:ToggleSectionCollapsed(categoryName)
     if not ZenBagsDB.collapsedSections then
         ZenBagsDB.collapsedSections = {}
     end
-    
+
     if ZenBagsDB.collapsedSections[categoryName] then
         ZenBagsDB.collapsedSections[categoryName] = nil
     else
@@ -61,5 +61,5 @@ function NS.Config:Reset()
         ZenBagsDB[k] = v
     end
     -- Preserve collapsed sections if desired, or reset them too
-    -- ZenBagsDB.collapsedSections = {} 
+    -- ZenBagsDB.collapsedSections = {}
 end

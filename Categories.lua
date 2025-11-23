@@ -4,6 +4,7 @@ NS.Categories = {}
 local Categories = NS.Categories
 
 -- Constants for Categories
+local CAT_RECENTLY_ACQUIRED = "Recently Acquired"
 local CAT_ARMOR = "Armor"
 local CAT_WEAPON = "Weapon"
 local CAT_JEWELRY = "Jewelry"
@@ -29,7 +30,7 @@ local EQUIP_LOC_MAP = {
     INVTYPE_WRIST = CAT_ARMOR,
     INVTYPE_HAND = CAT_ARMOR,
     INVTYPE_CLOAK = CAT_ARMOR,
-    
+
     INVTYPE_WEAPON = CAT_WEAPON,
     INVTYPE_SHIELD = CAT_WEAPON,
     INVTYPE_2HWEAPON = CAT_WEAPON,
@@ -40,17 +41,18 @@ local EQUIP_LOC_MAP = {
     INVTYPE_THROWN = CAT_WEAPON,
     INVTYPE_RANGEDRIGHT = CAT_WEAPON,
     INVTYPE_RELIC = CAT_JEWELRY,
-    
+
     INVTYPE_NECK = CAT_JEWELRY,
     INVTYPE_FINGER = CAT_JEWELRY,
     INVTYPE_TRINKET = CAT_JEWELRY,
-    
+
     INVTYPE_BAG = CAT_CONTAINER,
     INVTYPE_TABARD = CAT_MISC,
 }
 
 -- Priority List (Lower index = Higher priority in UI)
 Categories.Priority = {
+    [CAT_RECENTLY_ACQUIRED] = 0, -- Highest priority!
     [CAT_QUEST] = 1,
     [CAT_WEAPON] = 2,
     [CAT_ARMOR] = 3,
@@ -64,23 +66,29 @@ Categories.Priority = {
     [CAT_JUNK] = 11,
 }
 
-function Categories:GetCategory(itemLink)
+function Categories:GetCategory(itemLink, bagID, slotID)
     if not itemLink then return "Empty" end
-    
+
+    -- PRIORITY 0: Recently Acquired
+    -- Check if item is marked as new in Inventory tracking
+    if bagID and slotID and NS.Inventory:IsNew(bagID, slotID) then
+        return CAT_RECENTLY_ACQUIRED
+    end
+
     local name, _, quality, _, _, itemType, itemSubType, _, equipLoc = GetItemInfo(itemLink)
-    
+
     if not itemType then return "Unknown" end
 
     -- 1. Quest Items (Highest Priority)
     if itemType == "Quest" or quality == 7 then -- 7 is Heirloom, treating as special/quest-like for visibility or add separate
         return CAT_QUEST
     end
-    
+
     -- 2. Equipment (Using Slot Mapping)
     if EQUIP_LOC_MAP[equipLoc] then
         return EQUIP_LOC_MAP[equipLoc]
     end
-    
+
     -- 3. Standard Types
     if itemType == "Consumable" then return CAT_CONSUMABLE end
     if itemType == "Trade Goods" then return CAT_TRADE end
@@ -88,10 +96,10 @@ function Categories:GetCategory(itemLink)
     if itemType == "Gem" then return CAT_GEM end
     if itemType == "Glyph" then return CAT_GLYPH end
     if itemType == "Recipe" then return CAT_TRADE end -- Group recipes with trade goods
-    
+
     -- 4. Junk
     if quality == 0 then return CAT_JUNK end
-    
+
     return CAT_MISC
 end
 
@@ -100,19 +108,19 @@ function Categories:CompareItems(a, b)
     -- 1. Category Priority
     local catA = a.category or CAT_MISC
     local catB = b.category or CAT_MISC
-    
+
     local prioA = self.Priority[catA] or 99
     local prioB = self.Priority[catB] or 99
-    
+
     if prioA ~= prioB then
         return prioA < prioB
     end
-    
+
     -- 2. Quality (High to Low)
     if a.quality ~= b.quality then
         return (a.quality or 0) > (b.quality or 0)
     end
-    
+
     -- 3. Name
     local nameA = GetItemInfo(a.link) or ""
     local nameB = GetItemInfo(b.link) or ""
