@@ -21,15 +21,28 @@ Inventory.previousState = {}  -- bagID:slotID -> {link, count, texture}
 Inventory.forceFullUpdate = false
 
 function Inventory:Init()
+    -- Initialize SavedVariables structure
+    ZenBagsDB = ZenBagsDB or {}
+    ZenBagsDB.newItems = ZenBagsDB.newItems or {}
+
+    -- Load saved new items state
+    self.newItems = ZenBagsDB.newItems
+
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
     self.frame:RegisterEvent("PLAYER_MONEY")
     self.frame:RegisterEvent("BANKFRAME_OPENED")
     self.frame:RegisterEvent("BANKFRAME_CLOSED")
     self.frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+    self.frame:RegisterEvent("PLAYER_LOGIN")
 
     self.frame:SetScript("OnEvent", function(self, event, arg1)
-        if event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
+        if event == "PLAYER_LOGIN" then
+            -- Clear all new item highlights on fresh login
+            -- Each session starts clean
+            wipe(Inventory.newItems)
+            ZenBagsDB.newItems = Inventory.newItems
+        elseif event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
             -- Event Bucketing: Coalesce rapid-fire BAG_UPDATE events
             -- This reduces updates from ~50/sec to ~10/sec during looting
             if not Inventory.updatePending then
@@ -61,7 +74,8 @@ function Inventory:Init()
             end
         end
     end)
-    self:ScanBags()
+    -- Don't scan here - bags aren't loaded yet!
+    -- Wait for first BAG_UPDATE event instead
 end
 
 function Inventory:ScanBags()
@@ -140,6 +154,8 @@ function Inventory:ScanBags()
 
                 if not isMove then
                     self.newItems[added.bagID .. ":" .. added.slotID] = true
+                    -- Persist to SavedVariables
+                    ZenBagsDB.newItems = self.newItems
                 end
             end
         end
@@ -151,13 +167,14 @@ function Inventory:ScanBags()
         scanList(BANK, "bank")
     end
 
-    -- Clear first scan flag after processing bags
+    -- Update previous state for next comparison
+    -- IMPORTANT: Do this BEFORE clearing firstScan, so we have a baseline
+    self.previousState = newState
+
+    -- Clear first scan flag after establishing baseline state
     if self.firstScan then
         self.firstScan = false
     end
-
-    -- Update previous state for next comparison
-    self.previousState = newState
 
     -- Sort
     table.sort(self.items, function(a, b) return NS.Categories:CompareItems(a, b) end)
@@ -195,7 +212,7 @@ end
 -- New Item Tracking
 -- =============================================================================
 
-Inventory.newItems = {}
+-- Note: newItems is initialized from SavedVariables in Init()
 Inventory.firstScan = true
 
 function Inventory:IsNew(bagID, slotID)
@@ -203,8 +220,11 @@ function Inventory:IsNew(bagID, slotID)
 end
 
 function Inventory:ClearNew(bagID, slotID)
-    if self.newItems[bagID .. ":" .. slotID] then
-        self.newItems[bagID .. ":" .. slotID] = nil
+    local key = bagID .. ":" .. slotID
+    if self.newItems[key] then
+        self.newItems[key] = nil
+        -- Persist to SavedVariables
+        ZenBagsDB.newItems = self.newItems
         -- Force update to remove glow
         if NS.Frames then NS.Frames:Update(true) end
     end

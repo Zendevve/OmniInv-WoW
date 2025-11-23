@@ -290,7 +290,7 @@ function NS.Pools:Init()
 
             -- Category text
             btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalLeft")
-            btn.text:SetPoint("LEFT", 18, 0) -- Tighter spacing
+            btn.text:SetPoint("LEFT", 0, 0) -- Align with left edge
 
             -- Separator Line
             btn.line = btn:CreateTexture(nil, "ARTWORK")
