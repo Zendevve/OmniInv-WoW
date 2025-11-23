@@ -88,9 +88,10 @@ function NS.Settings:Init()
     self.title:SetText("ZenBags Settings")
 
     -- Close Button (in header, raised frame level)
-    self.closeBtn = CreateFrame("Button", nil, self.frame, "UIPanelCloseButton")
-    self.closeBtn:SetPoint("TOPRIGHT", 0, 0)
+    self.closeBtn = NS.Utils:CreateCloseButton(self.frame)
+    self.closeBtn:SetPoint("TOPRIGHT", -5, -10)
     self.closeBtn:SetFrameLevel(self.frame:GetFrameLevel() + 10)
+    self.closeBtn:SetScript("OnClick", function() self:Toggle() end)
 
     -- Create Controls
     self:CreateControls()
@@ -159,16 +160,13 @@ function NS.Settings:CreateControls()
     yOffset = yOffset - 50
 
     -- Reset Button
-    local resetBtn = CreateFrame("Button", nil, self.frame, "UIPanelButtonTemplate")
-    resetBtn:SetSize(120, 25)
-    resetBtn:SetPoint("BOTTOM", 0, 20)
-    resetBtn:SetText("Reset Defaults")
-    resetBtn:SetScript("OnClick", function()
+    local resetBtn = NS.Utils:CreateFlatButton(self.frame, "Reset Defaults", 120, 25, function()
         NS.Config:Reset()
         self:RefreshControls()
         NS.Frames:Update(true)
         print("|cFF00FF00ZenBags:|r Settings reset to defaults.")
     end)
+    resetBtn:SetPoint("BOTTOM", 0, 20)
 end
 
 function NS.Settings:CreateHeader(text, y)
@@ -186,27 +184,8 @@ function NS.Settings:CreateHeader(text, y)
 end
 
 function NS.Settings:CreateSlider(key, label, minVal, maxVal, step, callback, y)
-    local slider = CreateFrame("Slider", "ZenBagsSlider"..key, self.frame, "OptionsSliderTemplate")
+    local slider = NS.Utils:CreateFlatSlider(self.frame, label, minVal, maxVal, step, callback)
     slider:SetPoint("TOPLEFT", 30, y)
-    slider:SetWidth(200)
-    slider:SetMinMaxValues(minVal, maxVal)
-    slider:SetValueStep(step)
-    -- slider:SetObeyStepOnDrag(true) -- Not available in Classic
-
-    _G[slider:GetName().."Low"]:SetText(minVal)
-    _G[slider:GetName().."High"]:SetText(maxVal)
-    _G[slider:GetName().."Text"]:SetText(label)
-
-    -- Value Label
-    local valueLabel = slider:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    valueLabel:SetPoint("TOP", slider, "BOTTOM", 0, 0)
-
-    slider:SetScript("OnValueChanged", function(self, value)
-        -- Round to avoid floating point weirdness
-        value = math.floor(value / step + 0.5) * step
-        valueLabel:SetText(string.format("%.1f", value))
-        callback(value)
-    end)
 
     -- Store for refresh
     self.controls = self.controls or {}
@@ -214,13 +193,8 @@ function NS.Settings:CreateSlider(key, label, minVal, maxVal, step, callback, y)
 end
 
 function NS.Settings:CreateCheckbox(key, label, callback, y)
-    local cb = CreateFrame("CheckButton", "ZenBagsCheck"..key, self.frame, "InterfaceOptionsCheckButtonTemplate")
+    local cb = NS.Utils:CreateFlatCheckbox(self.frame, label, callback)
     cb:SetPoint("TOPLEFT", 25, y)
-    _G[cb:GetName().."Text"]:SetText(label)
-
-    cb:SetScript("OnClick", function(self)
-        callback(self:GetChecked())
-    end)
 
     -- Store for refresh
     self.controls = self.controls or {}

@@ -123,29 +123,38 @@ function Frames:Init()
     self.headerSeparator:SetPoint("TOPRIGHT", 0, -40)
     self.headerSeparator:SetHeight(1)
 
-
-
     -- Close Button (raised frame level to be above drag area)
-    self.mainFrame.closeBtn = CreateFrame("Button", nil, self.mainFrame, "UIPanelCloseButton")
-    self.mainFrame.closeBtn:SetPoint("TOPRIGHT", 0, 0) -- Tighter fit
+    self.mainFrame.closeBtn = NS.Utils:CreateCloseButton(self.mainFrame)
+    self.mainFrame.closeBtn:SetPoint("TOPRIGHT", -10, -10) -- More padding from right edge
     self.mainFrame.closeBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
+    self.mainFrame.closeBtn:SetScript("OnClick", function() self:Hide() end)
 
-    -- Settings Button (Gear Icon)
-    self.settingsBtn = CreateFrame("Button", nil, self.mainFrame)
-    self.settingsBtn:SetSize(16, 16)
-    self.settingsBtn:SetPoint("RIGHT", self.mainFrame.closeBtn, "LEFT", -5, 0)
-    self.settingsBtn:SetNormalTexture("Interface\\GossipFrame\\BinderGossipIcon")
-    self.settingsBtn:SetHighlightTexture("Interface\\Buttons\\UI-Common-MouseHilight")
-    self.settingsBtn:SetScript("OnClick", function()
+    -- Settings Button (Gear Icon) - Now skinned to match Close Button
+    self.settingsBtn = NS.Utils:CreateFlatButton(self.mainFrame, "", 20, 20, function()
         NS.Settings:Toggle()
     end)
+    self.settingsBtn:SetPoint("RIGHT", self.mainFrame.closeBtn, "LEFT", -5, 0)
+    self.settingsBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10)
+
+    -- Add Gear Icon Texture to the button
+    local gearIcon = self.settingsBtn:CreateTexture(nil, "ARTWORK")
+    gearIcon:SetTexture("Interface\\GossipFrame\\BinderGossipIcon")
+    gearIcon:SetSize(14, 14)
+    gearIcon:SetPoint("CENTER", 0, 0)
+    gearIcon:SetVertexColor(0.9, 0.9, 0.9)
+    self.settingsBtn.icon = gearIcon
+
     self.settingsBtn:SetScript("OnEnter", function(self)
+        NS.Utils:CreateBackdrop(self) -- Re-apply backdrop to ensure color reset
+        self:SetBackdropColor(unpack(NS.Utils.COLORS.HIGHLIGHT or {0.3, 0.3, 0.3, 1}))
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText("Settings")
         GameTooltip:Show()
     end)
-    self.settingsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    self.settingsBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10) -- Above drag area
+    self.settingsBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.15, 0.15, 0.15, 1)
+        GameTooltip:Hide()
+    end)
 
     -- Character Dropdown Button (Top Left)
     self.charButton = CreateFrame("Button", "ZenBagsCharButton", self.mainFrame)
@@ -199,9 +208,9 @@ function Frames:Init()
 
     -- Search Box (sticky, below header, NOT in scroll frame)
     self.searchBox = CreateFrame("EditBox", nil, self.mainFrame)
-    self.searchBox:SetPoint("TOPLEFT", 20, -48)
-    self.searchBox:SetPoint("TOPRIGHT", -38, -48)
-    self.searchBox:SetHeight(22)
+    self.searchBox:SetPoint("TOPLEFT", 15, -45) -- Aligned with ScrollFrame
+    self.searchBox:SetPoint("TOPRIGHT", -35, -45) -- Aligned with ScrollFrame
+    self.searchBox:SetHeight(24) -- Slightly taller
     self.searchBox:SetAutoFocus(false)
     self.searchBox:SetFont("Fonts\\FRIZQT__.TTF", 12)
     self.searchBox:SetTextColor(0.9, 0.9, 0.9, 1)
@@ -225,11 +234,11 @@ function Frames:Init()
     local searchIcon = self.searchBox:CreateTexture(nil, "OVERLAY")
     searchIcon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
     searchIcon:SetSize(14, 14)
-    searchIcon:SetPoint("LEFT", self.searchBox, "LEFT", 3, 0)
+    searchIcon:SetPoint("LEFT", self.searchBox, "LEFT", 5, 0) -- More padding
     searchIcon:SetVertexColor(0.6, 0.6, 0.6) -- Gray color
 
     -- Adjust text inset to make room for icon
-    self.searchBox:SetTextInsets(20, 10, 0, 0)
+    self.searchBox:SetTextInsets(25, 10, 0, 0)
 
     -- Money Frame
     self.moneyFrame = CreateFrame("Frame", nil, self.mainFrame)
@@ -268,8 +277,11 @@ function Frames:Init()
 
     -- Scroll Frame (starts below sticky search bar)
     self.scrollFrame = CreateFrame("ScrollFrame", "ZenBagsScrollFrame", self.mainFrame, "UIPanelScrollFrameTemplate")
-    self.scrollFrame:SetPoint("TOPLEFT", 15, -88)
+    self.scrollFrame:SetPoint("TOPLEFT", 15, -80) -- More space for search bar
     self.scrollFrame:SetPoint("BOTTOMRIGHT", -35, 40) -- Balanced spacing - no overlap, minimal waste
+
+    -- Skin the scrollbar
+    NS.Utils:SkinScrollFrame(self.scrollFrame)
 
     self.content = CreateFrame("Frame", nil, self.scrollFrame)
     self.content:SetSize(350, 1000) --Height will be dynamic
@@ -729,7 +741,6 @@ function Frames:Update(fullUpdate)
         -- Calculate Section Position
         local sectionX = (minCol - 1) * sectionWidth
         local sectionY = minHeight
-
         -- Header - use pooled interactive button
         local headerPool = NS.Pools:GetPool("SectionHeader")
         local hdr = headerPool:Acquire()
@@ -744,12 +755,17 @@ function Frames:Update(fullUpdate)
 
         -- Set icon texture
         if isCollapsed then
-            hdr.icon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+            -- hdr.icon:SetTexture("Interface\\Buttons\\UI-PlusButton-Up")
+            hdr.text:SetText("[+] " .. cat .. " (" .. #catItems .. ")")
         else
-            hdr.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+            -- hdr.icon:SetTexture("Interface\\Buttons\\UI-MinusButton-Up")
+            hdr.text:SetText("[-] " .. cat .. " (" .. #catItems .. ")")
         end
 
-        hdr.text:SetText(cat .. " (" .. #catItems .. ")")
+        -- Hide the icon texture as we are using text
+        hdr.icon:SetTexture(nil)
+
+        -- hdr.text:SetText(cat .. " (" .. #catItems .. ")")
 
         -- Ensure header is clickable and on top
         hdr:SetFrameLevel(self.content:GetFrameLevel() + 10)
