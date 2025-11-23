@@ -413,3 +413,20 @@ function Data:GetAvailableCharacters()
 
     return chars
 end
+
+--- Delete cached data for a specific character
+-- @param charKey string The character key to delete
+function Data:DeleteCharacterCache(charKey)
+    if not charKey then return end
+
+    -- Remove from DB
+    if ZenBagsDB and ZenBagsDB.cache then
+        ZenBagsDB.cache[charKey] = nil
+        self.cache = ZenBagsDB.cache
+    end
+
+    -- If we were viewing this character, switch back to current
+    if self.selectedCharacter == charKey then
+        self.selectedCharacter = nil
+    end
+end

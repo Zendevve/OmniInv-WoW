@@ -15,6 +15,7 @@ local CAT_GEM = "Gem"
 local CAT_GLYPH = "Glyph"
 local CAT_MISC = "Miscellaneous"
 local CAT_JUNK = "Junk"
+local CAT_NEW_ITEMS = "New Items"
 
 -- Equipment Slot Mapping
 local EQUIP_LOC_MAP = {
@@ -51,6 +52,7 @@ local EQUIP_LOC_MAP = {
 
 -- Priority List (Lower index = Higher priority in UI)
 Categories.Priority = {
+    [CAT_NEW_ITEMS] = 0,
     [CAT_QUEST] = 1,
     [CAT_WEAPON] = 2,
     [CAT_ARMOR] = 3,
@@ -64,14 +66,19 @@ Categories.Priority = {
     [CAT_JUNK] = 11,
 }
 
-function Categories:GetCategory(itemLink)
+function Categories:GetCategory(itemLink, bag, slot)
     if not itemLink then return "Empty" end
+
+    -- 0. New Items (Highest Priority)
+    if bag and slot and NS.Inventory and NS.Inventory.IsNew and NS.Inventory:IsNew(bag, slot) then
+        return CAT_NEW_ITEMS
+    end
 
     local name, _, quality, _, _, itemType, itemSubType, _, equipLoc = GetItemInfo(itemLink)
 
     if not itemType then return "Unknown" end
 
-    -- 1. Quest Items (Highest Priority)
+    -- 1. Quest Items
     if itemType == "Quest" or quality == 7 then -- 7 is Heirloom, treating as special/quest-like for visibility or add separate
         return CAT_QUEST
     end

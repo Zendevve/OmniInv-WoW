@@ -205,6 +205,39 @@ function Frames:Init()
         NS.Frames:ShowCharacterDropdown()
     end)
 
+    -- Delete Character Button (Hidden by default)
+    self.deleteBtn = NS.Utils:CreateFlatButton(self.mainFrame, "X", 20, 20, function()
+        local charKey = NS.Data:GetSelectedCharacter()
+        if charKey then
+            -- Confirm deletion? For now, just do it.
+            NS.Data:DeleteCharacterCache(charKey)
+
+            -- Update UI (will switch back to current char)
+            self.charButton.text:SetText(UnitName("player"))
+            self.searchBox:SetText("")
+            self:Update(true)
+
+            print("|cFFFF0000ZenBags:|r Deleted cache for " .. charKey)
+        end
+    end)
+    self.deleteBtn:SetPoint("LEFT", self.charButton, "RIGHT", 5, 0)
+    self.deleteBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10)
+
+    -- Style the delete button (Red hover)
+    self.deleteBtn:SetScript("OnEnter", function(self)
+        NS.Utils:CreateBackdrop(self)
+        self:SetBackdropColor(0.8, 0.1, 0.1, 1) -- Red
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Delete Character Data")
+        GameTooltip:AddLine("Remove cached data for this character.", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    self.deleteBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.15, 0.15, 0.15, 1)
+        GameTooltip:Hide()
+    end)
+    self.deleteBtn:Hide()
+
     -- Space Counter
     self.spaceCounter = self.mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     self.spaceCounter:SetPoint("LEFT", self.charButton, "RIGHT", 10, 0)
@@ -458,6 +491,13 @@ end
 
 function Frames:Show()
     self.mainFrame:Show()
+
+    -- Fail-safe: If we have no items, force a scan immediately
+    -- This handles cases where events might have been missed
+    if #NS.Inventory:GetItems() == 0 then
+        NS.Inventory:ScanBags()
+    end
+
     NS.Inventory:SetFullUpdate(true)  -- Force full update on show
     self:Update(true)
 end
@@ -601,6 +641,8 @@ function Frames:Update(fullUpdate)
 
     -- If viewing another character, load EVERYTHING from cache
     if NS.Data:IsViewingOtherCharacter() then
+        self.deleteBtn:Show() -- Show delete button
+
         local bagItems = NS.Data:GetCachedInventoryItems()
         local bankItems = NS.Data:GetCachedBankItems()
 
@@ -608,6 +650,8 @@ function Frames:Update(fullUpdate)
         for _, item in ipairs(bankItems) do table.insert(allItems, item) end
 
     else
+        self.deleteBtn:Hide() -- Hide delete button
+
         -- Viewing current character: Load live items + cached offline bank
         allItems = NS.Inventory:GetItems()
 
@@ -777,16 +821,28 @@ function Frames:Update(fullUpdate)
 
         -- Click handler to toggle
         hdr:SetScript("OnClick", function(self, button)
-            NS.Config:ToggleSectionCollapsed(cat)
-            NS.Frames:Update(true)  -- Force full redraw
+            if button == "RightButton" and cat == "New Items" then
+                NS.Inventory:ClearAllNewItems()
+            else
+                NS.Config:ToggleSectionCollapsed(cat)
+                NS.Frames:Update(true)  -- Force full redraw
+            end
         end)
 
         -- Hover effects
         hdr:SetScript("OnEnter", function(self)
             self.text:SetTextColor(1, 1, 0)  -- Yellow
+
+            if cat == "New Items" then
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("New Items")
+                GameTooltip:AddLine("Right-click to clear all new items.", 1, 1, 1)
+                GameTooltip:Show()
+            end
         end)
         hdr:SetScript("OnLeave", function(self)
             self.text:SetTextColor(1, 1, 1)  -- White
+            GameTooltip:Hide()
         end)
 
         hdr:Show()
