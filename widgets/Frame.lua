@@ -212,17 +212,17 @@ function Frames:Init()
 
     -- Search Box (sticky, below header, NOT in scroll frame)
     self.searchBox = CreateFrame("EditBox", nil, self.mainFrame)
-    self.searchBox:SetPoint("TOPLEFT", 15, -45) -- Aligned with ScrollFrame
-    self.searchBox:SetPoint("TOPRIGHT", -35, -45) -- Aligned with ScrollFrame
+    self.searchBox:SetPoint("TOPLEFT", 20, -50) -- More padding from left and top
+    self.searchBox:SetPoint("TOPRIGHT", -40, -50) -- More padding from right
     self.searchBox:SetHeight(24) -- Slightly taller
     self.searchBox:SetAutoFocus(false)
     self.searchBox:SetFont("Fonts\\FRIZQT__.TTF", 12)
     self.searchBox:SetTextColor(0.9, 0.9, 0.9, 1)
 
-    -- Simple dark background
-    local searchBg = self.searchBox:CreateTexture(nil, "BACKGROUND")
-    searchBg:SetAllPoints()
-    searchBg:SetTexture(0.12, 0.12, 0.12, 1)
+    -- Simple dark background with border
+    NS.Utils:CreateBackdrop(self.searchBox)
+    self.searchBox:SetBackdropColor(0.15, 0.15, 0.15, 1)
+    self.searchBox:SetBackdropBorderColor(0.4, 0.4, 0.4, 1) -- Visible grey border
 
     self.searchBox:SetScript("OnTextChanged", function(self)
         local text = self:GetText()
@@ -281,7 +281,7 @@ function Frames:Init()
 
     -- Scroll Frame (starts below sticky search bar)
     self.scrollFrame = CreateFrame("ScrollFrame", "ZenBagsScrollFrame", self.mainFrame, "UIPanelScrollFrameTemplate")
-    self.scrollFrame:SetPoint("TOPLEFT", 15, -80) -- More space for search bar
+    self.scrollFrame:SetPoint("TOPLEFT", 15, -85) -- More space for search bar
     self.scrollFrame:SetPoint("BOTTOMRIGHT", -35, 40) -- Balanced spacing - no overlap, minimal waste
 
     -- Skin the scrollbar
