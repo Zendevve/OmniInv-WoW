@@ -646,6 +646,13 @@ function Frames:Update(fullUpdate)
     local sortedCats = {}
     for cat in pairs(groups) do table.insert(sortedCats, cat) end
     table.sort(sortedCats, function(a, b)
+        local collapsedA = NS.Config:IsSectionCollapsed(a)
+        local collapsedB = NS.Config:IsSectionCollapsed(b)
+
+        if collapsedA ~= collapsedB then
+            return not collapsedA
+        end
+
         local prioA = NS.Categories.Priority[a] or 99
         local prioB = NS.Categories.Priority[b] or 99
         return prioA < prioB
@@ -765,7 +772,7 @@ function Frames:Update(fullUpdate)
         hdr:Show()
         table.insert(self.headers, hdr)
 
-        local currentSectionHeight = 20 -- Header height
+        local currentSectionHeight = 30 -- Header height
 
         -- Items Grid
         if not isCollapsed then
