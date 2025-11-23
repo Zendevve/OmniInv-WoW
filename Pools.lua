@@ -271,7 +271,6 @@ function NS.Pools:Init()
             -- OnRelease
             btn:Hide()
             btn.IconBorder:Hide()
-            btn.QualityBorder:Hide()
         end
     )
 
