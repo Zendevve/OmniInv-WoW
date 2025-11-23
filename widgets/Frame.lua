@@ -764,26 +764,15 @@ function Frames:Update(fullUpdate)
                 -- Quality/Quest Border
                 local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemData.bagID, itemData.slotID)
 
-                -- Reset borders
-                btn.IconBorder:Hide()
-                if btn.QualityBorder then btn.QualityBorder:Hide() end
+                -- Determine quality for border
+                local quality = itemData.quality
+                if questId or isQuestItem then
+                    quality = 4 -- Epic color for quest items (or use custom logic)
+                end
 
-                if questId and not isActive then
-                    btn.IconBorder:SetTexture(TEXTURE_ITEM_QUEST_BANG)
-                    btn.IconBorder:SetVertexColor(1, 1, 1)
-                    btn.IconBorder:Show()
-                elseif questId or isQuestItem then
-                    btn.IconBorder:SetTexture(TEXTURE_ITEM_QUEST_BORDER)
-                    btn.IconBorder:SetVertexColor(1, 1, 1)
-                    btn.IconBorder:Show()
-                elseif itemData.quality and itemData.quality > 1 then
-                    local r, g, b = GetItemQualityColor(itemData.quality)
-                    if btn.QualityBorder then
-                        btn.QualityBorder:SetVertexColor(r, g, b)
-                        btn.QualityBorder:Show()
-                        -- Store for search restore
-                        btn.qualityR, btn.qualityG, btn.qualityB = r, g, b
-                    end
+                -- Update using new method
+                if btn.UpdateQuality then
+                    btn:UpdateQuality(quality)
                 end
 
                 -- Cooldown
