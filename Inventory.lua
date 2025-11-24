@@ -63,7 +63,31 @@ function Inventory:Init()
             if NS.Frames and NS.Frames.mainFrame and NS.Frames.mainFrame:IsShown() then
                 NS.Frames:UpdateMoney()
             end
-    local function scanList(bagList, locationType)
+        elseif event == "BANKFRAME_OPENED" then
+            NS.Data:SetBankOpen(true)
+            Inventory:ScanBags()
+            if NS.Frames then
+                NS.Frames:ShowBankTab()
+                NS.Frames:Update(true)
+            end
+        elseif event == "BANKFRAME_CLOSED" then
+            NS.Data:SetBankOpen(false)
+            if NS.Frames then
+                -- Don't hide bank tab or switch view!
+                -- Just update to show offline state
+                NS.Frames:Update(true)
+            end
+        end
+    end)
+    -- Don't scan here - bags aren't loaded yet!
+    -- Wait for first BAG_UPDATE event instead
+end
+
+function Inventory:ScanBags()
+    wipe(self.items)
+    local newState = {}
+
+    -- Helper to scan a list of bags
         local addedItems = {}
         local removedItems = {}
 
