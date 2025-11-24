@@ -65,7 +65,7 @@ function Frames:Init()
     self.mainFrame:SetScript("OnSizeChanged", function()
         if not resizeThrottle then
             resizeThrottle = true
-            C_Timer.After(0.1, function()
+            NS.Utils:After(0.1, function()
                 resizeThrottle = nil
                 NS.Frames:Update(true)
             end)
@@ -283,7 +283,7 @@ function Frames:ShowCharacterDropdown()
     EasyMenu(menu, CreateFrame("Frame", "ZenBagsCharDropdown", UIParent, "UIDropDownMenuTemplate"), "cursor", 0, 0, "MENU")
 
     -- Apply flat dark styling to the dropdown
-    C_Timer.After(0.01, function()
+    NS.Utils:After(0.01, function()
         local dropdown = _G["DropDownList1"]
         if dropdown then
             dropdown:SetBackdrop({

@@ -133,7 +133,7 @@ function FrameHelpers:CreateDropButton(contentFrame)
                     local itemInfo = GetContainerItemInfo(bagID, slotID)
                     if not itemInfo then
                         PickupContainerItem(bagID, slotID)
-                        C_Timer.After(0.1, function()
+                        NS.Utils:After(0.1, function()
                             NS.Frames:Update()
                         end)
                         return
@@ -151,7 +151,7 @@ function FrameHelpers:CreateDropButton(contentFrame)
                     local itemInfo = GetContainerItemInfo(bagID, slotID)
                     if not itemInfo then
                         PickupContainerItem(bagID, slotID)
-                        C_Timer.After(0.1, function()
+                        NS.Utils:After(0.1, function()
                             NS.Frames:Update()
                         end)
                         return
