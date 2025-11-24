@@ -16,7 +16,8 @@ ZenBags brings zen to your inventory management with blazing-fast performance, i
 
 ### 🎯 Smart Organization
 - **Auto-Categorization**: Items automatically grouped by type (Quest, Trade Goods, Equipment, etc.)
-- **Collapsible Sections**: Click section headers to expand/collapse categories
+- **Recent Items Tracking**: Newly looted or bought items appear in a dedicated "Recent Items" category with a glowing animation
+- **Collapsible Sections**: Click section headers to expand/collapse categories (right-click Recent Items to clear)
 - **Visual Hierarchy**: Clear section headers with item counts
 - **Quality Borders**: Color-coded borders for item quality at a glance
 - **Quest Item Highlighting**: Never miss a quest item again
@@ -65,6 +66,18 @@ ZenBags brings zen to your inventory management with blazing-fast performance, i
 ### Managing Sections
 - Click section headers to collapse/expand categories
 - Collapsed state persists between sessions
+- **Right-click "Recent Items"** header to clear all recent item highlights
+
+### Recent Items
+- Newly looted or bought items appear in the "Recent Items" category at the top
+- Items have a glowing yellow animation
+- Hover over an item to remove its "new" status
+- Right-click the "Recent Items" header to clear all highlights at once
+
+### Vendor Trash
+- A coin button appears when you open a merchant
+- Click to instantly sell all gray (poor quality) items
+- Hover to see total vendor value before selling
 
 ### Drag & Drop
 - Drag items from anywhere (character panel, other bags)
@@ -119,6 +132,7 @@ ZenBags/
 ### Technical Highlights
 - **Event Bucketing**: Coalesces rapid-fire `BAG_UPDATE` events to prevent UI lag
 - **Object Pooling**: Reuses button frames instead of recreating them
+- **Count-Based Item Tracking**: Robust new item detection using total item counts (inspired by AdiBags)
 - **Dirty Flag System**: Tracks changed slots for minimal updates
 - **Masonry Layout**: Dynamic column calculation for responsive design
 - **Dummy Overlay Pattern**: Handles tooltips for offline/cached items without UI interference
@@ -140,12 +154,13 @@ ZenBags/
 ### Phase 2: Advanced Features 🚧
 - [ ] Search highlighting (dim non-matching items)
 - [ ] Item count badges (show total count across bags)
-- [ ] New item glow/tracking
+- [x] New item glow/tracking (Recent Items)
 - [ ] Cross-character inventory viewing
 - [ ] Custom category filters
 - [x] Item level display on equipment
 - [ ] Profession bag integration
 - [ ] Bag slot management UI
+- [x] Vendor trash button (sell all gray items at merchants)
 
 ### Phase 3: Polish & Quality of Life 📋
 - [ ] Themes & skins
