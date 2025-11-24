@@ -54,6 +54,11 @@ function Inventory:Init()
     -- Clear timestamps but KEEP previousItemCounts (needed for detection!)
     wipe(ZenBagsDB.itemTimestamps[charKey])
 
+    -- DEBUG: Verify it's actually empty
+    local count = 0
+    for _ in pairs(ZenBagsDB.itemTimestamps[charKey]) do count = count + 1 end
+    print("ZenBags DEBUG: After wipe, itemTimestamps has " .. count .. " entries")
+
     -- Load this character's data
     self.previousItemCounts = ZenBagsDB.previousItemCounts[charKey]
     self.itemTimestamps = ZenBagsDB.itemTimestamps[charKey]
