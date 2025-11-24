@@ -177,6 +177,11 @@ function Inventory:ScanBags()
     local totalPrevious = 0
     for _ in pairs(self.previousItemCounts) do totalPrevious = totalPrevious + 1 end
 
+    -- DEBUG: Trace persistence state
+    if self.firstScan then
+        print("ZenBags DEBUG: First Scan. TotalCurrent=" .. totalCurrent .. ", TotalPrevious=" .. totalPrevious)
+    end
+
     -- If we have history, check for partial scans (e.g. only backpack loaded)
     if self.firstScan and totalPrevious > 0 then
         -- If we found significantly fewer items than we remember, assume bags are still loading
@@ -191,6 +196,10 @@ function Inventory:ScanBags()
     -- If we have history, ALWAYS run detection (even on first scan) to catch offline changes/syncs
     local shouldDetect = not (self.firstScan and totalPrevious == 0)
 
+    if self.firstScan then
+        print("ZenBags DEBUG: ShouldDetect=" .. tostring(shouldDetect))
+    end
+
     if shouldDetect then
         for itemID, count in pairs(currentCounts) do
             local prevCount = self.previousItemCounts[itemID] or 0
@@ -198,6 +207,7 @@ function Inventory:ScanBags()
                 -- Item count increased, mark as new
                 self.newItems[itemID] = true
                 ZenBagsDB.newItems = self.newItems
+                -- print("ZenBags DEBUG: New Item " .. itemID .. " (Count: " .. count .. " > " .. prevCount .. ")")
             end
         end
     end
