@@ -47,13 +47,28 @@ function Inventory:Init()
     ZenBagsDB.previousItemCounts[charKey] = ZenBagsDB.previousItemCounts[charKey] or {}
     ZenBagsDB.characterData[charKey] = ZenBagsDB.characterData[charKey] or {}
 
-    -- Advance timestamps by offline time (so only in-game time counts)
+    -- CRITICAL: Clean up expired timestamps ON LOGIN
+    local currentTime = time()
+    local RECENT_ITEM_DURATION = 300 -- 5 minutes
     local lastLogout = ZenBagsDB.characterData[charKey].lastLogout
+
     if lastLogout then
-        local offlineTime = time() - lastLogout
+        local offlineTime = currentTime - lastLogout
+        -- Advance timestamps by offline time AND remove expired ones
         for itemID, timestamp in pairs(ZenBagsDB.itemTimestamps[charKey]) do
-            ZenBagsDB.itemTimestamps[charKey][itemID] = timestamp + offlineTime
+            local adjustedTimestamp = timestamp + offlineTime
+            if currentTime - adjustedTimestamp > RECENT_ITEM_DURATION then
+                -- Expired, remove it
+                ZenBagsDB.itemTimestamps[charKey][itemID] = nil
+            else
+                -- Still valid, update with offline adjustment
+                ZenBagsDB.itemTimestamps[charKey][itemID] = adjustedTimestamp
+            end
         end
+    else
+        -- First login ever, or no logout data - clear all timestamps
+        print("ZenBags: First login or no logout data. Clearing timestamps.")
+        wipe(ZenBagsDB.itemTimestamps[charKey])
     end
 
     -- Load this character's data
