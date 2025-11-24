@@ -31,8 +31,10 @@ function Inventory:Init()
     -- Load saved new items state (fresh start)
     self.newItems = ZenBagsDB.newItems
 
-    -- Load saved previous item counts
-    self.previousItemCounts = ZenBagsDB.previousItemCounts
+    -- Load saved previous item counts (Per Character!)
+    local charKey = NS.Data:GetCurrentCharacterKey()
+    ZenBagsDB.previousItemCounts[charKey] = ZenBagsDB.previousItemCounts[charKey] or {}
+    self.previousItemCounts = ZenBagsDB.previousItemCounts[charKey]
 
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
@@ -193,7 +195,8 @@ function Inventory:ScanBags()
 
     -- 4. Update State
     self.previousItemCounts = currentCounts
-    ZenBagsDB.previousItemCounts = self.previousItemCounts
+    local charKey = NS.Data:GetCurrentCharacterKey()
+    ZenBagsDB.previousItemCounts[charKey] = self.previousItemCounts
 
     if self.firstScan then
         self.firstScan = false
