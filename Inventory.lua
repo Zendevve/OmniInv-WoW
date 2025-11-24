@@ -51,6 +51,9 @@ function Inventory:Init()
     -- Always start with a clean slate on login
     print("ZenBags: Clearing recent items (new session)")
 
+    -- BRUTE FORCE: Disable Recent Items category until we actually detect new loot
+    self.allowRecentItems = false
+
     -- Clear timestamps but KEEP previousItemCounts (needed for detection!)
     wipe(ZenBagsDB.itemTimestamps[charKey])
 
@@ -245,6 +248,8 @@ function Inventory:ScanBags()
                 -- Item count increased, mark as new with timestamp
                 self.itemTimestamps[itemID] = currentTime
                 markedCount = markedCount + 1
+                -- ENABLE Recent Items now that we have actual new loot
+                self.allowRecentItems = true
                 -- Save to character-specific table
                 local charKey = NS.Data:GetCurrentCharacterKey()
                 ZenBagsDB.itemTimestamps[charKey] = self.itemTimestamps

@@ -121,8 +121,8 @@ function Categories:GetCategory(itemLink, isNew)
     end
 
     -- 0. Recent Items (Highest Priority)
-    -- GUARD: Never categorize as recent during first scan
-    if isNew and not NS.Inventory.firstScan then
+    -- BRUTE FORCE: Only allow if session flag is enabled AND not first scan
+    if isNew and NS.Inventory.allowRecentItems and not NS.Inventory.firstScan then
         return CAT_RECENT
     end
 
