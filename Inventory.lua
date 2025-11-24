@@ -147,8 +147,9 @@ end)
 
 -- Helper for debug logging
 function Inventory:CountNewItems()
+    if not self.itemTimestamps then return 0 end
     local count = 0
-    for _ in pairs(self.newItems) do count = count + 1 end
+    for _ in pairs(self.itemTimestamps) do count = count + 1 end
     return count
 end
 
