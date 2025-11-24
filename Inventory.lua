@@ -10,6 +10,8 @@ local BANK = {-1, 5, 6, 7, 8, 9, 10, 11}
 
 -- Storage for scanned items
 Inventory.items = {}
+Inventory.itemCounts = {} -- itemID -> count
+Inventory.previousItemCounts = {}
 
 -- Event bucketing to reduce spam
 Inventory.updatePending = false
@@ -106,47 +108,54 @@ end
 
 function Inventory:ScanBags()
     wipe(self.items)
-    local newState = {}
 
-    -- Helper to scan a list of bags
-    local function scanList(bagList, locationType)
-        local addedItems = {}
-        local removedItems = {}
-
+    -- 1. Count all items first
+    local currentCounts = {}
+    local function countItems(bagList)
         for _, bagID in ipairs(bagList) do
             local numSlots = GetContainerNumSlots(bagID)
             for slotID = 1, numSlots do
-                local texture, count, locked, quality, readable, lootable, link, isFiltered, noValue, itemID = GetContainerItemInfo(bagID, slotID)
+                local itemID = GetContainerItemID(bagID, slotID)
+                if itemID then
+                    local _, count = GetContainerItemInfo(bagID, slotID)
+                    currentCounts[itemID] = (currentCounts[itemID] or 0) + (count or 1)
+                end
+            end
+        end
+    end
 
-                local key = bagID .. ":" .. slotID
+    countItems(BAGS)
+    if NS.Data:IsBankOpen() then
+        countItems(BANK)
+    end
 
-                -- Track current state
-                if link then
+    -- 2. Detect New Items (Count Increase)
+    if not self.firstScan then
+        for itemID, count in pairs(currentCounts) do
+            local prevCount = self.previousItemCounts[itemID] or 0
+            if count > prevCount then
+                -- Item count increased, mark as new
+                self.newItems[itemID] = true
+                ZenBagsDB.newItems = self.newItems
+            end
+        end
+    end
+
+    -- 3. Build Item List
+    local function scanList(bagList, locationType)
+        for _, bagID in ipairs(bagList) do
+            local numSlots = GetContainerNumSlots(bagID)
+            for slotID = 1, numSlots do
+                local texture, count, locked, quality, readable, lootable, link = GetContainerItemInfo(bagID, slotID)
+                local itemID = GetContainerItemID(bagID, slotID) -- Use this instead of unreliable 10th return value
+
+                if link and itemID then
                     -- Capture iLevel for equipment
                     local _, _, _, iLevel, _, _, _, _, equipSlot = GetItemInfo(link)
                     local isEquipment = (equipSlot and equipSlot ~= "") and (iLevel and iLevel > 1)
 
-                    newState[key] = {
-                        link = link,
-                        count = count,
-                        texture = texture,
-                        itemID = itemID
-                    }
-
-                    -- Check if item is new BEFORE categorization
-                    -- First check if it's already tracked as new
-                    local isNew = self:IsNew(bagID, slotID)
-
-                    -- If not in our tracking AND this isn't the first scan, it's potentially new
-                    if not isNew and not self.firstScan then
-                        local prev = self.previousState[key]
-                        if not prev then
-                            -- This is a genuinely new item (not a move)
-                            isNew = true
-                            self.newItems[key] = true
-                            ZenBagsDB.newItems = self.newItems
-                        end
-                    end
+                    -- Check if item is new (by Item ID)
+                    local isNew = self.newItems[itemID]
 
                     table.insert(self.items, {
                         bagID = bagID,
@@ -156,38 +165,12 @@ function Inventory:ScanBags()
                         count = count,
                         quality = quality,
                         itemID = itemID,
-                        iLevel = isEquipment and iLevel or nil, -- Store iLevel
-                        location = locationType, -- "bags", "bank", "keyring"
+                        iLevel = isEquipment and iLevel or nil,
+                        location = locationType,
                         category = NS.Categories:GetCategory(link, isNew)
                     })
                 end
-
-                -- Compare with previous state to detect changes (for dirty tracking)
-                local prev = self.previousState[key]
-                local curr = newState[key]
-
-                -- Mark dirty if changed
-                if not prev and curr then
-                    -- New item (potentially)
-                    self:MarkDirty(bagID, slotID)
-                    table.insert(addedItems, {bagID = bagID, slotID = slotID, itemID = itemID})
-                elseif prev and not curr then
-                    -- Item removed
-                    self:MarkDirty(bagID, slotID)
-                    table.insert(removedItems, {itemID = prev.itemID})
-                elseif prev and curr then
-                    -- Check if item changed (different link or count)
-                    if prev.link ~= curr.link or prev.count ~= curr.count then
-                        self:MarkDirty(bagID, slotID)
-                    end
-                end
             end
-        end
-
-        -- Mark dirty slots for removed items
-        for _, removed in ipairs(removedItems) do
-            -- We don't have bag/slot for removed items anymore, just itemID
-            -- Can't mark dirty without coordinates
         end
     end
 
@@ -197,11 +180,10 @@ function Inventory:ScanBags()
         scanList(BANK, "bank")
     end
 
-    -- Update previous state for next comparison
-    -- IMPORTANT: Do this BEFORE clearing firstScan, so we have a baseline
-    self.previousState = newState
+    -- Update previous counts
+    self.previousItemCounts = currentCounts
 
-    -- Clear first scan flag after establishing baseline state
+    -- Clear first scan flag
     if self.firstScan then
         self.firstScan = false
     end
@@ -211,6 +193,9 @@ function Inventory:ScanBags()
 
     -- Update the Data Layer cache
     NS.Data:UpdateCache()
+
+    -- Mark dirty (simplified for now, full update usually needed after scan)
+    self:SetFullUpdate(true)
 end
 
 function Inventory:GetItems()
@@ -245,14 +230,13 @@ end
 -- Note: newItems is initialized from SavedVariables in Init()
 Inventory.firstScan = true
 
-function Inventory:IsNew(bagID, slotID)
-    return self.newItems[bagID .. ":" .. slotID]
+function Inventory:IsNew(itemID)
+    return self.newItems[itemID]
 end
 
-function Inventory:ClearNew(bagID, slotID)
-    local key = bagID .. ":" .. slotID
-    if self.newItems[key] then
-        self.newItems[key] = nil
+function Inventory:ClearNew(itemID)
+    if self.newItems[itemID] then
+        self.newItems[itemID] = nil
         -- Persist to SavedVariables
         ZenBagsDB.newItems = self.newItems
         -- Force update to remove glow
@@ -289,9 +273,3 @@ function Inventory:GetTrashValue()
     return totalValue
 end
 
--- Helper to extract Item ID from link
-local function GetItemID(link)
-    if not link then return nil end
-    local id = link:match("item:(%d+)")
-    return tonumber(id)
-end
