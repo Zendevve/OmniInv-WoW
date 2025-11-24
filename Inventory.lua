@@ -37,32 +37,6 @@ function Inventory:Init()
     self.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
 
     self.frame:SetScript("OnEvent", function(self, event, arg1)
-        if event == "PLAYER_LOGIN" then
-            -- Clear all new item highlights on fresh login
-            -- Each session starts clean
-            wipe(Inventory.newItems)
-            ZenBagsDB.newItems = Inventory.newItems
-        elseif event == "PLAYER_ENTERING_WORLD" then
-            -- Force a scan when entering world to ensure we have data
-            -- Delay slightly to ensure bag data is available
-            C_Timer.After(1.0, function()
-                Inventory:ScanBags()
-                if NS.Frames then NS.Frames:Update(true) end
-            end)
-        elseif event == "BAG_UPDATE" or event == "PLAYERBANKSLOTS_CHANGED" then
-            -- Event Bucketing: Coalesce rapid-fire BAG_UPDATE events
-            -- This reduces updates from ~50/sec to ~10/sec during looting
-            if not Inventory.updatePending then
-                Inventory.updatePending = true
-                C_Timer.After(Inventory.bucketDelay, function()
-                    Inventory:ScanBags()
-                    if NS.Frames then NS.Frames:Update() end
-                    Inventory.updatePending = false
-                end)
-            end
-        elseif event == "PLAYER_MONEY" then
-            -- Update money display
-            if NS.Frames and NS.Frames.mainFrame and NS.Frames.mainFrame:IsShown() then
                 NS.Frames:UpdateMoney()
             end
         elseif event == "BANKFRAME_OPENED" then
