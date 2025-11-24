@@ -363,10 +363,6 @@ function Inventory:IsNew(itemID)
 end
 
 function Inventory:ClearNew(itemID)
-    if self.newItems[itemID] then
-        self.newItems[itemID] = nil
-        -- Persist to SavedVariables
-        ZenBagsDB.newItems = self.newItems
     if self.itemTimestamps then
         self.itemTimestamps[itemID] = nil
         ZenBagsDB.itemTimestamps = self.itemTimestamps
