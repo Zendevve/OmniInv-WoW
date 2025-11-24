@@ -27,24 +27,37 @@ function Inventory:Init()
     ZenBagsDB = ZenBagsDB or {}
 
     -- Database Versioning
-    local DB_VERSION = 2
+    local DB_VERSION = 3  -- Bump version for new timestamp system
     if not ZenBagsDB.version or ZenBagsDB.version < DB_VERSION then
         print("ZenBags: Upgrading database to version " .. DB_VERSION .. ". Resetting data.")
         wipe(ZenBagsDB)
         ZenBagsDB.version = DB_VERSION
     end
 
-    ZenBagsDB.newItems = {} -- Always start fresh on login
+    -- NEW: Timestamp-based tracking (itemID -> timestamp when it became new)
+    ZenBagsDB.itemTimestamps = ZenBagsDB.itemTimestamps or {}
     ZenBagsDB.previousItemCounts = ZenBagsDB.previousItemCounts or {}
 
-    ZenBagsDB.newItems = {} -- Always start fresh on login
-    self.newItems = ZenBagsDB.newItems
-    print("ZenBags DEBUG: Init called. newItems cleared.")
-
-    -- Load saved previous item counts (Per Character!)
+    -- Track last logout time for this character
     local charKey = NS.Data:GetCurrentCharacterKey()
+    ZenBagsDB.characterData = ZenBagsDB.characterData or {}
+    ZenBagsDB.characterData[charKey] = ZenBagsDB.characterData[charKey] or {}
+
+    -- Advance timestamps by offline time (so only in-game time counts)
+    local lastLogout = ZenBagsDB.characterData[charKey].lastLogout
+    if lastLogout then
+        local offlineTime = time() - lastLogout
+        for itemID, timestamp in pairs(ZenBagsDB.itemTimestamps) do
+            ZenBagsDB.itemTimestamps[itemID] = timestamp + offlineTime
+        end
+    end
+
+    -- Load previous item counts for this character
     ZenBagsDB.previousItemCounts[charKey] = ZenBagsDB.previousItemCounts[charKey] or {}
     self.previousItemCounts = ZenBagsDB.previousItemCounts[charKey]
+
+    -- Reference to timestamps table
+    self.itemTimestamps = ZenBagsDB.itemTimestamps
 
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
@@ -121,6 +134,16 @@ function Inventory:Init()
     -- Don't scan here - bags aren't loaded yet!
     -- Wait for first BAG_UPDATE event instead
 end
+
+-- Track logout time for offline time adjustment
+local logoutFrame = CreateFrame("Frame")
+logoutFrame:RegisterEvent("PLAYER_LOGOUT")
+logoutFrame:SetScript("OnEvent", function()
+    local charKey = NS.Data:GetCurrentCharacterKey()
+    ZenBagsDB.characterData = ZenBagsDB.characterData or {}
+    ZenBagsDB.characterData[charKey] = ZenBagsDB.characterData[charKey] or {}
+    ZenBagsDB.characterData[charKey].lastLogout = time()
+end)
 
 -- Helper for debug logging
 function Inventory:CountNewItems()
@@ -200,23 +223,30 @@ function Inventory:ScanBags()
         end
     end
 
-    -- 3. Detect New Items
-    -- If it's the first scan and we have no history, skip detection (don't mark everything new)
-    -- If we have history, ALWAYS run detection (even on first scan) to catch offline changes/syncs
+    -- 3. Detect New Items & Cleanup Old Timestamps
     local shouldDetect = not (self.firstScan and totalPrevious == 0)
+    local currentTime = time()
+    local RECENT_ITEM_DURATION = 300 -- 5 minutes in seconds
 
     if self.firstScan then
         print("ZenBags DEBUG: ShouldDetect=" .. tostring(shouldDetect))
     end
 
+    -- Clean up expired timestamps
+    for itemID, timestamp in pairs(self.itemTimestamps) do
+        if currentTime - timestamp > RECENT_ITEM_DURATION then
+            self.itemTimestamps[itemID] = nil
+        end
+    end
+
+    -- Detect new items
     if shouldDetect then
         for itemID, count in pairs(currentCounts) do
             local prevCount = self.previousItemCounts[itemID] or 0
             if count > prevCount then
-                -- Item count increased, mark as new
-                self.newItems[itemID] = true
-                ZenBagsDB.newItems = self.newItems
-                -- print("ZenBags DEBUG: New Item " .. itemID .. " (Count: " .. count .. " > " .. prevCount .. ")")
+                -- Item count increased, mark as new with timestamp
+                self.itemTimestamps[itemID] = currentTime
+                ZenBagsDB.itemTimestamps = self.itemTimestamps
             end
         end
     end
@@ -229,8 +259,8 @@ function Inventory:ScanBags()
     if self.firstScan then
         self.firstScan = false
         local newCount = 0
-        for _ in pairs(self.newItems) do newCount = newCount + 1 end
-        print("ZenBags: Initial scan complete. Persistence synced. NewItems Count: " .. newCount)
+        for _ in pairs(self.itemTimestamps) do newCount = newCount + 1 end
+        print("ZenBags: Initial scan complete. Recent items: " .. newCount)
     end
 
     -- 5. Build Item List
@@ -246,8 +276,8 @@ function Inventory:ScanBags()
                     local _, _, _, iLevel, _, _, _, _, equipSlot = GetItemInfo(link)
                     local isEquipment = (equipSlot and equipSlot ~= "") and (iLevel and iLevel > 1)
 
-                    -- Check if item is new (by Item ID)
-                    local isNew = self.newItems[itemID]
+                    -- Check if item is new (by timestamp)
+                    local isNew = self.itemTimestamps[itemID] ~= nil
 
                     table.insert(self.items, {
                         bagID = bagID,
@@ -329,7 +359,7 @@ end
 Inventory.firstScan = true
 
 function Inventory:IsNew(itemID)
-    return self.newItems[itemID]
+    return self.itemTimestamps and self.itemTimestamps[itemID] ~= nil
 end
 
 function Inventory:ClearNew(itemID)
@@ -337,14 +367,17 @@ function Inventory:ClearNew(itemID)
         self.newItems[itemID] = nil
         -- Persist to SavedVariables
         ZenBagsDB.newItems = self.newItems
-        -- Force update to remove glow
-        if NS.Frames then NS.Frames:Update(true) end
+    if self.itemTimestamps then
+        self.itemTimestamps[itemID] = nil
+        ZenBagsDB.itemTimestamps = self.itemTimestamps
     end
+    -- Force update to remove glow
+    if NS.Frames then NS.Frames:Update(true) end
 end
 
 function Inventory:ClearRecentItems()
-    wipe(self.newItems)
-    ZenBagsDB.newItems = self.newItems
+    wipe(self.itemTimestamps)
+    ZenBagsDB.itemTimestamps = self.itemTimestamps
     -- Force full update to re-categorize items
     self:ScanBags()
     if NS.Frames then NS.Frames:Update(true) end
