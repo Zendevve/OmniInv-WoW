@@ -71,6 +71,46 @@ Categories.Priority = {
     [CAT_JUNK] = 11,
 }
 
+-- Initialize lookup tables
+local function InitializeCategoryLookup()
+    local categories = {
+        { id = "recent", name = CAT_RECENT, priority = 0 },
+        { id = "quest", name = CAT_QUEST, priority = 1 },
+        { id = "weapon", name = CAT_WEAPON, priority = 2 },
+        { id = "armor", name = CAT_ARMOR, priority = 3 },
+        { id = "jewelry", name = CAT_JEWELRY, priority = 4 },
+        { id = "consumable", name = CAT_CONSUMABLE, priority = 5 },
+        { id = "trade", name = CAT_TRADE, priority = 6 },
+        { id = "gem", name = CAT_GEM, priority = 7 },
+        { id = "glyph", name = CAT_GLYPH, priority = 8 },
+        { id = "container", name = CAT_CONTAINER, priority = 9 },
+        { id = "misc", name = CAT_MISC, priority = 10 },
+        { id = "junk", name = CAT_JUNK, priority = 11 },
+    }
+
+    for _, cat in ipairs(categories) do
+        categoryByName[cat.name] = cat
+        categoryById[cat.id] = cat
+        table.insert(categoryList, cat)
+    end
+end
+
+-- Call initialization
+InitializeCategoryLookup()
+
+-- Helper functions for O(1) lookups
+function Categories:GetCategoryByName(name)
+    return categoryByName[name]
+end
+
+function Categories:GetCategoryById(id)
+    return categoryById[id]
+end
+
+function Categories:GetAllCategories()
+    return categoryList
+end
+
 function Categories:GetCategory(itemLink, isNew)
     if not itemLink then return "Empty" end
 
