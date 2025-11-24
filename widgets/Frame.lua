@@ -253,23 +253,23 @@ function Frames:Init()
     charText:SetText(UnitName("player")) -- Start with current character
     self.charButton.text = charText
 
-    -- Button background (subtle)
-    local bg = self.charButton:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints()
-    bg:SetTexture(0.2, 0.2, 0.2, 0.3)
-    bg:Hide()
-    self.charButton.bg = bg
+    -- Button background (Flat Dark Style)
+    NS.Utils:CreateBackdrop(self.charButton)
+    self.charButton:SetBackdropColor(0.15, 0.15, 0.15, 1)
+    self.charButton:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
 
     -- Hover effect
     self.charButton:SetScript("OnEnter", function(self)
-        self.bg:Show()
+        self:SetBackdropColor(0.25, 0.25, 0.25, 1)
+        self:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText("Switch Character")
         GameTooltip:AddLine("View bags from other characters on this realm", 1, 1, 1)
         GameTooltip:Show()
     end)
     self.charButton:SetScript("OnLeave", function(self)
-        self.bg:Hide()
+        self:SetBackdropColor(0.15, 0.15, 0.15, 1)
+        self:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
         GameTooltip:Hide()
     end)
 
@@ -721,20 +721,38 @@ function Frames:UpdateDropdownList()
 
         -- Delete Handler
         btn.delBtn:SetScript("OnClick", function()
-            -- Simple confirmation by changing text color/icon?
-            -- For now, direct delete with print message (MVP)
-            -- Or better: StaticPopup? No, let's keep it simple.
+            -- Define StaticPopup if not already defined
+            if not StaticPopupDialogs["ZENBAGS_CONFIRM_DELETE_CHAR"] then
+                StaticPopupDialogs["ZENBAGS_CONFIRM_DELETE_CHAR"] = {
+                    text = "Are you sure you want to delete the cached data for %s?",
+                    button1 = "Delete",
+                    button2 = "Cancel",
+                    OnAccept = function(self, data)
+                        NS.Data:DeleteCharacter(data.key)
+                        print("|cFFFF0000ZenBags:|r Deleted data for " .. data.name)
 
-            NS.Data:DeleteCharacter(charData.key)
-            print("|cFFFF0000ZenBags:|r Deleted data for " .. charData.name)
+                        -- Refresh list immediately
+                        if NS.Frames.UpdateDropdownList then
+                            NS.Frames:UpdateDropdownList()
+                        end
 
-            -- Refresh list immediately
-            self:UpdateDropdownList()
+                        -- Reset view if we deleted the viewed character
+                        if NS.Data:GetSelectedCharacter() == nil then
+                            NS.Frames.charButton.text:SetText(UnitName("player"))
+                            NS.Frames:Update(true)
+                        end
+                    end,
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                }
+            end
 
-            -- Reset view if we deleted the viewed character
-            if NS.Data:GetSelectedCharacter() == nil then
-                self.charButton.text:SetText(UnitName("player"))
-                self:Update(true)
+            -- Show Confirmation
+            local dialog = StaticPopup_Show("ZENBAGS_CONFIRM_DELETE_CHAR", charData.name)
+            if dialog then
+                dialog.data = charData
             end
         end)
 
