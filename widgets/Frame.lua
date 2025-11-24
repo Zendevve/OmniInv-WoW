@@ -169,8 +169,8 @@ function Frames:Init()
         GameTooltip:Hide()
     end)
 
-    -- Vendor Trash Button (appears when at merchant)
-    self.trashBtn = NS.Utils:CreateFlatButton(self.mainFrame, "Sell Trash", 100, 20, function()
+    -- Vendor Trash Button (icon-only, appears when at merchant)
+    self.trashBtn = NS.Utils:CreateFlatButton(self.mainFrame, "", 20, 20, function()
         local trashItems = NS.Inventory:GetTrashItems()
         if #trashItems == 0 then
             print("|cFFFF0000ZenBags:|r No trash items to sell.")
@@ -188,11 +188,13 @@ function Frames:Init()
     self.trashBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10)
     self.trashBtn:Hide() -- Hidden by default
 
-    -- Trash button text
-    self.trashBtn.text = self.trashBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    self.trashBtn.text:SetPoint("CENTER", 0, 0)
-    self.trashBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10)
-    self.trashBtn.text:SetText("Sell Trash")
+    -- Add Coin Icon to the button
+    local coinIcon = self.trashBtn:CreateTexture(nil, "ARTWORK")
+    coinIcon:SetTexture("Interface\\MoneyFrame\\UI-GoldIcon")
+    coinIcon:SetSize(14, 14)
+    coinIcon:SetPoint("CENTER", 0, 0)
+    coinIcon:SetVertexColor(0.9, 0.9, 0.9)
+    self.trashBtn.icon = coinIcon
 
     self.trashBtn:SetScript("OnEnter", function(self)
         NS.Utils:CreateBackdrop(self)
@@ -204,7 +206,7 @@ function Frames:Init()
             local gold = math.floor(trashValue / 10000)
             local silver = math.floor((trashValue % 10000) / 100)
             local copper = trashValue % 100
-            GameTooltip:AddLine(string.format("%dg %ds %dc", gold, silver, copper), 1, 1, 1)
+            GameTooltip:AddLine(string.format("Value: %dg %ds %dc", gold, silver, copper), 1, 1, 0.5)
         else
             GameTooltip:AddLine("No trash items", 0.5, 0.5, 0.5)
         end
