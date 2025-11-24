@@ -1123,7 +1123,7 @@ function Frames:Update(fullUpdate)
                 end
 
                 -- New Item Highlight
-                if NS.Inventory:IsNew(itemData.itemID) then
+                if NS.Inventory:IsNew(itemData.bagID, itemData.slotID) then
                     if not btn.newGlow then
                         btn.newGlow = btn:CreateTexture(nil, "OVERLAY")
                         btn.newGlow:SetTexture("Interface\\Cooldown\\star4")
@@ -1160,7 +1160,7 @@ function Frames:Update(fullUpdate)
                 -- Clear New Status on Hover
                 btn:SetScript("OnEnter", function(self)
                     if self.itemData then
-                        NS.Inventory:ClearNew(self.itemData.itemID)
+                        NS.Inventory:ClearNew(self.itemData.bagID, self.itemData.slotID)
                     end
 
                     -- Standard Tooltip
