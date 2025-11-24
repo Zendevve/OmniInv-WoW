@@ -19,8 +19,8 @@ Categories.lua
 Inventory.lua
 
 # UI Widgets
-widgets\Settings.lua
-widgets\FrameHelpers.lua
-widgets\FrameHeader.lua
-widgets\FrameContent.lua
-widgets\Frame.lua
+widgets/Settings.lua
+widgets/FrameHelpers.lua
+widgets/FrameHeader.lua
+widgets/FrameContent.lua
+widgets/Frame.lua
