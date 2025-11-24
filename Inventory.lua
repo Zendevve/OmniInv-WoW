@@ -53,16 +53,21 @@ function Inventory:Init()
     local lastLogout = ZenBagsDB.characterData[charKey].lastLogout
 
     if lastLogout then
+        -- Calculate how long we were offline
         local offlineTime = currentTime - lastLogout
-        -- Advance timestamps by offline time AND remove expired ones
+
+        -- Check each timestamp - it should be from WITHIN the last 5 minutes of GAME time
+        -- Game time = current time - offline time
+        local gameTime = currentTime - offlineTime
+
         for itemID, timestamp in pairs(ZenBagsDB.itemTimestamps[charKey]) do
-            local adjustedTimestamp = timestamp + offlineTime
-            if currentTime - adjustedTimestamp > RECENT_ITEM_DURATION then
-                -- Expired, remove it
+            -- How old is this timestamp in game time?
+            local ageInGameTime = gameTime - timestamp
+
+            if ageInGameTime > RECENT_ITEM_DURATION then
+                -- Too old, remove it
                 ZenBagsDB.itemTimestamps[charKey][itemID] = nil
-            else
-                -- Still valid, update with offline adjustment
-                ZenBagsDB.itemTimestamps[charKey][itemID] = adjustedTimestamp
+                print("ZenBags DEBUG: Removed expired timestamp for itemID " .. itemID .. " (age: " .. ageInGameTime .. "s)")
             end
         end
     else
