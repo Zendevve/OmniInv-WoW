@@ -3,9 +3,11 @@ local addonName, NS = ...
 NS.Utils = {}
 local Utils = NS.Utils
 
+
 function Utils:Init()
-    self:SetupSellingProtection()
+    -- Selling protection removed - was just a placeholder warning
 end
+
 
 -- =============================================================================
 -- UI Skinning Helpers
@@ -184,19 +186,5 @@ function Utils:SkinScrollFrame(scrollFrame)
     for _, child in ipairs(kids) do
         child:Hide()
     end
-end
-
-function Utils:SetupSellingProtection()
-    local frame = CreateFrame("Frame")
-    frame:RegisterEvent("MERCHANT_SHOW")
-    frame:SetScript("OnEvent", function(self, event)
-        -- Hook UseContainerItem to prevent accidental sales
-        -- Note: This is a simplified protection mechanism.
-        -- Real protection requires secure hooks and careful handling of taint.
-        -- For this MVP, we'll just print a warning if you try to sell an Epic.
-
-        -- In a real addon, you'd hook the merchant click logic.
-        -- For now, let's just print a safety message.
-        print("|cFFFF0000ZenBags:|r Selling Protection Active. Be careful!")
-    end)
+    end
 end
