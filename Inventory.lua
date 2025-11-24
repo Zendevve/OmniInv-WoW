@@ -25,6 +25,15 @@ Inventory.forceFullUpdate = false
 function Inventory:Init()
     -- Initialize SavedVariables structure
     ZenBagsDB = ZenBagsDB or {}
+
+    -- Database Versioning
+    local DB_VERSION = 2
+    if not ZenBagsDB.version or ZenBagsDB.version < DB_VERSION then
+        print("ZenBags: Upgrading database to version " .. DB_VERSION .. ". Resetting data.")
+        wipe(ZenBagsDB)
+        ZenBagsDB.version = DB_VERSION
+    end
+
     ZenBagsDB.newItems = {} -- Always start fresh on login
     ZenBagsDB.previousItemCounts = ZenBagsDB.previousItemCounts or {}
 
