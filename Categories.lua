@@ -120,10 +120,11 @@ function Categories:GetCategory(itemLink, isNew)
         print("  Stack: " .. debugstack(2, 1, 0))
     end
 
-    -- DISABLED: Recent Items (debugging)
-    -- if isNew then
-    --     return CAT_RECENT
-    -- end
+    -- 0. Recent Items (Highest Priority)
+    -- GUARD: Never categorize as recent during first scan
+    if isNew and not NS.Inventory.firstScan then
+        return CAT_RECENT
+    end
 
     local name, _, quality, _, _, itemType, itemSubType, _, equipLoc = GetItemInfo(itemLink)
 
