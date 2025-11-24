@@ -69,6 +69,13 @@ function Inventory:Init()
             end
             Inventory:ScanBags()
             if NS.Frames then NS.Frames:Update(true) end
+
+            -- Delayed rescan to handle late-loading bags
+            -- Bags 1-4 often report 0 slots initially on login, then load after ~1 second
+            C_Timer.After(1.5, function()
+                Inventory:ScanBags()
+                if NS.Frames then NS.Frames:Update(true) end
+            end)
         elseif event == "BAG_UPDATE" then
             -- Check for new items
             Inventory:CheckForNewItems(arg1)

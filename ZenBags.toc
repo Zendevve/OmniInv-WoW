@@ -21,3 +21,6 @@ Inventory.lua
 # UI Widgets
 widgets\Settings.lua
 widgets\Frame.lua
+widgets\Dropdown.lua
+widgets\Tabs.lua
+widgets\Info.lua
