@@ -35,6 +35,8 @@ function Inventory:Init()
     self.frame:RegisterEvent("BANKFRAME_CLOSED")
     self.frame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
     self.frame:RegisterEvent("PLAYER_ENTERING_WORLD")
+    self.frame:RegisterEvent("MERCHANT_SHOW")
+    self.frame:RegisterEvent("MERCHANT_CLOSED")
 
     self.frame:SetScript("OnEvent", function(self, event, arg1)
         if event == "PLAYER_LOGIN" then
@@ -90,6 +92,12 @@ function Inventory:Init()
                 -- Just update to show offline state
                 NS.Frames:Update(true)
             end
+        elseif event == "MERCHANT_SHOW" then
+            NS.Data:SetMerchantOpen(true)
+            if NS.Frames then NS.Frames:Update(true) end
+        elseif event == "MERCHANT_CLOSED" then
+            NS.Data:SetMerchantOpen(false)
+            if NS.Frames then NS.Frames:Update(true) end
         end
     end)
     -- Don't scan here - bags aren't loaded yet!
@@ -258,6 +266,27 @@ function Inventory:ClearRecentItems()
     -- Force full update to re-categorize items
     self:ScanBags()
     if NS.Frames then NS.Frames:Update(true) end
+end
+
+function Inventory:GetTrashItems()
+    local trashItems = {}
+    for _, item in ipairs(self.items) do
+        if item.quality == 0 and item.location == "bags" then
+            table.insert(trashItems, item)
+        end
+    end
+    return trashItems
+end
+
+function Inventory:GetTrashValue()
+    local totalValue = 0
+    for _, item in ipairs(self:GetTrashItems()) do
+        local _, _, _, _, _, _, _, _, _, _, vendorPrice = GetItemInfo(item.link)
+        if vendorPrice and vendorPrice > 0 then
+            totalValue = totalValue + (vendorPrice * item.count)
+        end
+    end
+    return totalValue
 end
 
 -- Helper to extract Item ID from link

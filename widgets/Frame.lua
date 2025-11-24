@@ -169,6 +169,52 @@ function Frames:Init()
         GameTooltip:Hide()
     end)
 
+    -- Vendor Trash Button (appears when at merchant)
+    self.trashBtn = NS.Utils:CreateFlatButton(self.mainFrame, "Sell Trash", 100, 20, function()
+        local trashItems = NS.Inventory:GetTrashItems()
+        if #trashItems == 0 then
+            print("|cFFFF0000ZenBags:|r No trash items to sell.")
+            return
+        end
+
+        -- Sell all trash items
+        for _, item in ipairs(trashItems) do
+            UseContainerItem(item.bagID, item.slotID)
+        end
+
+        print("|cFF00FF00ZenBags:|r Sold " .. #trashItems .. " trash items.")
+    end)
+    self.trashBtn:SetPoint("RIGHT", self.settingsBtn, "LEFT", -5, 0)
+    self.trashBtn:SetFrameLevel(self.mainFrame:GetFrameLevel() + 10)
+    self.trashBtn:Hide() -- Hidden by default
+
+    -- Trash button text
+    self.trashBtn.text = self.trashBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    self.trashBtn.text:SetPoint("CENTER", 0, 0)
+    self.trashBtn.text:SetFont("Fonts\\FRIZQT__.TTF", 10)
+    self.trashBtn.text:SetText("Sell Trash")
+
+    self.trashBtn:SetScript("OnEnter", function(self)
+        NS.Utils:CreateBackdrop(self)
+        self:SetBackdropColor(unpack(NS.Utils.COLORS.HIGHLIGHT or {0.3, 0.3, 0.3, 1}))
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Sell All Trash")
+        local trashValue = NS.Inventory:GetTrashValue()
+        if trashValue > 0 then
+            local gold = math.floor(trashValue / 10000)
+            local silver = math.floor((trashValue % 10000) / 100)
+            local copper = trashValue % 100
+            GameTooltip:AddLine(string.format("%dg %ds %dc", gold, silver, copper), 1, 1, 1)
+        else
+            GameTooltip:AddLine("No trash items", 0.5, 0.5, 0.5)
+        end
+        GameTooltip:Show()
+    end)
+    self.trashBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.15, 0.15, 0.15, 1)
+        GameTooltip:Hide()
+    end)
+
     -- Character Dropdown Button (Top Left)
     self.charButton = CreateFrame("Button", "ZenBagsCharButton", self.mainFrame)
     self.charButton:SetSize(120, 20)
@@ -659,6 +705,13 @@ function Frames:Update(fullUpdate)
     -- Skip update if nothing changed
     if not fullUpdate and not searchChanged and not hasDirtySlots and not NS.Inventory:NeedsFullUpdate() then
         return
+    end
+
+    -- Show/hide trash button based on merchant state
+    if NS.Data:IsMerchantOpen() then
+        self.trashBtn:Show()
+    else
+        self.trashBtn:Hide()
     end
 
     local allItems = {}

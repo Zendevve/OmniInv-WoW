@@ -11,6 +11,7 @@ Data.KEYRING = -2
 -- State
 Data.cache = {} -- Cached item data per character
 Data.isBankOpen = false
+Data.isMerchantOpen = false
 Data.selectedCharacter = nil -- nil = current character, otherwise character key
 
 -- =============================================================================
@@ -222,6 +223,14 @@ end
 
 function Data:IsBankOpen()
     return self.isBankOpen
+end
+
+function Data:SetMerchantOpen(isOpen)
+    self.isMerchantOpen = isOpen
+end
+
+function Data:IsMerchantOpen()
+    return self.isMerchantOpen
 end
 
 --- Get cached inventory items (bags 0-4) in Inventory-compatible format
