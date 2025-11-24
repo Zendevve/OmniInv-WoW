@@ -34,6 +34,10 @@ function Inventory:Init()
     -- Load saved previous item counts
     self.previousItemCounts = ZenBagsDB.previousItemCounts
 
+    local count = 0
+    for _ in pairs(self.previousItemCounts) do count = count + 1 end
+    print("ZenBags: Loaded " .. count .. " previous item counts from DB.")
+
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
     self.frame:RegisterEvent("PLAYER_MONEY")
@@ -211,12 +215,20 @@ function Inventory:ScanBags()
     end
 
     -- Update previous counts and save to database
-    self.previousItemCounts = currentCounts
-    ZenBagsDB.previousItemCounts = self.previousItemCounts
+    -- Only update if we found items, or if it's not the first scan
+    -- This protects against premature empty scans overwriting valid DB data
+    local hasItems = next(currentCounts) ~= nil
 
-    -- Clear first scan flag
-    if self.firstScan then
-        self.firstScan = false
+    if hasItems or not self.firstScan then
+        self.previousItemCounts = currentCounts
+        ZenBagsDB.previousItemCounts = self.previousItemCounts
+
+        if self.firstScan then
+            print("ZenBags: First scan complete. Found items. persistence initialized.")
+            self.firstScan = false
+        end
+    else
+        print("ZenBags: First scan found 0 items. Waiting for data...")
     end
 
     -- Sort
