@@ -26,9 +26,13 @@ function Inventory:Init()
     -- Initialize SavedVariables structure
     ZenBagsDB = ZenBagsDB or {}
     ZenBagsDB.newItems = ZenBagsDB.newItems or {}
+    ZenBagsDB.previousItemCounts = ZenBagsDB.previousItemCounts or {}
 
     -- Load saved new items state
     self.newItems = ZenBagsDB.newItems
+
+    -- Load saved previous item counts
+    self.previousItemCounts = ZenBagsDB.previousItemCounts
 
     self.frame = CreateFrame("Frame")
     self.frame:RegisterEvent("BAG_UPDATE")
@@ -206,8 +210,9 @@ function Inventory:ScanBags()
         scanList(BANK, "bank")
     end
 
-    -- Update previous counts
+    -- Update previous counts and save to database
     self.previousItemCounts = currentCounts
+    ZenBagsDB.previousItemCounts = self.previousItemCounts
 
     -- Clear first scan flag
     if self.firstScan then
