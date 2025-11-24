@@ -106,10 +106,36 @@ function Inventory:Init()
     -- Wait for first BAG_UPDATE event instead
 end
 
+--- Fast path for updating item slot colors without full layout recalculation.
+--- Use this for search highlighting, category color changes, etc.
+--- Much faster than full Update() cycle.
+function Inventory:UpdateItemSlotColors()
+    if not NS.Frames or not NS.Frames.buttons then return end
+
+    for _, button in ipairs(NS.Frames.buttons) do
+        if button and button:IsVisible() and button.itemData then
+            -- Update quality border color
+            if button.itemData.quality and button.itemData.quality > 1 then
+                local r, g, b = GetItemQualityColor(button.itemData.quality)
+                button.IconBorder:SetVertexColor(r, g, b, 1)
+                button.IconBorder:Show()
+            else
+                button.IconBorder:Hide()
+            end
+
+            -- Update new item glow
+            if NS.Inventory:IsNew(button.itemData.itemID) then
+                button.NewItemTexture:Show()
+            else
+                button.NewItemTexture:Hide()
+            end
+        end
+    end
+end
+
 function Inventory:ScanBags()
     wipe(self.items)
 
-    -- 1. Count all items first
     local currentCounts = {}
     local function countItems(bagList)
         for _, bagID in ipairs(bagList) do

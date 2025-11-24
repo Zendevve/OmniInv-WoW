@@ -17,6 +17,11 @@ local CAT_MISC = "Miscellaneous"
 local CAT_JUNK = "Junk"
 local CAT_RECENT = "Recent Items"
 
+-- Lookup tables for O(1) category access
+local categoryByName = {}
+local categoryById = {}
+local categoryList = {}
+
 -- Equipment Slot Mapping
 local EQUIP_LOC_MAP = {
     INVTYPE_HEAD = CAT_ARMOR,
