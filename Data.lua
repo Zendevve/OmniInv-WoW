@@ -439,3 +439,73 @@ function Data:DeleteCharacter(charKey)
         self.selectedCharacter = nil
     end
 end
+
+-- =============================================================================
+-- Tooltip Enhancement: Total Item Count
+-- =============================================================================
+
+--- Get total count of an item across all bags and bank
+-- @param itemID number The item ID to count
+-- @return bagCount number, bankCount number Total counts in bags and bank
+function Data:GetTotalItemCount(itemID)
+    if not itemID then return 0, 0 end
+
+    local bagCount = 0
+    local bankCount = 0
+    local charKey = self:GetCharacterKey()
+
+    -- Count in bags
+    for _, bag in ipairs(self.BAGS) do
+        if self:IsCached(bag) then
+            -- Use cached data
+            local bagData = self.cache[charKey] and self.cache[charKey][bag]
+            if bagData then
+                for slot = 1, (bagData.size or 0) do
+                    local itemData = bagData[slot]
+                    if itemData and itemData.itemID == itemID then
+                        bagCount = bagCount + (itemData.count or 1)
+                    end
+                end
+            end
+        else
+            -- Use live data
+            local numSlots = GetContainerNumSlots(bag) or 0
+            for slot = 1, numSlots do
+                local slotItemID = GetContainerItemID(bag, slot)
+                if slotItemID == itemID then
+                    local _, count = GetContainerItemInfo(bag, slot)
+                    bagCount = bagCount + (count or 1)
+                end
+            end
+        end
+    end
+
+    -- Count in bank (always cached if bank is closed)
+    for _, bag in ipairs(self.BANK) do
+        if self:IsCached(bag) then
+            -- Use cached data
+            local bagData = self.cache[charKey] and self.cache[charKey][bag]
+            if bagData then
+                for slot = 1, (bagData.size or 0) do
+                    local itemData = bagData[slot]
+                    if itemData and itemData.itemID == itemID then
+                        bankCount = bankCount + (itemData.count or 1)
+                    end
+                end
+            end
+        else
+            -- Bank is open, use live data
+            local numSlots = GetContainerNumSlots(bag) or 0
+            for slot = 1, numSlots do
+                local slotItemID = GetContainerItemID(bag, slot)
+                if slotItemID == itemID then
+                    local _, count = GetContainerItemInfo(bag, slot)
+                    bankCount = bankCount + (count or 1)
+                end
+            end
+        end
+    end
+
+    return bagCount, bankCount
+end
+

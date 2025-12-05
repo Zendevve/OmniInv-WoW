@@ -108,6 +108,34 @@ function NS.Settings:CreateGeneralSettings()
     end, yOffset)
     yOffset = yOffset - 50
 
+    -- === New Item Tracking Section ===
+    self:CreateHeader("New Item Tracking", yOffset)
+    yOffset = yOffset - 30
+
+    -- New Item Glow Checkbox
+    self:CreateCheckbox("NewItemGlowEnabled", "Enable New Item Glow", function(checked)
+        NS.Config:Set("newItemGlowEnabled", checked)
+        NS.Frames:Update(true)
+    end, yOffset)
+    yOffset = yOffset - 30
+
+    -- Ignore Junk Glow Checkbox
+    self:CreateCheckbox("NewItemGlowIgnoreJunk", "Don't Glow Junk Items", function(checked)
+        NS.Config:Set("newItemGlowIgnoreJunk", checked)
+        NS.Frames:Update(true)
+    end, yOffset)
+    yOffset = yOffset - 50
+
+    -- === Tooltip Section ===
+    self:CreateHeader("Tooltips", yOffset)
+    yOffset = yOffset - 30
+
+    -- Total Item Count Checkbox
+    self:CreateCheckbox("ShowTotalItemCount", "Show Total Item Count", function(checked)
+        NS.Config:Set("showTotalItemCount", checked)
+    end, yOffset)
+    yOffset = yOffset - 50
+
     -- Reset Button
     local resetBtn = CreateFrame("Button", nil, self.generalPanel, "UIPanelButtonTemplate")
     resetBtn:SetSize(120, 25)
@@ -198,6 +226,9 @@ function NS.Settings:RefreshControls()
     if self.controls["EnableSearch"] then self.controls["EnableSearch"].frame:SetChecked(config:Get("enableSearch")) end
     if self.controls["ShowTooltips"] then self.controls["ShowTooltips"].frame:SetChecked(config:Get("showTooltips")) end
     if self.controls["SortOnUpdate"] then self.controls["SortOnUpdate"].frame:SetChecked(config:Get("sortOnUpdate")) end
+    if self.controls["NewItemGlowEnabled"] then self.controls["NewItemGlowEnabled"].frame:SetChecked(config:Get("newItemGlowEnabled")) end
+    if self.controls["NewItemGlowIgnoreJunk"] then self.controls["NewItemGlowIgnoreJunk"].frame:SetChecked(config:Get("newItemGlowIgnoreJunk")) end
+    if self.controls["ShowTotalItemCount"] then self.controls["ShowTotalItemCount"].frame:SetChecked(config:Get("showTotalItemCount")) end
 end
 
 function NS.Settings:Open()
