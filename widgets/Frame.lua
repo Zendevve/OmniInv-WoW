@@ -805,16 +805,21 @@ function Frames:Update(fullUpdate)
                     end
                 end
 
-                -- New Item Highlight
-                if NS.Inventory:IsNew(itemData.itemID) then
+                -- New Item Highlight (configurable)
+                local glowEnabled = NS.Config:Get("newItemGlowEnabled")
+                local glowIgnoreJunk = NS.Config:Get("newItemGlowIgnoreJunk")
+                local isJunk = itemData.quality == 0
+                local shouldGlow = glowEnabled and NS.Inventory:IsNew(itemData.itemID) and not (glowIgnoreJunk and isJunk)
+
+                if shouldGlow then
+                    local glowColor = NS.Config:Get("newItemGlowColor")
+                    local glowScale = NS.Config:Get("newItemGlowScale")
 
                     if not btn.newGlow then
                         btn.newGlow = btn:CreateTexture(nil, "OVERLAY")
                         btn.newGlow:SetTexture("Interface\\Cooldown\\star4")
                         btn.newGlow:SetPoint("CENTER")
-                        btn.newGlow:SetSize(ITEM_SIZE * 1.8, ITEM_SIZE * 1.8)
                         btn.newGlow:SetBlendMode("ADD")
-                        btn.newGlow:SetVertexColor(1, 1, 0, 0.8) -- Yellow glow
 
                         -- Animation
                         local ag = btn.newGlow:CreateAnimationGroup()
@@ -825,6 +830,9 @@ function Frames:Update(fullUpdate)
                         ag:Play()
                         btn.newGlow.ag = ag
                     end
+                    -- Apply current settings
+                    btn.newGlow:SetSize(ITEM_SIZE * glowScale, ITEM_SIZE * glowScale)
+                    btn.newGlow:SetVertexColor(glowColor.r, glowColor.g, glowColor.b, 0.8)
                     btn.newGlow:Show()
                     btn.newGlow.ag:Play()
                 else
@@ -841,12 +849,19 @@ function Frames:Update(fullUpdate)
                 -- We only need to ensure the button is shown
                 btn:Show()
 
+                -- Apply current search filter (fixes search not working after /reload until bag opened)
+                if self.searchBox then
+                    local searchText = self.searchBox:GetText()
+                    if searchText and searchText ~= "" then
+                        btn:UpdateSearch(searchText)
+                    end
+                end
+
                 -- Clear New Status on Hover
                 btn:SetScript("OnEnter", function(self)
                     if self.itemData and self.itemData.itemID then
                         NS.Inventory:MarkItemViewed(self.itemData.itemID)
                     end
-
 
                     -- Standard Tooltip
                     if self.itemData.location == "bank" then
@@ -859,6 +874,24 @@ function Frames:Update(fullUpdate)
                     else
                         -- Standard bag tooltip
                         ContainerFrameItemButton_OnEnter(self)
+                    end
+
+                    -- Add total item count if enabled
+                    if NS.Config:Get("showTotalItemCount") and self.itemData and self.itemData.itemID then
+                        local bagCount, bankCount = NS.Data:GetTotalItemCount(self.itemData.itemID)
+                        local totalCount = bagCount + bankCount
+
+                        -- Only show if there's more than just this stack
+                        if totalCount > (self.itemData.count or 1) then
+                            local countText = ""
+                            if bankCount > 0 then
+                                countText = string.format("|cFFFFFFFFTotal:|r %d  |cFF888888(Bags: %d, Bank: %d)|r", totalCount, bagCount, bankCount)
+                            else
+                                countText = string.format("|cFFFFFFFFTotal:|r %d", totalCount)
+                            end
+                            GameTooltip:AddLine(countText)
+                            GameTooltip:Show() -- Refresh to include new line
+                        end
                     end
                 end)
 

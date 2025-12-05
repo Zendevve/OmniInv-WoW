@@ -12,6 +12,13 @@ local defaults = {
     showTooltips = true,
     enableSearch = true,
     collapsedSections = {},  -- Track which category sections are collapsed
+    -- New Item Glow Settings
+    newItemGlowEnabled = true,
+    newItemGlowColor = { r = 1, g = 1, b = 0 }, -- Yellow
+    newItemGlowScale = 1.8,
+    newItemGlowIgnoreJunk = true, -- Ignore grey quality items
+    -- Tooltip Enhancements
+    showTotalItemCount = true, -- Show total count across all bags in tooltip
 }
 
 function NS.Config:Init()

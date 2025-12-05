@@ -9,10 +9,13 @@ ZenBags brings zen to your inventory management with blazing-fast performance, i
 ## 🎉 Recent Updates
 
 **Latest improvements to ZenBags:**
+- ✅ **Search Highlighting**: Non-matching items are dimmed and desaturated instead of hidden, keeping context visible
+- ✅ **Total Item Count in Tooltips**: Hover over any item to see total count across bags and bank
+- ✅ **Configurable New Item Glow**: Toggle glow on/off, ignore junk items, in Settings panel
 - ✅ **Recent Items Fixed**: Session-based tracking now works reliably - items marked as new only when actually looted in the current session, with automatic 5-minute expiry
 - ✅ **Vendor Trash Button**: Instantly sell all gray (poor quality) items at merchants with a single click
 - ✅ **Flat Dark UI Theme**: Modern, sleek interface with improved visual hierarchy and professional styling
-- ✅ **Enhanced Settings Panel**: Comprehensive configuration with improved layout and above-UI positioning
+- ✅ **Enhanced Settings Panel**: Comprehensive configuration with New Item Tracking and Tooltip sections
 - ✅ **Search Bar Auto-Clear**: Automatically clears when switching character views to prevent unintended filtering
 - ✅ **Performance Optimizations**: Refined event bucketing and object pooling for even smoother operation
 
@@ -132,6 +135,9 @@ Access the settings panel via the gear icon or `/zb config`.
 | **Enable Search** | Show/hide the search bar | On |
 | **Show Tooltips** | Display item tooltips on hover | On |
 | **Auto-Sort** | Automatically sort items on update | On |
+| **Enable New Item Glow** | Show spinning glow on newly acquired items | On |
+| **Don't Glow Junk Items** | Skip glow effect for gray quality items | On |
+| **Show Total Item Count** | Display total count across bags/bank in tooltips | On |
 
 All settings update in real-time with a **Reset to Defaults** button available.
 
@@ -177,8 +183,8 @@ ZenBags/
 - [x] In-game settings panel
 
 ### Phase 2: Advanced Features 🚧
-- [ ] Search highlighting (dim non-matching items)
-- [ ] Item count badges (show total count across bags)
+- [x] Search highlighting (dim non-matching items)
+- [x] Item count badges (show total count across bags)
 - [x] New item glow/tracking (Recent Items)
 - [ ] Cross-character inventory viewing
 - [ ] Custom category filters
