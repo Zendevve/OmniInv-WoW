@@ -12,6 +12,7 @@ local defaults = {
     showTooltips = true,
     enableSearch = true,
     collapsedSections = {},  -- Track which category sections are collapsed
+    layoutMode = "category", -- "category" or "grid"
     -- New Item Glow Settings
     newItemGlowEnabled = true,
     newItemGlowColor = { r = 1, g = 1, b = 0 }, -- Yellow
