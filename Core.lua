@@ -38,7 +38,9 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if NS.Inventory then NS.Inventory:Init() end
         if NS.Frames then NS.Frames:Init() end
         if NS.Utils then NS.Utils:Init() end
-        if NS.Settings then NS.Settings:Init() end -- Initialize Settings UI
+        if NS.Settings then NS.Settings:Init() end
+        if NS.Alts then NS.Alts:Init() end -- Cross-character data
+        if NS.Search then NS.Search:Init() end -- Omni-search
 
         -- Close any default bags that might be open
         CloseBackpack()

@@ -19,6 +19,8 @@ Utils.lua
 
 # Data & Logic
 Data.lua
+Alts.lua
+Search.lua
 Categories.lua
 Inventory.lua
 
