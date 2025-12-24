@@ -1,7 +1,7 @@
 ## Interface: 30403
 ## Title: ZenBags
 ## Notes: A comprehensive "One Bag" inventory management addon.
-## Author: Antigravity
+## Author: Zendevve
 ## Version: 0.1
 ## SavedVariables: ZenBagsDB
 
