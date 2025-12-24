@@ -10,6 +10,7 @@ Core.lua
 Config.lua
 Pools.lua
 ItemCache.lua
+Filter.lua
 
 # Utilities
 Utils.lua
