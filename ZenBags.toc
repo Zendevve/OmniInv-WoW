@@ -2,7 +2,7 @@
 ## Title: ZenBags
 ## Notes: A comprehensive "One Bag" inventory management addon.
 ## Author: Zendevve
-## Version: 0.1
+## Version: 1.0
 ## SavedVariables: ZenBagsDB
 
 # Core System

@@ -31,7 +31,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             NS.ItemCache:Init()
         end
 
-        print("|cFF00FF00ZenBags v0.1|r loaded. Made by |cFF00FFFFZendevve|r. Type /zb to toggle.")
+        print("|cFF00FF00ZenBags v1.0|r loaded. Made by |cFF00FFFFZendevve|r. Type /zb to toggle.")
 
     elseif event == "PLAYER_LOGIN" then
         -- Initialize modules

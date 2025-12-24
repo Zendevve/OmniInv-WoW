@@ -6,18 +6,22 @@ ZenBags brings zen to your inventory management with blazing-fast performance, i
 
 ---
 
-## 🎉 Recent Updates
+## 🎉 v1.0 Release - "Omni Inventory"
 
-**Latest improvements to ZenBags:**
-- ✅ **Search Highlighting**: Non-matching items are dimmed and desaturated instead of hidden, keeping context visible
-- ✅ **Total Item Count in Tooltips**: Hover over any item to see total count across bags and bank
-- ✅ **Configurable New Item Glow**: Toggle glow on/off, ignore junk items, in Settings panel
-- ✅ **Recent Items Fixed**: Session-based tracking now works reliably - items marked as new only when actually looted in the current session, with automatic 5-minute expiry
-- ✅ **Vendor Trash Button**: Instantly sell all gray (poor quality) items at merchants with a single click
-- ✅ **Flat Dark UI Theme**: Modern, sleek interface with improved visual hierarchy and professional styling
-- ✅ **Enhanced Settings Panel**: Comprehensive configuration with New Item Tracking and Tooltip sections
-- ✅ **Search Bar Auto-Clear**: Automatically clears when switching character views to prevent unintended filtering
-- ✅ **Performance Optimizations**: Refined event bucketing and object pooling for even smoother operation
+**Major new features:**
+- ✅ **Cross-Character Inventory** - View other characters' bags from character dropdown
+- ✅ **Omni-Search** - Search items across all characters with `/zensearch <item>`
+- ✅ **Gear Upgrade Detection** - Green arrow on items that are upgrades, dimmed for downgrades
+- ✅ **Smart Junk Learning** - Learns what you sell and auto-marks similar items
+- ✅ **Dual-View Toggle** - Switch between Category view and Grid view
+- ✅ **Rule-Based Categories** - Custom categorization rules via `/zenrules`
+- ✅ **Alt Gold Tracking** - See gold across all characters with `/zenalts`
+
+**Plus all previous features:**
+- Search highlighting, new item glow, vendor trash button
+- Bank integration with offline caching, collapsible sections
+- Quality borders, item level display, tooltip enhancements
+
 
 ---
 
