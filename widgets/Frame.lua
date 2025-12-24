@@ -427,6 +427,17 @@ function Frames:Init()
 
     self.currentView = "bags" -- "bags" or "bank"
     self:CreateTabs()
+
+    -- Create view toggle button (after trashBtn exists)
+    -- Note: CreateViewToggleButton is defined in ViewToggle.lua
+    -- We delay creation to ensure trashBtn positioning works
+    local initFrame = CreateFrame("Frame")
+    initFrame:SetScript("OnUpdate", function(f)
+        if Frames.trashBtn then
+            Frames:CreateViewToggleButton()
+            f:SetScript("OnUpdate", nil)
+        end
+    end)
 end
 
 -- Tabs Logic
