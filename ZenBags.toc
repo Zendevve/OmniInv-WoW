@@ -21,6 +21,8 @@ Utils.lua
 Data.lua
 Alts.lua
 Search.lua
+RuleEngine.lua
+JunkLearner.lua
 Categories.lua
 Inventory.lua
 
