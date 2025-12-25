@@ -43,6 +43,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if Omni.Events then Omni.Events:Init() end
         if Omni.Categorizer then Omni.Categorizer:Init() end
         if Omni.Sorter then Omni.Sorter:Init() end
+        if Omni.Rules then Omni.Rules:Init() end
         if Omni.Frame then Omni.Frame:Init() end
 
         -- Override default bag functions

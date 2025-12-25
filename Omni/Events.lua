@@ -123,6 +123,26 @@ function Events:Init()
     -- The callback receives a table of modified bagIDs
 
     self:RegisterBucketEvent("BAG_UPDATE", function(modifiedBags)
+        -- Detect new items in modified bags
+        if Omni.Categorizer then
+            for bagID in pairs(modifiedBags) do
+                if type(bagID) == "number" and bagID >= 0 and bagID <= 4 then
+                    local numSlots = GetContainerNumSlots(bagID) or 0
+                    for slot = 1, numSlots do
+                        local link = GetContainerItemLink(bagID, slot)
+                        if link then
+                            local itemID = tonumber(string.match(link, "item:(%d+)"))
+                            if itemID then
+                                -- Mark as new if not in session snapshot
+                                Omni.Categorizer:MarkAsNew(itemID)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Update the frame
         if Omni.Frame then
             Omni.Frame:UpdateLayout(modifiedBags)
         end

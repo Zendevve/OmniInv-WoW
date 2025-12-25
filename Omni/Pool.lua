@@ -133,6 +133,27 @@ function Pool:GetAllStats()
     return stats
 end
 
+--- Convenience method: Acquire from named pool
+---@param name string Pool name
+---@return any object or nil
+function Pool:Acquire(name)
+    local pool = pools[name]
+    if pool then
+        return pool:Acquire()
+    end
+    return nil
+end
+
+--- Convenience method: Release to named pool
+---@param name string Pool name
+---@param obj any Object to release
+function Pool:Release(name, obj)
+    local pool = pools[name]
+    if pool then
+        pool:Release(obj)
+    end
+end
+
 --- Print pool debug info
 function Pool:Debug()
     print("|cFF00FF00OmniInventory|r: Pool Statistics")
@@ -152,37 +173,29 @@ function Pool:Init()
     -- Item Button Pool
     self:Create("ItemButton",
         function()
-            -- Create item button frame
-            local btn = CreateFrame("Button", nil, UIParent, "ItemButtonTemplate")
-            btn:SetSize(37, 37)
-            btn:Hide()
-
-            -- Remove default textures for flat look
-            local normalTexture = btn:GetNormalTexture()
-            if normalTexture then
-                normalTexture:SetTexture("")
+            -- Delegate to ItemButton factory
+            if Omni.ItemButton and Omni.ItemButton.Create then
+                local btn = Omni.ItemButton:Create(UIParent)
+                btn:Hide()
+                -- Add custom pool data if not present (though Create checks for it)
+                if not btn.omniData then btn.omniData = {} end
+                return btn
             end
 
-            -- Add custom data table
-            btn.omniData = {}
-
+            -- Fallback (should not happen if loaded correctly)
+            local btn = CreateFrame("Button", nil, UIParent, "ItemButtonTemplate")
             return btn
         end,
         function(btn)
-            -- Reset function
+            -- Delegate to ItemButton reset
+            if Omni.ItemButton and Omni.ItemButton.Reset then
+                Omni.ItemButton:Reset(btn)
+            end
+
+            -- Ensure it's hidden and re-parented to global
             btn:Hide()
             btn:ClearAllPoints()
             btn:SetParent(UIParent)
-
-            -- Clear item data
-            SetItemButtonTexture(btn, nil)
-            SetItemButtonCount(btn, 0)
-            SetItemButtonDesaturated(btn, false)
-
-            -- Clear custom data
-            for k in pairs(btn.omniData) do
-                btn.omniData[k] = nil
-            end
         end
     )
 

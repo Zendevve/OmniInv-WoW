@@ -85,6 +85,13 @@ function OmniC_Container.GetContainerItemInfo(bagID, slotID)
     -- Get binding status (cached per session for performance)
     local isBound, bindType = ScanTooltipForBinding(bagID, slotID)
 
+    -- WotLK 3.3.5a often returns -1 or nil for quality from GetContainerItemInfo
+    -- We need to fetch it from GetItemInfo instead for accurate values
+    if (not quality or quality < 0) and itemLink then
+        local _, _, itemQuality = GetItemInfo(itemLink)
+        quality = itemQuality
+    end
+
     -- Return modern table structure (matching Retail C_Container)
     return {
         -- Core Identification
@@ -102,8 +109,8 @@ function OmniC_Container.GetContainerItemInfo(bagID, slotID)
         isBound = isBound,
         bindType = bindType,
 
-        -- Quality
-        quality = quality or 0,
+        -- Quality (default to 1/Common if still unknown)
+        quality = quality or 1,
 
         -- Filter state (for search)
         isFiltered = false,

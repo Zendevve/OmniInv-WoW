@@ -28,6 +28,10 @@ local CATEGORY_COLORS = {
     ["Junk"]            = { r = 0.6, g = 0.6, b = 0.6 },
     ["New Items"]       = { r = 0.0, g = 1.0, b = 0.5 },
     ["Miscellaneous"]   = { r = 0.5, g = 0.5, b = 0.5 },
+    ["Keys"]            = { r = 1.0, g = 0.9, b = 0.4 },
+    ["Bags"]            = { r = 0.6, g = 0.4, b = 0.2 },
+    ["Ammo"]            = { r = 0.8, g = 0.7, b = 0.5 },
+    ["Glyphs"]          = { r = 0.5, g = 0.8, b = 1.0 },
 }
 
 -- =============================================================================
@@ -53,15 +57,26 @@ local function SnapshotInventory()
     end
 end
 
-local function IsNewItem(itemID)
+-- Public API for new item tracking
+function Categorizer:IsNewItem(itemID)
     if not itemID then return false end
     return newItems[itemID] == true
 end
 
-local function MarkAsNew(itemID)
+function Categorizer:MarkAsNew(itemID)
     if itemID and not sessionItems[itemID] then
         newItems[itemID] = true
     end
+end
+
+function Categorizer:ClearNewItem(itemID)
+    if itemID then
+        newItems[itemID] = nil
+    end
+end
+
+function Categorizer:ClearAllNewItems()
+    newItems = {}
 end
 
 -- =============================================================================
@@ -117,19 +132,42 @@ end
 -- =============================================================================
 
 local TYPE_TO_CATEGORY = {
-    ["Armor"]       = "Equipment",
-    ["Weapon"]      = "Equipment",
-    ["Consumable"]  = "Consumables",
-    ["Trade Goods"] = "Trade Goods",
-    ["Reagent"]     = "Reagents",
-    ["Recipe"]      = "Trade Goods",
-    ["Gem"]         = "Trade Goods",
-    ["Quest"]       = "Quest Items",
-    ["Key"]         = "Keys",
+    -- Main types
+    ["Armor"]         = "Equipment",
+    ["Weapon"]        = "Equipment",
+    ["Consumable"]    = "Consumables",
+    ["Trade Goods"]   = "Trade Goods",
+    ["Reagent"]       = "Reagents",
+    ["Recipe"]        = "Trade Goods",
+    ["Gem"]           = "Trade Goods",
+    ["Quest"]         = "Quest Items",
+    ["Key"]           = "Keys",
     ["Miscellaneous"] = "Miscellaneous",
-    ["Container"]   = "Bags",
-    ["Projectile"]  = "Ammo",
-    ["Quiver"]      = "Bags",
+    ["Container"]     = "Bags",
+    ["Projectile"]    = "Ammo",
+    ["Quiver"]        = "Bags",
+    ["Glyph"]         = "Glyphs",
+
+    -- Subtypes (for more specific matching)
+    ["Potion"]        = "Consumables",
+    ["Elixir"]        = "Consumables",
+    ["Flask"]         = "Consumables",
+    ["Food & Drink"]  = "Consumables",
+    ["Bandage"]       = "Consumables",
+    ["Scroll"]        = "Consumables",
+    ["Other"]         = "Consumables",  -- Consumable subtype
+    ["Leather"]       = "Trade Goods",
+    ["Metal & Stone"] = "Trade Goods",
+    ["Cloth"]         = "Trade Goods",
+    ["Herb"]          = "Trade Goods",
+    ["Enchanting"]    = "Trade Goods",
+    ["Jewelcrafting"] = "Trade Goods",
+    ["Parts"]         = "Trade Goods",
+    ["Devices"]       = "Trade Goods",
+    ["Explosives"]    = "Trade Goods",
+    ["Mount"]         = "Miscellaneous",
+    ["Companion Pets"] = "Miscellaneous",
+    ["Holiday"]       = "Miscellaneous",
 }
 
 local function ClassifyByItemType(itemInfo)
@@ -168,6 +206,14 @@ function Categorizer:GetCategory(itemInfo)
         end
     end
 
+    -- Priority 1.5: Custom Rules Engine
+    if Omni.Rules then
+        local matchedRule = Omni.Rules:FindMatchingRule(itemInfo)
+        if matchedRule and matchedRule.category then
+            return matchedRule.category
+        end
+    end
+
     -- Priority 2: Quest Items
     if IsQuestItem(itemInfo) then
         return "Quest Items"
@@ -179,7 +225,7 @@ function Categorizer:GetCategory(itemInfo)
     end
 
     -- Priority 4: New Items (session-based)
-    if IsNewItem(itemInfo.itemID) then
+    if self:IsNewItem(itemInfo.itemID) then
         -- Don't return here, just mark - new items also belong to a real category
         -- We'll handle "New" as a special overlay, not a category
     end
@@ -286,7 +332,11 @@ function Categorizer:Init()
     self:RegisterCategory("Consumables", 11, nil, CATEGORY_COLORS["Consumables"])
     self:RegisterCategory("Trade Goods", 12, nil, CATEGORY_COLORS["Trade Goods"])
     self:RegisterCategory("Reagents", 13, nil, CATEGORY_COLORS["Reagents"])
-    self:RegisterCategory("Junk", 14, nil, CATEGORY_COLORS["Junk"])
+    self:RegisterCategory("Keys", 15, nil, CATEGORY_COLORS["Keys"])
+    self:RegisterCategory("Bags", 16, nil, CATEGORY_COLORS["Bags"])
+    self:RegisterCategory("Ammo", 17, nil, CATEGORY_COLORS["Ammo"])
+    self:RegisterCategory("Glyphs", 18, nil, CATEGORY_COLORS["Glyphs"])
+    self:RegisterCategory("Junk", 90, nil, CATEGORY_COLORS["Junk"])
     self:RegisterCategory("Miscellaneous", 99, nil, CATEGORY_COLORS["Miscellaneous"])
 
     -- Initialize manual overrides

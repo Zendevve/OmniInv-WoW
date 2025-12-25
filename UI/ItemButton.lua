@@ -39,40 +39,95 @@ function ItemButton:Create(parent)
     buttonCount = buttonCount + 1
     local name = "OmniItemButton" .. buttonCount
 
-    -- Create using ItemButtonTemplate for proper behavior
-    local button = CreateFrame("Button", name, parent, "ItemButtonTemplate")
+    -- Create plain button WITHOUT template to avoid all styling issues
+    local button = CreateFrame("Button", name, parent)
     button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForDrag("LeftButton")
 
-    -- Get standard template elements
-    button.icon = _G[name .. "IconTexture"] or button:CreateTexture(nil, "ARTWORK")
-    button.icon:SetPoint("CENTER")
-    button.icon:SetSize(ICON_SIZE, ICON_SIZE)
+    -- Dark background
+    button.bg = button:CreateTexture(nil, "BACKGROUND")
+    button.bg:SetAllPoints()
+    button.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.bg:SetVertexColor(0.1, 0.1, 0.1, 1)
 
-    button.count = _G[name .. "Count"] or button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    -- Icon texture
+    button.icon = button:CreateTexture(nil, "ARTWORK")
+    button.icon:SetPoint("TOPLEFT", 2, -2)
+    button.icon:SetPoint("BOTTOMRIGHT", -2, 2)
+    button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)  -- Trim icon edges
+
+    -- Stack count
+    button.count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     button.count:SetPoint("BOTTOMRIGHT", -2, 2)
+    button.count:SetJustifyH("RIGHT")
 
-    -- Quality border frame
-    button.border = CreateFrame("Frame", nil, button)
-    button.border:SetPoint("TOPLEFT", -BORDER_SIZE, BORDER_SIZE)
-    button.border:SetPoint("BOTTOMRIGHT", BORDER_SIZE, -BORDER_SIZE)
-    button.border:SetBackdrop({
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        edgeSize = BORDER_SIZE,
-    })
-    button.border:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
-    button.border:SetFrameLevel(button:GetFrameLevel() + 1)
+    -- Quality border (our custom colored border)
+    button.border = button:CreateTexture(nil, "OVERLAY")
+    button.border:SetPoint("TOPLEFT", -1, 1)
+    button.border:SetPoint("BOTTOMRIGHT", 1, -1)
+    button.border:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.border:SetVertexColor(0.3, 0.3, 0.3, 1)
+    button:CreateTexture(nil, "OVERLAY"):Hide()  -- Placeholder
 
-    -- New item glow
+    -- Create actual border using 4 edge textures for clean look
+    button.borderTop = button:CreateTexture(nil, "OVERLAY")
+    button.borderTop:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.borderTop:SetHeight(1)
+    button.borderTop:SetPoint("TOPLEFT", 0, 0)
+    button.borderTop:SetPoint("TOPRIGHT", 0, 0)
+    button.borderTop:SetVertexColor(0.3, 0.3, 0.3, 1)
+
+    button.borderBottom = button:CreateTexture(nil, "OVERLAY")
+    button.borderBottom:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.borderBottom:SetHeight(1)
+    button.borderBottom:SetPoint("BOTTOMLEFT", 0, 0)
+    button.borderBottom:SetPoint("BOTTOMRIGHT", 0, 0)
+    button.borderBottom:SetVertexColor(0.3, 0.3, 0.3, 1)
+
+    button.borderLeft = button:CreateTexture(nil, "OVERLAY")
+    button.borderLeft:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.borderLeft:SetWidth(1)
+    button.borderLeft:SetPoint("TOPLEFT", 0, 0)
+    button.borderLeft:SetPoint("BOTTOMLEFT", 0, 0)
+    button.borderLeft:SetVertexColor(0.3, 0.3, 0.3, 1)
+
+    button.borderRight = button:CreateTexture(nil, "OVERLAY")
+    button.borderRight:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.borderRight:SetWidth(1)
+    button.borderRight:SetPoint("TOPRIGHT", 0, 0)
+    button.borderRight:SetPoint("BOTTOMRIGHT", 0, 0)
+    button.borderRight:SetVertexColor(0.3, 0.3, 0.3, 1)
+
+    -- Hide the backdrop border texture we created earlier
+    button.border:Hide()
+
+    -- New item glow with pulsing animation
     button.glow = button:CreateTexture(nil, "OVERLAY")
     button.glow:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
     button.glow:SetBlendMode("ADD")
     button.glow:SetPoint("CENTER")
     button.glow:SetSize(BUTTON_SIZE * 1.5, BUTTON_SIZE * 1.5)
+    button.glow:SetVertexColor(0.0, 1.0, 0.5, 1)  -- Green-ish tint for new items
     button.glow:Hide()
 
+    -- Animation state
+    button.glowAnimTime = 0
+    button.glowAnimating = false
+
+    -- OnUpdate for pulsing animation
+    button:SetScript("OnUpdate", function(self, elapsed)
+        if self.glowAnimating and self.glow:IsShown() then
+            self.glowAnimTime = (self.glowAnimTime or 0) + elapsed * 3  -- Speed multiplier
+            -- Pulse alpha between 0.4 and 1.0 using sine wave
+            local alpha = 0.7 + 0.3 * math.sin(self.glowAnimTime)
+            self.glow:SetAlpha(alpha)
+        end
+    end)
+
     -- Search dim overlay
-    button.dimOverlay = button:CreateTexture(nil, "OVERLAY")
-    button.dimOverlay:SetAllPoints()
+    button.dimOverlay = button:CreateTexture(nil, "OVERLAY", nil, 7)
+    button.dimOverlay:SetAllPoints(button.icon)
     button.dimOverlay:SetTexture("Interface\\Buttons\\WHITE8X8")
     button.dimOverlay:SetVertexColor(0, 0, 0, 0.7)
     button.dimOverlay:Hide()
@@ -94,7 +149,6 @@ function ItemButton:Create(parent)
     end)
 
     -- Drag handlers
-    button:RegisterForDrag("LeftButton")
     button:SetScript("OnDragStart", function(self)
         ItemButton:OnDragStart(self)
     end)
@@ -119,10 +173,14 @@ function ItemButton:SetItem(button, itemInfo)
         -- Empty slot
         button.icon:SetTexture(nil)
         button.count:SetText("")
-        button.border:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+        -- Reset border to dark grey
+        local grey = 0.3
+        if button.borderTop then button.borderTop:SetVertexColor(grey, grey, grey, 1) end
+        if button.borderBottom then button.borderBottom:SetVertexColor(grey, grey, grey, 1) end
+        if button.borderLeft then button.borderLeft:SetVertexColor(grey, grey, grey, 1) end
+        if button.borderRight then button.borderRight:SetVertexColor(grey, grey, grey, 1) end
         button.glow:Hide()
         button.dimOverlay:Hide()
-        button:SetID(0)
         return
     end
 
@@ -142,21 +200,28 @@ function ItemButton:SetItem(button, itemInfo)
         button.count:SetText("")
     end
 
-    -- Set quality border
+    -- Set quality border color
     local quality = itemInfo.quality or 1
     local color = QUALITY_COLORS[quality] or QUALITY_COLORS[1]
-    button.border:SetBackdropBorderColor(color[1], color[2], color[3], 1)
+    local r, g, b = color[1], color[2], color[3]
+
+    if button.borderTop then button.borderTop:SetVertexColor(r, g, b, 1) end
+    if button.borderBottom then button.borderBottom:SetVertexColor(r, g, b, 1) end
+    if button.borderLeft then button.borderLeft:SetVertexColor(r, g, b, 1) end
+    if button.borderRight then button.borderRight:SetVertexColor(r, g, b, 1) end
 
     -- Store bag/slot for container operations
-    button:SetID(itemInfo.slotID or 0)
     button.bagID = itemInfo.bagID
     button.slotID = itemInfo.slotID
 
-    -- New item glow (optional)
+    -- New item glow with animation
     if itemInfo.isNew then
         button.glow:Show()
+        button.glowAnimating = true
+        button.glowAnimTime = 0
     else
         button.glow:Hide()
+        button.glowAnimating = false
     end
 
     -- Clear search dim
@@ -200,6 +265,17 @@ function ItemButton:OnClick(button, mouseButton)
     local slotID = button.slotID
 
     if not bagID or not slotID then return end
+
+    -- Clear new item status on any click
+    if button.itemInfo and button.itemInfo.isNew then
+        button.itemInfo.isNew = false
+        button.glow:Hide()
+        button.glowAnimating = false
+        -- Also clear in Categorizer's tracking
+        if Omni.Categorizer and button.itemInfo.itemID then
+            Omni.Categorizer:ClearNewItem(button.itemInfo.itemID)
+        end
+    end
 
     if mouseButton == "LeftButton" then
         if IsModifiedClick("PICKUPACTION") then
@@ -277,7 +353,14 @@ function ItemButton:Reset(button)
     button.slotID = nil
     button.icon:SetTexture(nil)
     button.count:SetText("")
-    button.border:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+    -- Reset border colors to grey
+    local grey = 0.3
+    if button.borderTop then button.borderTop:SetVertexColor(grey, grey, grey, 1) end
+    if button.borderBottom then button.borderBottom:SetVertexColor(grey, grey, grey, 1) end
+    if button.borderLeft then button.borderLeft:SetVertexColor(grey, grey, grey, 1) end
+    if button.borderRight then button.borderRight:SetVertexColor(grey, grey, grey, 1) end
+
     button.glow:Hide()
     button.dimOverlay:Hide()
     button.icon:SetDesaturated(false)

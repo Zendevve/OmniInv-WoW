@@ -31,6 +31,8 @@ local ITEM_SPACING = 4
 
 local mainFrame = nil
 local itemButtons = {}  -- Active item buttons
+local categoryHeaders = {}  -- Active category header FontStrings
+local listRows = {}  -- Track list row frames
 local currentView = "grid"
 local isSearchActive = false
 local searchText = ""
@@ -139,6 +141,38 @@ function Frame:CreateHeader()
         self:SetBackdropColor(0.2, 0.2, 0.2, 1)
     end)
 
+    -- Sort mode button
+    header.sortBtn = CreateFrame("Button", nil, header)
+    header.sortBtn:SetSize(50, 18)
+    header.sortBtn:SetPoint("RIGHT", header.viewBtn, "LEFT", -4, 0)
+    header.sortBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    header.sortBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    header.sortBtn:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    header.sortBtn.text = header.sortBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header.sortBtn.text:SetPoint("CENTER")
+    header.sortBtn.text:SetText("Sort")
+
+    header.sortBtn:SetScript("OnClick", function()
+        Frame:CycleSort()
+    end)
+
+    header.sortBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.3, 0.3, 0.3, 1)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        local mode = Omni.Sorter and Omni.Sorter:GetDefaultMode() or "category"
+        GameTooltip:SetText("Sort Mode: " .. mode)
+        GameTooltip:Show()
+    end)
+    header.sortBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.2, 0.2, 0.2, 1)
+        GameTooltip:Hide()
+    end)
+
     -- Make header draggable
     header:EnableMouse(true)
     header:RegisterForDrag("LeftButton")
@@ -175,19 +209,15 @@ function Frame:CreateSearchBar()
     searchBar.icon:SetPoint("LEFT", 6, 0)
     searchBar.icon:SetTexture("Interface\\Common\\UI-Searchbox-Icon")
 
-    -- Search editbox
-    searchBar.editBox = CreateFrame("EditBox", "OmniSearchBox", searchBar, "InputBoxTemplate")
+    -- Search editbox (plain EditBox, no template to avoid white borders)
+    searchBar.editBox = CreateFrame("EditBox", "OmniSearchBox", searchBar)
     searchBar.editBox:SetPoint("LEFT", searchBar.icon, "RIGHT", 4, 0)
     searchBar.editBox:SetPoint("RIGHT", -6, 0)
     searchBar.editBox:SetHeight(18)
     searchBar.editBox:SetAutoFocus(false)
-    searchBar.editBox:SetFontObject(GameFontNormalSmall)
-
-    -- Remove default borders
-    searchBar.editBox:SetBackdrop(nil)
-    if searchBar.editBox.Left then searchBar.editBox.Left:Hide() end
-    if searchBar.editBox.Right then searchBar.editBox.Right:Hide() end
-    if searchBar.editBox.Middle then searchBar.editBox.Middle:Hide() end
+    searchBar.editBox:SetFontObject(ChatFontNormal)
+    searchBar.editBox:SetTextColor(1, 1, 1, 1)
+    searchBar.editBox:SetTextInsets(2, 2, 0, 0)
 
     searchBar.editBox:SetScript("OnTextChanged", function(self)
         searchText = self:GetText() or ""
@@ -369,6 +399,34 @@ function Frame:CycleView()
     Frame:SetView(modes[nextIdx])
 end
 
+function Frame:CycleSort()
+    if not Omni.Sorter then return end
+
+    local modes = Omni.Sorter:GetModes()
+    local currentMode = Omni.Sorter:GetDefaultMode()
+    local nextIdx = 1
+
+    for i, mode in ipairs(modes) do
+        if mode == currentMode then
+            nextIdx = (i % #modes) + 1
+            break
+        end
+    end
+
+    local newMode = modes[nextIdx]
+    Omni.Sorter:SetDefaultMode(newMode)
+
+    -- Update button tooltip on next hover
+    if mainFrame and mainFrame.header and mainFrame.header.sortBtn then
+        -- Capitalize first letter for display
+        local displayMode = newMode:gsub("^%l", string.upper)
+        mainFrame.header.sortBtn.text:SetText(displayMode)
+    end
+
+    -- Refresh layout with new sort
+    Frame:UpdateLayout()
+end
+
 -- =============================================================================
 -- Layout Update
 -- =============================================================================
@@ -382,10 +440,14 @@ function Frame:UpdateLayout(changedBags)
         items = OmniC_Container.GetAllBagItems()
     end
 
-    -- Categorize items
+    -- Categorize items and check for new items
     if Omni.Categorizer then
         for _, item in ipairs(items) do
             item.category = Omni.Categorizer:GetCategory(item)
+            -- Check if this is a new item (acquired this session)
+            if item.itemID then
+                item.isNew = Omni.Categorizer:IsNewItem(item.itemID)
+            end
         end
     end
 
@@ -399,6 +461,8 @@ function Frame:UpdateLayout(changedBags)
         self:RenderGridView(items)
     elseif currentView == "flow" then
         self:RenderFlowView(items)
+    elseif currentView == "list" then
+        self:RenderListView(items)
     else
         self:RenderGridView(items)  -- Fallback
     end
@@ -429,6 +493,16 @@ function Frame:RenderGridView(items)
         end
     end
     itemButtons = {}
+
+    -- Hide list rows if any (from List view)
+    for _, row in ipairs(listRows) do
+        row:Hide()
+    end
+
+    -- Hide category headers if any (from Flow view)
+    for _, header in ipairs(categoryHeaders) do
+        header:Hide()
+    end
 
     -- Calculate layout
     local contentWidth = mainFrame.content:GetWidth() - 20
@@ -507,6 +581,16 @@ function Frame:RenderFlowView(items)
     end
     itemButtons = {}
 
+    -- Hide existing category headers (they'll be reused by index)
+    for _, header in ipairs(categoryHeaders) do
+        header:Hide()
+    end
+
+    -- Hide list rows if any (from List view)
+    for _, row in ipairs(listRows) do
+        row:Hide()
+    end
+
     -- Layout
     local contentWidth = mainFrame.content:GetWidth() - 20
     local columns = math.floor(contentWidth / (ITEM_SIZE + ITEM_SPACING))
@@ -514,12 +598,20 @@ function Frame:RenderFlowView(items)
 
     local yOffset = -ITEM_SPACING
     local HEADER_HEIGHT = 20
+    local headerIndex = 0
 
     for _, catName in ipairs(categoryOrder) do
         local catItems = categories[catName]
         if catItems and #catItems > 0 then
-            -- Category header
-            local header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            -- Get or create category header
+            headerIndex = headerIndex + 1
+            local header = categoryHeaders[headerIndex]
+            if not header then
+                header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                categoryHeaders[headerIndex] = header
+            end
+
+            header:ClearAllPoints()
             header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", ITEM_SPACING, yOffset)
 
             local r, g, b = 1, 1, 1
@@ -528,6 +620,7 @@ function Frame:RenderFlowView(items)
             end
             header:SetTextColor(r, g, b)
             header:SetText(catName .. " (" .. #catItems .. ")")
+            header:Show()
 
             yOffset = yOffset - HEADER_HEIGHT
 
@@ -567,6 +660,162 @@ function Frame:RenderFlowView(items)
 end
 
 -- =============================================================================
+-- List View Rendering (Data Table)
+-- =============================================================================
+
+
+function Frame:RenderListView(items)
+    if not mainFrame or not mainFrame.scrollChild then return end
+
+    local scrollChild = mainFrame.scrollChild
+
+    -- Release existing item buttons
+    if Omni.Pool then
+        for _, btn in ipairs(itemButtons) do
+            Omni.Pool:Release("ItemButton", btn)
+        end
+    end
+    itemButtons = {}
+
+    -- Hide existing list rows
+    for _, row in ipairs(listRows) do
+        row:Hide()
+    end
+
+    -- Hide category headers if any
+    for _, header in ipairs(categoryHeaders) do
+        header:Hide()
+    end
+
+    -- Layout constants
+    local ROW_HEIGHT = 22
+    local ICON_SIZE = 18
+    local contentWidth = mainFrame.content:GetWidth() - 20
+    local yOffset = -4
+
+    for i, itemInfo in ipairs(items) do
+        -- Get or create row frame
+        local row = listRows[i]
+        if not row then
+            row = CreateFrame("Button", nil, scrollChild)
+            row:SetHeight(ROW_HEIGHT)
+
+            -- Background (alternating)
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetAllPoints()
+            row.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+
+            -- Icon
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+            row.icon:SetPoint("LEFT", 4, 0)
+
+            -- Name
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+            row.name:SetWidth(180)
+            row.name:SetJustifyH("LEFT")
+
+            -- Type
+            row.itemType = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.itemType:SetPoint("LEFT", row.name, "RIGHT", 8, 0)
+            row.itemType:SetWidth(80)
+            row.itemType:SetJustifyH("LEFT")
+            row.itemType:SetTextColor(0.7, 0.7, 0.7)
+
+            -- Quantity
+            row.qty = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.qty:SetPoint("RIGHT", -8, 0)
+            row.qty:SetWidth(30)
+            row.qty:SetJustifyH("RIGHT")
+
+            -- Hover highlight
+            row:SetScript("OnEnter", function(self)
+                self.bg:SetVertexColor(0.3, 0.3, 0.3, 1)
+                if self.itemInfo and self.itemInfo.bagID and self.itemInfo.slotID then
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:SetBagItem(self.itemInfo.bagID, self.itemInfo.slotID)
+                    GameTooltip:Show()
+                end
+            end)
+            row:SetScript("OnLeave", function(self)
+                local alpha = (i % 2 == 0) and 0.15 or 0.1
+                self.bg:SetVertexColor(0.1, 0.1, 0.1, 1)
+                GameTooltip:Hide()
+            end)
+
+            -- Click handler
+            row:SetScript("OnClick", function(self, mouseButton)
+                if self.itemInfo and self.itemInfo.bagID and self.itemInfo.slotID then
+                    if mouseButton == "LeftButton" then
+                        UseContainerItem(self.itemInfo.bagID, self.itemInfo.slotID)
+                    elseif mouseButton == "RightButton" then
+                        UseContainerItem(self.itemInfo.bagID, self.itemInfo.slotID)
+                    end
+                end
+            end)
+
+            listRows[i] = row
+        end
+
+        -- Position row
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, yOffset)
+        row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, yOffset)
+
+        -- Set background color (alternating rows)
+        if i % 2 == 0 then
+            row.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
+        else
+            row.bg:SetVertexColor(0.1, 0.1, 0.1, 1)
+        end
+
+        -- Set icon
+        row.icon:SetTexture(itemInfo.iconFileID or "Interface\\Icons\\INV_Misc_QuestionMark")
+
+        -- Get item info for name and type
+        local itemName, _, quality, _, _, itemType, itemSubType = nil, nil, itemInfo.quality, nil, nil, nil, nil
+        if itemInfo.hyperlink then
+            itemName, _, quality, _, _, itemType, itemSubType = GetItemInfo(itemInfo.hyperlink)
+        end
+
+        -- Set name with quality color
+        local QUALITY_COLORS = {
+            [0] = { 0.62, 0.62, 0.62 },
+            [1] = { 1.00, 1.00, 1.00 },
+            [2] = { 0.12, 1.00, 0.00 },
+            [3] = { 0.00, 0.44, 0.87 },
+            [4] = { 0.64, 0.21, 0.93 },
+            [5] = { 1.00, 0.50, 0.00 },
+            [6] = { 0.90, 0.80, 0.50 },
+            [7] = { 0.00, 0.80, 1.00 },
+        }
+        local qColor = QUALITY_COLORS[quality or 1] or QUALITY_COLORS[1]
+        row.name:SetText(itemName or itemInfo.hyperlink or "Unknown")
+        row.name:SetTextColor(qColor[1], qColor[2], qColor[3])
+
+        -- Set type
+        row.itemType:SetText(itemSubType or itemType or "")
+
+        -- Set quantity
+        local count = itemInfo.stackCount or 1
+        if count > 1 then
+            row.qty:SetText(count)
+        else
+            row.qty:SetText("")
+        end
+
+        -- Store item info for click/tooltip
+        row.itemInfo = itemInfo
+
+        row:Show()
+        yOffset = yOffset - ROW_HEIGHT
+    end
+
+    scrollChild:SetHeight(math.abs(yOffset) + 8)
+end
+
+-- =============================================================================
 -- Search
 -- =============================================================================
 
@@ -575,15 +824,25 @@ function Frame:ApplySearch(text)
     isSearchActive = (searchText ~= "")
 
     if not isSearchActive then
-        -- Clear search - show all
+        -- Clear search - show all itemButtons
         for _, btn in ipairs(itemButtons) do
-            Omni.ItemButton:ClearSearch(btn)
+            if Omni.ItemButton then
+                Omni.ItemButton:ClearSearch(btn)
+            end
+        end
+        -- Show all list rows (they'll be rebuilt on next update anyway)
+        for _, row in ipairs(listRows) do
+            if row.itemInfo then
+                row:SetAlpha(1)
+                if row.icon then row.icon:SetDesaturated(false) end
+            end
         end
         return
     end
 
     local lowerSearch = string.lower(searchText)
 
+    -- Filter Grid/Flow view buttons
     for _, btn in ipairs(itemButtons) do
         local itemInfo = btn.itemInfo
         local isMatch = false
@@ -595,7 +854,32 @@ function Frame:ApplySearch(text)
             end
         end
 
-        Omni.ItemButton:SetSearchMatch(btn, isMatch)
+        if Omni.ItemButton then
+            Omni.ItemButton:SetSearchMatch(btn, isMatch)
+        end
+    end
+
+    -- Filter List view rows
+    for _, row in ipairs(listRows) do
+        if row:IsShown() and row.itemInfo then
+            local itemInfo = row.itemInfo
+            local isMatch = false
+
+            if itemInfo.hyperlink then
+                local name = GetItemInfo(itemInfo.hyperlink)
+                if name and string.find(string.lower(name), lowerSearch, 1, true) then
+                    isMatch = true
+                end
+            end
+
+            if isMatch then
+                row:SetAlpha(1)
+                if row.icon then row.icon:SetDesaturated(false) end
+            else
+                row:SetAlpha(0.3)
+                if row.icon then row.icon:SetDesaturated(true) end
+            end
+        end
     end
 end
 
