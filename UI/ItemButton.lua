@@ -39,10 +39,11 @@ function ItemButton:Create(parent)
     buttonCount = buttonCount + 1
     local name = "OmniItemButton" .. buttonCount
 
-    -- Create plain button WITHOUT template to avoid all styling issues
-    local button = CreateFrame("Button", name, parent)
+    -- Create secure action button for protected item usage
+    -- This allows WoW's secure action system to handle item use directly
+    local button = CreateFrame("Button", name, parent, "SecureActionButtonTemplate")
     button:SetSize(BUTTON_SIZE, BUTTON_SIZE)
-    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    button:RegisterForClicks("AnyUp")  -- SecureActionButton needs this for both left/right
     button:RegisterForDrag("LeftButton")
 
     -- Dark background
@@ -135,8 +136,8 @@ function ItemButton:Create(parent)
     -- Store item info reference
     button.itemInfo = nil
 
-    -- Click handlers
-    button:SetScript("OnClick", function(self, mouseButton)
+    -- Click handlers - use PostClick so secure action fires first
+    button:SetScript("PostClick", function(self, mouseButton)
         ItemButton:OnClick(self, mouseButton)
     end)
 
@@ -181,6 +182,9 @@ function ItemButton:SetItem(button, itemInfo)
         if button.borderRight then button.borderRight:SetVertexColor(grey, grey, grey, 1) end
         button.glow:Hide()
         button.dimOverlay:Hide()
+        -- Clear secure attributes
+        button:SetAttribute("type", nil)
+        button:SetAttribute("item", nil)
         return
     end
 
@@ -213,6 +217,12 @@ function ItemButton:SetItem(button, itemInfo)
     -- Store bag/slot for container operations
     button.bagID = itemInfo.bagID
     button.slotID = itemInfo.slotID
+
+    -- Configure secure action attributes for item usage
+    -- This allows WoW's protected action system to handle item use directly
+    -- Format: "bag slot" where bag is container ID (0-4) and slot is slot number
+    button:SetAttribute("type", "item")
+    button:SetAttribute("item", itemInfo.bagID .. " " .. itemInfo.slotID)
 
     -- New item glow with animation
     if itemInfo.isNew then
@@ -277,24 +287,30 @@ function ItemButton:OnClick(button, mouseButton)
         end
     end
 
+    -- Handle modifier clicks that the secure button doesn't handle
+    -- Normal left/right clicks are handled by SecureActionButtonTemplate via type="item"
     if mouseButton == "LeftButton" then
-        if IsModifiedClick("PICKUPACTION") then
-            -- Pickup item
-            PickupContainerItem(bagID, slotID)
+        if IsModifiedClick("CHATLINK") then
+            -- Shift-click to link item in chat
+            local itemLink = C_Container.GetContainerItemLink(bagID, slotID)
+            if itemLink then
+                ChatEdit_InsertLink(itemLink)
+            end
+        elseif IsModifiedClick("DRESSUP") then
+            -- Ctrl-click for dressing room
+            DressUpItemLink(C_Container.GetContainerItemLink(bagID, slotID))
+        elseif IsModifiedClick("PICKUPACTION") then
+            -- Pickup item (drag)
+            C_Container.PickupContainerItem(bagID, slotID)
         elseif IsModifiedClick("SPLITSTACK") then
             -- Split stack
-            local _, count = GetContainerItemInfo(bagID, slotID)
-            if count and count > 1 then
-                OpenStackSplitFrame(count, button, "BOTTOMRIGHT", "TOPRIGHT")
+            local info = C_Container.GetContainerItemInfo(bagID, slotID)
+            if info and info.stackCount and info.stackCount > 1 then
+                OpenStackSplitFrame(info.stackCount, button, "BOTTOMRIGHT", "TOPRIGHT")
             end
-        else
-            -- Use item
-            UseContainerItem(bagID, slotID)
         end
-    elseif mouseButton == "RightButton" then
-        -- Use item (right-click)
-        UseContainerItem(bagID, slotID)
     end
+    -- Right-click item usage is handled by SecureActionButtonTemplate
 end
 
 function ItemButton:OnEnter(button)
@@ -326,7 +342,7 @@ function ItemButton:OnDragStart(button)
     local slotID = button.slotID
 
     if bagID and slotID then
-        PickupContainerItem(bagID, slotID)
+        C_Container.PickupContainerItem(bagID, slotID)
     end
 end
 
@@ -337,7 +353,7 @@ function ItemButton:OnReceiveDrag(button)
     local slotID = button.slotID
 
     if bagID and slotID then
-        PickupContainerItem(bagID, slotID)
+        C_Container.PickupContainerItem(bagID, slotID)
     end
 end
 
