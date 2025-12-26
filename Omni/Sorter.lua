@@ -120,6 +120,12 @@ local function DefaultComparator(a, b)
     if not a then return false end
     if not b then return true end
 
+    -- 0. Pinned/Favorite items first
+    local pinnedA = a.itemID and Omni.Data and Omni.Data:IsPinned(a.itemID)
+    local pinnedB = b.itemID and Omni.Data and Omni.Data:IsPinned(b.itemID)
+    if pinnedA and not pinnedB then return true end
+    if pinnedB and not pinnedA then return false end
+
     -- 1. Category Priority (lower number = higher priority)
     local catA = GetCategoryPriority(a)
     local catB = GetCategoryPriority(b)

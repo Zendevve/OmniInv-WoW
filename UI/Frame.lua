@@ -116,6 +116,14 @@ function Frame:CreateMainFrame()
         if Frame.UpdateFooterButton then Frame:UpdateFooterButton() end
     end)
 
+    -- OnHide handler - auto-sort bags (physical)
+    mainFrame:SetScript("OnHide", function(self)
+        -- Only auto-sort if enabled (default: off)
+        if OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.autoSortOnClose then
+            Frame:PhysicalSortBags()
+        end
+    end)
+
     return mainFrame
 end
 
@@ -1342,6 +1350,17 @@ function Frame:Toggle()
         self:Hide()
     else
         self:Show()
+    end
+end
+
+-- =============================================================================
+-- Auto-Sort Physical Bags
+-- =============================================================================
+
+function Frame:PhysicalSortBags()
+    -- Use Blizzard's native SortBags function (WoTLK 3.3.5a compatible)
+    if SortBags then
+        SortBags()
     end
 end
 

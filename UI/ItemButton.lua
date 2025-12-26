@@ -140,6 +140,13 @@ function ItemButton:Create(parent)
     button.dimOverlay:SetVertexColor(0, 0, 0, 0.7)
     button.dimOverlay:Hide()
 
+    -- Pin/Favorite icon (star in top-right corner)
+    button.pinIcon = button:CreateTexture(nil, "OVERLAY")
+    button.pinIcon:SetTexture("Interface\\TargetingFrame\\UI-RaidTargetingIcon_1") -- Star icon
+    button.pinIcon:SetSize(14, 14)
+    button.pinIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -1, -1)
+    button.pinIcon:Hide()
+
     -- Store item info reference
     button.itemInfo = nil
 
@@ -259,6 +266,13 @@ function ItemButton:SetItem(button, itemInfo)
         button.icon:SetDesaturated(false)
         button.icon:SetAlpha(1)
     end
+
+    -- Show pin icon if item is pinned
+    if itemInfo.itemID and Omni.Data and Omni.Data:IsPinned(itemInfo.itemID) then
+        button.pinIcon:Show()
+    else
+        button.pinIcon:Hide()
+    end
 end
 
 -- =============================================================================
@@ -330,6 +344,25 @@ function ItemButton:OnClick(button, mouseButton)
             local _, count = GetContainerItemInfo(bagID, slotID)
             if count and count > 1 then
                 OpenStackSplitFrame(count, button, "BOTTOMRIGHT", "TOPRIGHT")
+            end
+        end
+    elseif mouseButton == "RightButton" then
+        -- Shift+Right-click to toggle pin/favorite
+        if IsShiftKeyDown() and button.itemInfo.itemID then
+            local isPinned = Omni.Data:TogglePin(button.itemInfo.itemID)
+
+            -- Update pin icon immediately
+            if isPinned then
+                button.pinIcon:Show()
+                print("|cFF00FF00Omni|r: Item pinned!")
+            else
+                button.pinIcon:Hide()
+                print("|cFF00FF00Omni|r: Item unpinned.")
+            end
+
+            -- Refresh layout to re-sort with pinned items first
+            if Omni.Frame then
+                Omni.Frame:UpdateLayout()
             end
         end
     end

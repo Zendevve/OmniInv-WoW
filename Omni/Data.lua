@@ -165,4 +165,36 @@ function Data:GetAllCharacters()
     return chars
 end
 
+-- =============================================================================
+-- Favorites/Pin System
+-- =============================================================================
+
+function Data:PinItem(itemID)
+    if not itemID then return end
+    OmniInventoryDB.global.pinnedItems = OmniInventoryDB.global.pinnedItems or {}
+    OmniInventoryDB.global.pinnedItems[itemID] = true
+end
+
+function Data:UnpinItem(itemID)
+    if not itemID then return end
+    if OmniInventoryDB.global.pinnedItems then
+        OmniInventoryDB.global.pinnedItems[itemID] = nil
+    end
+end
+
+function Data:IsPinned(itemID)
+    if not itemID then return false end
+    return OmniInventoryDB.global.pinnedItems and OmniInventoryDB.global.pinnedItems[itemID] == true
+end
+
+function Data:TogglePin(itemID)
+    if self:IsPinned(itemID) then
+        self:UnpinItem(itemID)
+        return false
+    else
+        self:PinItem(itemID)
+        return true
+    end
+end
+
 print("|cFF00FF00OmniInventory|r: Data module loaded")
