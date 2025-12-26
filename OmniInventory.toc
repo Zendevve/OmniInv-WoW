@@ -8,6 +8,9 @@
 ## X-Website: https://github.com/Zendevve/OmniInventory
 ## X-Category: Inventory
 ## X-License: MIT
+## X-Curse-Project-ID: 123456
+## X-WoWI-ID: 12345
+## Tags: Inventory, Bags, Bank, Sorting, Categorization
 
 # =============================================================================
 # Core Architecture (Load Order Critical)

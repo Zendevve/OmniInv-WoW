@@ -216,7 +216,7 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 
 <div align="center">
     <a href="https://github.com/Zendevve" target="_blank">
-        <img src="docs/images/icon-placeholder.png" width="100" height="100" alt="Zendevve"/>
+        <img src=".assets/Icon.jpg" width="100" height="100" alt="Zendevve"/>
     </a>
     <br>
     <sub>Made with ❤️ by <a href="https://github.com/Zendevve">Zendevve</a></sub>
