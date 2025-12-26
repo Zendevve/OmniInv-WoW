@@ -34,6 +34,8 @@ local itemButtons = {}  -- Active item buttons
 local categoryHeaders = {}  -- Active category header FontStrings
 local listRows = {}  -- Track list row frames
 local currentView = "grid"
+local currentMode = "bags"
+local isBankOpen = false
 local isSearchActive = false
 local searchText = ""
 
@@ -171,6 +173,41 @@ function Frame:CreateHeader()
     header.sortBtn:SetScript("OnLeave", function(self)
         self:SetBackdropColor(0.2, 0.2, 0.2, 1)
         GameTooltip:Hide()
+    end)
+
+    -- Bags/Bank toggle tabs
+    header.bagsTab = CreateFrame("Button", nil, header)
+    header.bagsTab:SetSize(40, 18)
+    header.bagsTab:SetPoint("LEFT", header.title, "RIGHT", 12, 0)
+    header.bagsTab:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    header.bagsTab:SetBackdropColor(0.3, 0.5, 0.3, 1)
+    header.bagsTab:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    header.bagsTab.text = header.bagsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header.bagsTab.text:SetPoint("CENTER")
+    header.bagsTab.text:SetText("Bags")
+    header.bagsTab:SetScript("OnClick", function()
+        Frame:SetMode("bags")
+    end)
+
+    header.bankTab = CreateFrame("Button", nil, header)
+    header.bankTab:SetSize(40, 18)
+    header.bankTab:SetPoint("LEFT", header.bagsTab, "RIGHT", 2, 0)
+    header.bankTab:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    header.bankTab:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    header.bankTab:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+    header.bankTab.text = header.bankTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header.bankTab.text:SetPoint("CENTER")
+    header.bankTab.text:SetText("Bank")
+    header.bankTab:SetScript("OnClick", function()
+        Frame:SetMode("bank")
     end)
 
     -- Make header draggable
@@ -325,13 +362,39 @@ function Frame:RegisterEvents()
     -- Connect to Event bucket system
     if Omni.Events then
         Omni.Events:RegisterBucketEvent("BAG_UPDATE", function(changedBags)
-            if mainFrame:IsShown() then
+            if mainFrame:IsShown() and currentMode == "bags" then
                 Frame:UpdateLayout(changedBags)
             end
         end)
 
         Omni.Events:RegisterEvent("PLAYER_MONEY", function()
             Frame:UpdateMoney()
+        end)
+
+        -- Bank events
+        Omni.Events:RegisterEvent("BANKFRAME_OPENED", function()
+            isBankOpen = true
+            Frame:UpdateBankTabState()
+            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
+                Frame:UpdateLayout()
+            end
+        end)
+
+        Omni.Events:RegisterEvent("BANKFRAME_CLOSED", function()
+            isBankOpen = false
+            Frame:UpdateBankTabState()
+        end)
+
+        Omni.Events:RegisterEvent("PLAYERBANKSLOTS_CHANGED", function()
+            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
+                Frame:UpdateLayout()
+            end
+        end)
+
+        Omni.Events:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
+            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
+                Frame:UpdateLayout()
+            end
         end)
     end
 end
@@ -428,16 +491,62 @@ function Frame:CycleSort()
 end
 
 -- =============================================================================
+-- Bags/Bank Mode
+-- =============================================================================
+
+function Frame:SetMode(mode)
+    currentMode = mode or "bags"
+
+    self:UpdateBankTabState()
+    self:UpdateLayout()
+end
+
+function Frame:UpdateBankTabState()
+    if not mainFrame or not mainFrame.header then return end
+
+    local header = mainFrame.header
+    if not header.bagsTab or not header.bankTab then return end
+
+    if currentMode == "bags" then
+        header.bagsTab:SetBackdropColor(0.3, 0.5, 0.3, 1)  -- Active (green tint)
+        header.bankTab:SetBackdropColor(0.2, 0.2, 0.2, 1)  -- Inactive
+    else
+        header.bagsTab:SetBackdropColor(0.2, 0.2, 0.2, 1)  -- Inactive
+        if isBankOpen then
+            header.bankTab:SetBackdropColor(0.3, 0.5, 0.3, 1)  -- Active (green tint)
+        else
+            header.bankTab:SetBackdropColor(0.5, 0.3, 0.3, 1)  -- Unavailable (red tint)
+        end
+    end
+
+    -- Show bank unavailable hint
+    if currentMode == "bank" and not isBankOpen then
+        header.bankTab.text:SetText("Bank*")
+    else
+        header.bankTab.text:SetText("Bank")
+    end
+end
+
+-- =============================================================================
 -- Layout Update
 -- =============================================================================
 
 function Frame:UpdateLayout(changedBags)
     if not mainFrame or not mainFrame:IsShown() then return end
 
-    -- Get all items via Shim
+    -- Get items based on current mode
     local items = {}
     if OmniC_Container then
-        items = OmniC_Container.GetAllBagItems()
+        if currentMode == "bank" then
+            if isBankOpen then
+                items = OmniC_Container.GetAllBankItems()
+            else
+                -- Bank is closed - show empty with message
+                items = {}
+            end
+        else
+            items = OmniC_Container.GetAllBagItems()
+        end
     end
 
     -- Categorize items and check for new items
@@ -891,11 +1000,29 @@ function Frame:UpdateSlotCount()
     if not mainFrame or not mainFrame.footer then return end
 
     local free, total = 0, 0
-    for bagID = 0, 4 do
-        local numSlots = GetContainerNumSlots(bagID)
-        local numFree = GetContainerNumFreeSlots(bagID)
-        total = total + numSlots
-        free = free + numFree
+
+    if currentMode == "bank" then
+        -- Main bank container (bagID = -1)
+        local mainSlots = GetContainerNumSlots(-1) or 0
+        local mainFree = GetContainerNumFreeSlots(-1) or 0
+        total = total + mainSlots
+        free = free + mainFree
+
+        -- Bank bags (5-11)
+        for bagID = 5, 11 do
+            local numSlots = GetContainerNumSlots(bagID) or 0
+            local numFree = GetContainerNumFreeSlots(bagID) or 0
+            total = total + numSlots
+            free = free + numFree
+        end
+    else
+        -- Regular bags (0-4)
+        for bagID = 0, 4 do
+            local numSlots = GetContainerNumSlots(bagID) or 0
+            local numFree = GetContainerNumFreeSlots(bagID) or 0
+            total = total + numSlots
+            free = free + numFree
+        end
     end
 
     local used = total - free

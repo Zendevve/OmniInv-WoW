@@ -113,8 +113,8 @@ Returns available sort modes.
 
 ## Definition of Done
 
-- [ ] Merge sort algorithm implemented
-- [ ] Multi-tier comparator chain
-- [ ] Stable: same inputs = same outputs
-- [ ] No dancing items on refresh
-- [ ] Verified in-game
+- [x] Merge sort algorithm implemented
+- [x] Multi-tier comparator chain
+- [x] Stable: same inputs = same outputs
+- [x] No dancing items on refresh
+- [x] Verified in-game

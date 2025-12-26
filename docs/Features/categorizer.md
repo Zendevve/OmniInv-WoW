@@ -161,9 +161,9 @@ OmniInventoryDB.categoryOverrides = {
 
 ## Definition of Done
 
-- [ ] `Omni/Categorizer.lua` implements priority pipeline
-- [ ] Quest Items detected via API
-- [ ] Manual overrides persist in SavedVariables
-- [ ] Heuristic fallback for unknown items
-- [ ] All test flows verified in-game
-- [ ] ADR documented (if needed)
+- [x] `Omni/Categorizer.lua` implements priority pipeline
+- [x] Quest Items detected via API
+- [x] Manual overrides persist in SavedVariables
+- [x] Heuristic fallback for unknown items
+- [x] All test flows verified in-game
+- [x] ADR documented (ADR-001 covers architecture)

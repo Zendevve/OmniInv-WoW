@@ -85,9 +85,9 @@ Switch view mode: "grid", "flow", "list"
 
 ## Definition of Done
 
-- [ ] Frame displays with proper backdrop
-- [ ] Header with title, close button
-- [ ] Search box functional
-- [ ] Position saves between sessions
-- [ ] B key toggles
-- [ ] ESC closes
+- [x] Frame displays with proper backdrop
+- [x] Header with title, close button
+- [x] Search box functional
+- [x] Position saves between sessions
+- [x] B key toggles
+- [x] ESC closes
