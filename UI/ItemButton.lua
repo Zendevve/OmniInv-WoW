@@ -249,8 +249,16 @@ function ItemButton:SetItem(button, itemInfo)
         end
     end
 
-    -- Clear search dim
-    button.dimOverlay:Hide()
+    -- Apply quick filter dimming or clear search dim
+    if itemInfo.isQuickFiltered then
+        button.dimOverlay:Show()
+        button.icon:SetDesaturated(true)
+        button.icon:SetAlpha(0.4)
+    else
+        button.dimOverlay:Hide()
+        button.icon:SetDesaturated(false)
+        button.icon:SetAlpha(1)
+    end
 end
 
 -- =============================================================================

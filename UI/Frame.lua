@@ -79,6 +79,7 @@ function Frame:CreateMainFrame()
     -- Create components
     self:CreateHeader()
     self:CreateSearchBar()
+    self:CreateFilterBar()
     self:CreateContentArea()
     self:CreateFooter()
     self:CreateResizeHandle()
@@ -322,12 +323,110 @@ function Frame:CreateSearchBar()
 end
 
 -- =============================================================================
+-- Quick Filter Bar
+-- =============================================================================
+
+local FILTER_HEIGHT = 22
+local activeFilter = nil  -- Current active filter
+
+local QUICK_FILTERS = {
+    { name = "All", filter = nil },
+    { name = "Quest", filter = "Quest" },
+    { name = "Gear", filter = "Equipment" },
+    { name = "Cons", filter = "Consumable" },
+    { name = "Junk", filter = "Junk" },
+}
+
+function Frame:CreateFilterBar()
+    local filterBar = CreateFrame("Frame", nil, mainFrame)
+    filterBar:SetHeight(FILTER_HEIGHT)
+    filterBar:SetPoint("TOPLEFT", mainFrame.searchBar, "BOTTOMLEFT", 0, -2)
+    filterBar:SetPoint("TOPRIGHT", mainFrame.searchBar, "BOTTOMRIGHT", 0, -2)
+
+    -- Background
+    filterBar.bg = filterBar:CreateTexture(nil, "BACKGROUND")
+    filterBar.bg:SetAllPoints()
+    filterBar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    filterBar.bg:SetVertexColor(0.08, 0.08, 0.08, 1)
+
+    -- Create filter buttons
+    filterBar.buttons = {}
+    local buttonWidth = 45
+    local buttonSpacing = 2
+    local startX = 4
+
+    for i, filterInfo in ipairs(QUICK_FILTERS) do
+        local btn = CreateFrame("Button", nil, filterBar)
+        btn:SetSize(buttonWidth, 18)
+        btn:SetPoint("LEFT", startX + (i-1) * (buttonWidth + buttonSpacing), 0)
+
+        btn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8X8",
+            edgeFile = "Interface\\Buttons\\WHITE8X8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+        btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+
+        btn.text = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        btn.text:SetPoint("CENTER")
+        btn.text:SetText(filterInfo.name)
+
+        btn.filterName = filterInfo.filter
+
+        btn:SetScript("OnClick", function(self)
+            Frame:SetQuickFilter(self.filterName)
+        end)
+
+        btn:SetScript("OnEnter", function(self)
+            self:SetBackdropColor(0.25, 0.25, 0.25, 1)
+        end)
+
+        btn:SetScript("OnLeave", function(self)
+            if activeFilter == self.filterName then
+                self:SetBackdropColor(0.2, 0.4, 0.2, 1)
+            else
+                self:SetBackdropColor(0.15, 0.15, 0.15, 1)
+            end
+        end)
+
+        filterBar.buttons[i] = btn
+    end
+
+    mainFrame.filterBar = filterBar
+end
+
+function Frame:SetQuickFilter(filterName)
+    activeFilter = filterName
+
+    -- Update button visuals
+    if mainFrame.filterBar and mainFrame.filterBar.buttons then
+        for _, btn in ipairs(mainFrame.filterBar.buttons) do
+            if btn.filterName == activeFilter then
+                btn:SetBackdropColor(0.2, 0.4, 0.2, 1)
+                btn:SetBackdropBorderColor(0.3, 0.6, 0.3, 1)
+            else
+                btn:SetBackdropColor(0.15, 0.15, 0.15, 1)
+                btn:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+            end
+        end
+    end
+
+    -- Apply filter (reuse search highlight logic)
+    self:UpdateLayout()
+end
+
+function Frame:GetActiveFilter()
+    return activeFilter
+end
+
+-- =============================================================================
 -- Content Area (ScrollFrame)
 -- =============================================================================
 
 function Frame:CreateContentArea()
     local content = CreateFrame("ScrollFrame", "OmniContentScroll", mainFrame, "UIPanelScrollFrameTemplate")
-    content:SetPoint("TOPLEFT", mainFrame.searchBar, "BOTTOMLEFT", 0, -4)
+    content:SetPoint("TOPLEFT", mainFrame.filterBar, "BOTTOMLEFT", 0, -4)
     content:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING - 20, PADDING + FOOTER_HEIGHT + 4)
 
     -- Scroll child
@@ -659,11 +758,29 @@ function Frame:UpdateLayout(changedBags)
     -- Categorize items and check for new items
     if Omni.Categorizer then
         for _, item in ipairs(items) do
-            item.category = Omni.Categorizer:GetCategory(item)
+            item.category = item.category or Omni.Categorizer:GetCategory(item)
             -- Check if this is a new item (acquired this session)
             if item.itemID then
                 item.isNew = Omni.Categorizer:IsNewItem(item.itemID)
             end
+        end
+    end
+
+    -- Apply quick filter (dim non-matching items)
+    local quickFilter = self:GetActiveFilter()
+    if quickFilter then
+        for _, item in ipairs(items) do
+            -- Check if item category matches the filter
+            local matches = false
+            if item.category and string.find(item.category, quickFilter) then
+                matches = true
+            end
+            item.isQuickFiltered = not matches
+        end
+    else
+        -- No filter active - clear all filter flags
+        for _, item in ipairs(items) do
+            item.isQuickFiltered = false
         end
     end
 
