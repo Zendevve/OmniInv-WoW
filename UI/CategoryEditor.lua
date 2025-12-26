@@ -61,7 +61,8 @@ function Editor:CreateFrame()
 
     sidebar.bg = sidebar:CreateTexture(nil, "BACKGROUND")
     sidebar.bg:SetAllPoints()
-    sidebar.bg:SetTexture(0, 0, 0, 0.3)
+    sidebar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    sidebar.bg:SetVertexColor(0, 0, 0, 0.3)
 
     self:CreateCategoryList(sidebar)
     self.sidebar = sidebar
@@ -73,7 +74,8 @@ function Editor:CreateFrame()
 
     content.bg = content:CreateTexture(nil, "BACKGROUND")
     content.bg:SetAllPoints()
-    content.bg:SetTexture(0, 0, 0, 0.1)
+    content.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    content.bg:SetVertexColor(0, 0, 0, 0.1)
 
     self:CreateRuleEditor(content)
     self.content = content

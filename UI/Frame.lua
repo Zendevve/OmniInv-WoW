@@ -400,7 +400,8 @@ end
 function Frame:RegisterEvents()
     if not mainFrame then return end
 
-    -- Connect to Event bucket system
+    -- Connect to Event bucket system for bag updates only
+    -- Note: Bank events and PLAYER_MONEY are handled by Omni.Events:Init()
     if Omni.Events then
         Omni.Events:RegisterBucketEvent("BAG_UPDATE", function(changedBags)
             if mainFrame:IsShown() and currentMode == "bags" then
@@ -408,37 +409,7 @@ function Frame:RegisterEvents()
             end
         end)
 
-        Omni.Events:RegisterEvent("PLAYER_MONEY", function()
-            Frame:UpdateMoney()
-        end)
-
-        -- Bank events
-        Omni.Events:RegisterEvent("BANKFRAME_OPENED", function()
-            isBankOpen = true
-            Frame:UpdateBankTabState()
-            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
-                Frame:UpdateLayout()
-            end
-        end)
-
-        Omni.Events:RegisterEvent("BANKFRAME_CLOSED", function()
-            isBankOpen = false
-            Frame:UpdateBankTabState()
-        end)
-
-        Omni.Events:RegisterEvent("PLAYERBANKSLOTS_CHANGED", function()
-            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
-                Frame:UpdateLayout()
-            end
-        end)
-
-        Omni.Events:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
-            if mainFrame and mainFrame:IsShown() and currentMode == "bank" then
-                Frame:UpdateLayout()
-            end
-        end)
-
-        -- Merchant events
+        -- Merchant events (unique to Frame, not in Events.lua)
         Omni.Events:RegisterEvent("MERCHANT_SHOW", function()
             isMerchantOpen = true
             Frame:UpdateFooterButton()
@@ -566,9 +537,15 @@ end
 -- Bags/Bank Mode
 -- =============================================================================
 
+--- Set bank open/close state (called by Events.lua)
+---@param isOpen boolean
+function Frame:SetBankOpen(isOpen)
+    isBankOpen = isOpen
+    self:UpdateBankTabState()
+end
+
 function Frame:SetMode(mode)
     currentMode = mode or "bags"
-
     self:UpdateBankTabState()
     self:UpdateLayout()
 end
