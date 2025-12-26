@@ -174,21 +174,16 @@ The **API Shim** (`Omni/API.lua`) wraps legacy 3.3.5a calls into modern table-re
 ---
 
 ## What's Next
+- [x] Phase 1: Foundation
+- [x] Phase 2: Filter Engine (Visual Editor)
+- [x] Phase 3: Visual Polish & Masque
+- [x] Phase 4: Integrations (Offline Bank, Pawn)
+- [ ] Phase 5: Release v2.0-beta
 
-### Phase 2: Filter Engine
-- [ ] Full categorization pipeline
-- [ ] Stable merge-sort algorithm
-- [ ] Visual rule editor
-
-### Phase 3: Visual Rendering
-- [ ] Grid, Flow, List view implementations
-- [ ] Masque skin support
-- [ ] Animations (new item flash, search dimming)
-
-### Phase 4: Integrations
-- [ ] Auctionator/TSM price display
-- [ ] Pawn upgrade arrows
-- [ ] Cross-character search
+### Future Roadmap
+- Cross-character viewing (UI pending)
+- Search History
+- Item Set Manager integration
 
 ---
 

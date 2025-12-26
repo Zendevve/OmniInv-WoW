@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Secure Item Buttons**: Re-implemented item buttons using `SecureActionButtonTemplate` to fix "Action blocked" errors.
 - **Sorting**: Implemented Stable Merge Sort with multi-tier business rules (Type -> Rarity -> Name).
 - **Categorization**: Added Smart Categorizer with priority-based rule engine.
+- **Visual Category Editor**: Full UI for managing categories and rules.
+- **Visual Polish**: Masque support, smooth Window Fade-in, and efficient `AnimationGroup` item glows.
+- **Offline Bank**: Bank contents are now cached and viewable anywhere.
+- **Integrations**: Added Pawn upgrade arrows and Auctionator price hooks.
 - **Event Handling**: Robust event system including Bank and Merchant events.
 
 ### Changed
