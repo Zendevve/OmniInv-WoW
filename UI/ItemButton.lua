@@ -126,6 +126,13 @@ function ItemButton:Create(parent)
         Omni.MasqueGroup:AddButton(button)
     end
 
+    -- Pawn Upgrade Arrow
+    button.upgradeArrow = button:CreateTexture(nil, "OVERLAY")
+    button.upgradeArrow:SetTexture("Interface\\AddOns\\Pawn\\Textures\\UpgradeArrow")
+    button.upgradeArrow:SetSize(23, 23)
+    button.upgradeArrow:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1)
+    button.upgradeArrow:Hide()
+
     -- Search dim overlay
     button.dimOverlay = button:CreateTexture(nil, "OVERLAY", nil, 7)
     button.dimOverlay:SetAllPoints(button.icon)
@@ -233,6 +240,14 @@ function ItemButton:SetItem(button, itemInfo)
         button.glow:Hide()
     end
 
+    -- Pawn Upgrade Check
+    button.upgradeArrow:Hide()
+    if PawnIsContainerItemAnUpgrade and itemInfo.bagID and itemInfo.bagID >= 0 then
+         if PawnIsContainerItemAnUpgrade(itemInfo.bagID, itemInfo.slotID) then
+             button.upgradeArrow:Show()
+         end
+    end
+
     -- Clear search dim
     button.dimOverlay:Hide()
 end
@@ -318,15 +333,28 @@ function ItemButton:OnEnter(button)
     local bagID = button.bagID
     local slotID = button.slotID
 
-    if bagID and slotID then
-        GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
-        GameTooltip:SetBagItem(bagID, slotID)
-        GameTooltip:Show()
+    GameTooltip:SetOwner(button, "ANCHOR_RIGHT")
 
-        -- Highlight in search
-        if Omni.Frame and Omni.Frame.HighlightItem then
-            Omni.Frame:HighlightItem(button.itemInfo)
-        end
+    if bagID and bagID >= 0 then
+        -- Standard online item
+        GameTooltip:SetBagItem(bagID, slotID)
+    elseif button.itemInfo.hyperlink then
+        -- Offline/Bank item
+        GameTooltip:SetHyperlink(button.itemInfo.hyperlink)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("Bank Item (Offline)", 0.5, 0.5, 0.5)
+    end
+
+    -- Hook for Auctionator (if it doesn't hook automatically)
+    if Auctionator and Auctionator.ShowTooltip then
+         -- Auctionator usually hooks SetBagItem/SetHyperlink, but we can allow extra logic here if needed
+    end
+
+    GameTooltip:Show()
+
+    -- Highlight in search
+    if Omni.Frame and Omni.Frame.HighlightItem then
+        Omni.Frame:HighlightItem(button.itemInfo)
     end
 end
 

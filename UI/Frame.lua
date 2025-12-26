@@ -622,8 +622,46 @@ function Frame:UpdateLayout(changedBags)
             if isBankOpen then
                 items = OmniC_Container.GetAllBankItems()
             else
-                -- Bank is closed - show empty with message
+                -- Offline Bank Access
                 items = {}
+                if OmniInventoryDB and OmniInventoryDB.realm then
+                    local realm = OmniInventoryDB.realm[Omni.Data.realmName]
+                    local char = realm and realm[Omni.Data.playerName]
+
+                    if char and char.bank then
+                        for _, savedItem in ipairs(char.bank) do
+                            -- Use API to get cached info
+                            if Omni.API and savedItem.link then
+                                local info = Omni.API:GetExtendedItemInfo(savedItem.link)
+                                if info then
+                                    -- Construct compatible item table
+                                    local item = {
+                                        iconFileID = info.iconFileID,
+                                        itemID = tonumber(string.match(savedItem.link, "item:(%d+)")),
+                                        hyperlink = savedItem.link,
+                                        stackCount = savedItem.count or 1,
+                                        quality = info.quality,
+                                        isLocked = false,
+                                        isReadable = false,
+                                        hasLoot = false,
+                                        isBound = true, -- Assume bound if in bank
+                                        bindType = nil,
+                                        isFiltered = false,
+                                        bagID = -1, -- Dummy ID indicating bank
+                                        slotID = 0,
+                                        -- Extended fields for safe keeping
+                                        itemType = info.itemType,
+                                        itemSubType = info.itemSubType,
+                                        itemLevel = info.itemLevel,
+                                        equipSlot = info.equipSlot,
+                                        vendorPrice = info.vendorPrice,
+                                    }
+                                    table.insert(items, item)
+                                end
+                            end
+                        end
+                    end
+                end
             end
         else
             items = OmniC_Container.GetAllBagItems()
