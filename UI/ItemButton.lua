@@ -112,11 +112,11 @@ function ItemButton:Create(parent)
     button.glow:SetVertexColor(0.0, 1.0, 0.5, 1)
     button.glow:Hide()
 
+    -- New item glow animation (Classic WoW compatible)
     local ag = button.glow:CreateAnimationGroup()
     ag:SetLooping("BOUNCE")
     local fade = ag:CreateAnimation("Alpha")
-    fade:SetFromAlpha(0.5)
-    fade:SetToAlpha(1.0)
+    fade:SetChange(0.5)  -- Pulse alpha by 0.5 (Classic compatible)
     fade:SetDuration(0.8)
     fade:SetSmoothing("IN_OUT")
     button.glow.anim = ag
@@ -306,21 +306,21 @@ function ItemButton:OnClick(button, mouseButton)
     if mouseButton == "LeftButton" then
         if IsModifiedClick("CHATLINK") then
             -- Shift-click to link item in chat
-            local itemLink = C_Container.GetContainerItemLink(bagID, slotID)
+            local itemLink = GetContainerItemLink(bagID, slotID)
             if itemLink then
                 ChatEdit_InsertLink(itemLink)
             end
         elseif IsModifiedClick("DRESSUP") then
             -- Ctrl-click for dressing room
-            DressUpItemLink(C_Container.GetContainerItemLink(bagID, slotID))
+            DressUpItemLink(GetContainerItemLink(bagID, slotID))
         elseif IsModifiedClick("PICKUPACTION") then
             -- Pickup item (drag)
-            C_Container.PickupContainerItem(bagID, slotID)
+            PickupContainerItem(bagID, slotID)
         elseif IsModifiedClick("SPLITSTACK") then
             -- Split stack
-            local info = C_Container.GetContainerItemInfo(bagID, slotID)
-            if info and info.stackCount and info.stackCount > 1 then
-                OpenStackSplitFrame(info.stackCount, button, "BOTTOMRIGHT", "TOPRIGHT")
+            local _, count = GetContainerItemInfo(bagID, slotID)
+            if count and count > 1 then
+                OpenStackSplitFrame(count, button, "BOTTOMRIGHT", "TOPRIGHT")
             end
         end
     end
@@ -369,7 +369,7 @@ function ItemButton:OnDragStart(button)
     local slotID = button.slotID
 
     if bagID and slotID then
-        C_Container.PickupContainerItem(bagID, slotID)
+        PickupContainerItem(bagID, slotID)
     end
 end
 
@@ -380,7 +380,7 @@ function ItemButton:OnReceiveDrag(button)
     local slotID = button.slotID
 
     if bagID and slotID then
-        C_Container.PickupContainerItem(bagID, slotID)
+        PickupContainerItem(bagID, slotID)
     end
 end
 

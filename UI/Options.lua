@@ -74,7 +74,7 @@ function Settings:CreateControls(parent)
     scaleSlider:SetPoint("TOP", 0, yOffset)
     scaleSlider:SetMinMaxValues(0.5, 2.0)
     scaleSlider:SetValueStep(0.1)
-    scaleSlider:SetObeyStepOnDrag(true)
+    -- Note: SetObeyStepOnDrag not available in WotLK 3.3.5a
     scaleSlider:SetWidth(200)
 
     _G[scaleSlider:GetName() .. "Low"]:SetText("50%")

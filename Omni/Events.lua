@@ -152,7 +152,7 @@ function Events:Init()
     self:RegisterEvent("BANKFRAME_OPENED", function()
         if Omni.Data then Omni.Data:SaveBankItems() end
         if Omni.Frame then
-            Omni.Frame:SetBankMode(true)
+            Omni.Frame:SetMode("bank")
             Omni.Frame:Show()
         end
     end)
@@ -169,7 +169,7 @@ function Events:Init()
 
     self:RegisterEvent("BANKFRAME_CLOSED", function()
         if Omni.Frame then
-            Omni.Frame:SetBankMode(false)
+            Omni.Frame:SetMode("bags")
         end
     end)
 

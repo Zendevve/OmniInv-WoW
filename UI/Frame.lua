@@ -73,7 +73,7 @@ function Frame:CreateMainFrame()
     local scale = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings and OmniInventoryDB.char.settings.scale
     mainFrame:SetScale(scale or 1)
 
-    -- Make tabbable
+    -- Make closable with ESC
     tinsert(UISpecialFrames, "OmniInventoryFrame")
 
     -- Create components
@@ -83,24 +83,15 @@ function Frame:CreateMainFrame()
     self:CreateFooter()
     self:CreateResizeHandle()
 
-    -- Fade Animation
-    local ag = mainFrame:CreateAnimationGroup()
-    local fade = ag:CreateAnimation("Alpha")
-    fade:SetFromAlpha(0.0)
-    fade:SetToAlpha(1.0)
-    fade:SetDuration(0.2)
-    fade:SetSmoothing("OUT")
-    mainFrame.fadeAnim = ag
-
+    -- NO animation - just show immediately
     -- Register for updates
     self:RegisterEvents()
 
     -- Start hidden
     mainFrame:Hide()
 
+    -- OnShow handler
     mainFrame:SetScript("OnShow", function(self)
-        self:SetAlpha(0)
-        self.fadeAnim:Play()
         if Frame.UpdateFooterButton then Frame:UpdateFooterButton() end
     end)
 

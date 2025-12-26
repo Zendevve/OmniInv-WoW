@@ -55,10 +55,28 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
         -- Override default bag functions
         local function OverrideBags()
-            ToggleAllBags = function()
+            -- Store original functions for cleanup/edge cases
+            local origToggleAllBags = ToggleAllBags
+            local origOpenBag = OpenBag
+            local origCloseBag = CloseBag
+
+            -- Debounce mechanism to prevent double toggles
+            local lastToggleTime = 0
+            local TOGGLE_DEBOUNCE = 0.1  -- 100ms debounce
+
+            local function SafeToggle()
+                local now = GetTime()
+                if now - lastToggleTime < TOGGLE_DEBOUNCE then
+                    return  -- Ignore rapid toggles
+                end
+                lastToggleTime = now
                 if Omni.Frame then
                     Omni.Frame:Toggle()
                 end
+            end
+
+            ToggleAllBags = function()
+                SafeToggle()
             end
 
             OpenAllBags = function()
@@ -74,9 +92,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             end
 
             ToggleBackpack = function()
-                if Omni.Frame then
-                    Omni.Frame:Toggle()
-                end
+                SafeToggle()
             end
 
             OpenBackpack = function()
@@ -92,8 +108,23 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             end
 
             ToggleBag = function(id)
+                SafeToggle()
+            end
+
+            -- CRITICAL: Override OpenBag to prevent default frames from showing
+            OpenBag = function(id)
                 if Omni.Frame then
-                    Omni.Frame:Toggle()
+                    Omni.Frame:Show()
+                end
+            end
+
+            -- Hide all default container frames permanently
+            for i = 1, 13 do
+                local containerFrame = _G["ContainerFrame" .. i]
+                if containerFrame then
+                    containerFrame:Hide()
+                    containerFrame:UnregisterAllEvents()
+                    containerFrame:SetScript("OnShow", function(self) self:Hide() end)
                 end
             end
         end
@@ -101,9 +132,12 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         -- Apply bag overrides
         OverrideBags()
 
-        -- Close any default bags that might be open
+        -- Close any default bags that might be open (use internal API)
         for i = 0, 4 do
-            CloseBag(i)
+            local containerFrame = _G["ContainerFrame" .. (i + 1)]
+            if containerFrame then
+                containerFrame:Hide()
+            end
         end
     end
 end)
