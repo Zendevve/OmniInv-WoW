@@ -150,10 +150,21 @@ function Events:Init()
 
     -- Bank events
     self:RegisterEvent("BANKFRAME_OPENED", function()
+        if Omni.Data then Omni.Data:SaveBankItems() end
         if Omni.Frame then
             Omni.Frame:SetBankMode(true)
             Omni.Frame:Show()
         end
+    end)
+
+    self:RegisterEvent("PLAYERBANKSLOTS_CHANGED", function()
+        if Omni.Data then Omni.Data:SaveBankItems() end
+        if Omni.Frame then Omni.Frame:UpdateLayout() end
+    end)
+
+    self:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
+        if Omni.Data then Omni.Data:SaveBankItems() end
+         if Omni.Frame then Omni.Frame:UpdateLayout() end
     end)
 
     self:RegisterEvent("BANKFRAME_CLOSED", function()
