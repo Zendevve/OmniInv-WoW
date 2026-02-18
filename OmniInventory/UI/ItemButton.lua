@@ -36,6 +36,31 @@ local QUALITY_COLORS = {
     [7] = { 0.00, 0.80, 1.00 },  -- Heirloom (Light Blue)
 }
 
+local function UpdateTooltipCompareState()
+    if not GameTooltip or not GameTooltip:IsShown() then
+        return
+    end
+
+    if IsShiftKeyDown() then
+        if GameTooltip_ShowCompareItem then
+            GameTooltip_ShowCompareItem(GameTooltip)
+        end
+    else
+        if GameTooltip_HideShoppingTooltips then
+            GameTooltip_HideShoppingTooltips(GameTooltip)
+        else
+            if ShoppingTooltip1 then ShoppingTooltip1:Hide() end
+            if ShoppingTooltip2 then ShoppingTooltip2:Hide() end
+        end
+    end
+end
+
+local modifierTooltipFrame = CreateFrame("Frame")
+modifierTooltipFrame:RegisterEvent("MODIFIER_STATE_CHANGED")
+modifierTooltipFrame:SetScript("OnEvent", function()
+    UpdateTooltipCompareState()
+end)
+
 local function GetAttuneSettings()
     local global = OmniInventoryDB and OmniInventoryDB.global
     local attune = global and global.attune
@@ -161,6 +186,12 @@ local function HideAttuneDisplay(button)
     button:SetScript("OnUpdate", nil)
 end
 
+local function HideItemCooldown(button)
+    if button and button.cooldown then
+        button.cooldown:Hide()
+    end
+end
+
 -- =============================================================================
 -- Button Creation
 -- =============================================================================
@@ -189,6 +220,11 @@ function ItemButton:Create(parent)
     button.icon:SetPoint("TOPLEFT", 2, -2)
     button.icon:SetPoint("BOTTOMRIGHT", -2, 2)
     button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)  -- Trim icon edges
+
+    button.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+    button.cooldown:SetPoint("TOPLEFT", button.icon, "TOPLEFT", 0, 0)
+    button.cooldown:SetPoint("BOTTOMRIGHT", button.icon, "BOTTOMRIGHT", 0, 0)
+    button.cooldown:Hide()
 
     -- Stack count
     button.count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
@@ -343,6 +379,33 @@ function ItemButton:Create(parent)
     end)
 
     return button
+end
+
+function ItemButton:UpdateCooldown(button)
+    if not button or not button.cooldown then return end
+
+    local bagID = button.bagID
+    local slotID = button.slotID
+    if not bagID or not slotID or bagID < 0 then
+        HideItemCooldown(button)
+        return
+    end
+
+    local start, duration, enable = GetContainerItemCooldown(bagID, slotID)
+    if not start or not duration or duration <= 0 or not enable or enable == 0 then
+        HideItemCooldown(button)
+        return
+    end
+
+    if button.cooldown.SetCooldown then
+        button.cooldown:SetCooldown(start, duration)
+        button.cooldown:Show()
+    elseif CooldownFrame_SetTimer then
+        CooldownFrame_SetTimer(button.cooldown, start, duration, enable)
+        button.cooldown:Show()
+    else
+        HideItemCooldown(button)
+    end
 end
 
 -- =============================================================================
@@ -563,6 +626,7 @@ function ItemButton:SetItem(button, itemInfo)
         button:SetAttribute("type", nil)
         button:SetAttribute("item", nil)
         HideAttuneDisplay(button)
+        HideItemCooldown(button)
         return
     end
 
@@ -596,9 +660,8 @@ function ItemButton:SetItem(button, itemInfo)
     button.bagID = itemInfo.bagID
     button.slotID = itemInfo.slotID
 
-    -- Configure secure action attributes for item usage
-    -- This allows WoW's protected action system to handle item use directly
-    -- Format: "bag slot" where bag is container ID (0-4) and slot is slot number
+    -- Configure secure action attributes for item usage.
+    -- Format: "bag slot" where bag is container ID (0-4) and slot is slot number.
     button:SetAttribute("type", "item")
     button:SetAttribute("item", itemInfo.bagID .. " " .. itemInfo.slotID)
 
@@ -639,6 +702,7 @@ function ItemButton:SetItem(button, itemInfo)
     end
 
     UpdateAttuneDisplay(button, itemInfo)
+    self:UpdateCooldown(button)
 end
 
 -- =============================================================================
@@ -732,7 +796,6 @@ function ItemButton:OnClick(button, mouseButton)
             end
         end
     end
-    -- Right-click item usage is handled by SecureActionButtonTemplate
 end
 
 function ItemButton:OnEnter(button)
@@ -759,6 +822,16 @@ function ItemButton:OnEnter(button)
     end
 
     GameTooltip:Show()
+    UpdateTooltipCompareState()
+    if bagID and bagID >= 0 and slotID and MerchantFrame and MerchantFrame:IsShown() and (not CursorHasItem or not CursorHasItem()) then
+        if ShowContainerSellCursor then
+            ShowContainerSellCursor(bagID, slotID)
+        elseif CursorUpdate then
+            CursorUpdate(button)
+        end
+    elseif CursorUpdate then
+        CursorUpdate(button)
+    end
 
     -- Highlight in search
     if Omni.Frame and Omni.Frame.HighlightItem then
@@ -768,6 +841,9 @@ end
 
 function ItemButton:OnLeave(button)
     GameTooltip:Hide()
+    if ResetCursor then
+        ResetCursor()
+    end
 end
 
 function ItemButton:OnDragStart(button)
@@ -817,6 +893,7 @@ function ItemButton:Reset(button)
     button.dimOverlay:Hide()
     button.pinIcon:Hide()
     HideAttuneDisplay(button)
+    HideItemCooldown(button)
     button.attuneAnimData = nil
     button.icon:SetDesaturated(false)
     button.icon:SetAlpha(1)
