@@ -24,6 +24,7 @@ local SEARCH_HEIGHT = 24
 local PADDING = 8
 local ITEM_SIZE = 37
 local ITEM_SPACING = 4
+local DEFAULT_VIEW_MODE = "flow"
 
 -- =============================================================================
 -- Frame State
@@ -33,7 +34,7 @@ local mainFrame = nil
 local itemButtons = {}  -- Active item buttons
 local categoryHeaders = {}  -- Active category header FontStrings
 local listRows = {}  -- Track list row frames
-local currentView = "grid"
+local currentView = DEFAULT_VIEW_MODE
 local currentMode = "bags"
 local isBankOpen = false
 local isMerchantOpen = false
@@ -51,6 +52,18 @@ local function SetButtonItem(btn, itemInfo)
     if Omni.ItemButton and Omni.ItemButton.SetItem then
         Omni.ItemButton:SetItem(btn, itemInfo)
     end
+end
+
+local function NormalizeViewMode(mode)
+    if mode == "grid" or mode == "flow" or mode == "list" then
+        return mode
+    end
+    return DEFAULT_VIEW_MODE
+end
+
+local function GetSavedViewMode()
+    local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
+    return NormalizeViewMode(settings and settings.viewMode)
 end
 
 -- =============================================================================
@@ -183,7 +196,7 @@ function Frame:CreateHeader()
 
     header.viewBtn.text = header.viewBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     header.viewBtn.text:SetPoint("CENTER")
-    header.viewBtn.text:SetText("Grid")
+    header.viewBtn.text:SetText("Flow")
 
     header.viewBtn:SetScript("OnClick", function()
         Frame:CycleView()
@@ -550,6 +563,14 @@ function Frame:RegisterEvents()
             end
         end)
 
+        Omni.Events:RegisterEvent("BAG_UPDATE_COOLDOWN", function()
+            if not mainFrame:IsShown() or currentMode ~= "bags" then return end
+            if not Omni.ItemButton or not Omni.ItemButton.UpdateCooldown then return end
+            for _, btn in ipairs(itemButtons) do
+                Omni.ItemButton:UpdateCooldown(btn)
+            end
+        end)
+
         -- Merchant events (unique to Frame, not in Events.lua)
         Omni.Events:RegisterEvent("MERCHANT_SHOW", function()
             isMerchantOpen = true
@@ -622,12 +643,17 @@ end
 -- =============================================================================
 
 function Frame:SetView(mode)
-    currentView = mode or "grid"
+    currentView = NormalizeViewMode(mode)
 
     if mainFrame and mainFrame.header and mainFrame.header.viewBtn then
         local labels = { grid = "Grid", flow = "Flow", list = "List" }
         mainFrame.header.viewBtn.text:SetText(labels[currentView] or "Grid")
     end
+
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.char = OmniInventoryDB.char or {}
+    OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+    OmniInventoryDB.char.settings.viewMode = currentView
 
     Frame:UpdateLayout()
 end
@@ -1047,12 +1073,20 @@ function Frame:RenderListView(items)
                     GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                     GameTooltip:SetBagItem(self.itemInfo.bagID, self.itemInfo.slotID)
                     GameTooltip:Show()
+                    if MerchantFrame and MerchantFrame:IsShown() and (not CursorHasItem or not CursorHasItem()) and ShowContainerSellCursor then
+                        ShowContainerSellCursor(self.itemInfo.bagID, self.itemInfo.slotID)
+                    elseif CursorUpdate then
+                        CursorUpdate(self)
+                    end
                 end
             end)
             row:SetScript("OnLeave", function(self)
                 local alpha = (i % 2 == 0) and 0.15 or 0.1
                 self.bg:SetVertexColor(0.1, 0.1, 0.1, 1)
                 GameTooltip:Hide()
+                if ResetCursor then
+                    ResetCursor()
+                end
             end)
 
             -- Click handler
@@ -1302,7 +1336,9 @@ end
 
 function Frame:Show()
     if not mainFrame then
+        currentView = GetSavedViewMode()
         self:CreateMainFrame()
+        self:SetView(currentView)
         self:LoadPosition()
     end
 
