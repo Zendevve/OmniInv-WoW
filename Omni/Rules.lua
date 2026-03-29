@@ -78,13 +78,6 @@ local OPERATORS = {
         end
         return false
     end,
-    in_list = function(a, b)
-        if type(b) ~= "table" then return false end
-        for _, v in ipairs(b) do
-            if a == v then return true end
-        end
-        return false
-    end,
 }
 
 function Rules:GetRuleTypes()
