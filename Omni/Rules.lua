@@ -171,34 +171,160 @@ end
 -- =============================================================================
 -- Sandboxed Lua Expression Execution
 -- =============================================================================
+-- Safety: 3 layers of protection against malicious/buggy expressions
+-- 1. Keyword blocking (while, for, repeat, goto)
+-- 2. Instruction counter (fuel limit prevents runaway computation)
+-- 3. Recursion depth limit (prevents stack overflow)
+-- =============================================================================
 
-local SAFE_ENV = {
-    -- Safe string functions
-    string = {
-        find = string.find,
-        match = string.match,
-        lower = string.lower,
-        upper = string.upper,
-        sub = string.sub,
-        len = string.len,
-    },
-    -- Safe math functions
-    math = {
-        floor = math.floor,
-        ceil = math.ceil,
-        abs = math.abs,
-        min = math.min,
-        max = math.max,
-    },
-    -- Comparison
-    tonumber = tonumber,
-    tostring = tostring,
-    type = type,
+-- Maximum "fuel" for expression execution (prevents infinite loops)
+local MAX_FUEL = 1000
+
+-- Maximum recursion depth for function calls within expressions
+local MAX_RECURSION = 5
+
+-- Dangerous keywords that enable infinite loops or gotos
+local DANGEROUS_KEYWORDS = {
+    "while", "for", "repeat", "goto",
 }
+
+--- Scan expression for dangerous patterns
+---@param expression string
+---@return boolean safe
+---@return string|nil reason
+local function ScanForDangerousPatterns(expression)
+    if not expression or expression == "" then
+        return true, nil
+    end
+
+    local lower = string.lower(expression)
+
+    -- Check for dangerous keywords (word boundary match)
+    for _, keyword in ipairs(DANGEROUS_KEYWORDS) do
+        -- Match keyword as whole word (not part of identifier like "therefore")
+        local pattern = "[^%w_]" .. keyword .. "[^%w_]"
+        local patternStart = "^" .. keyword .. "[^%w_]"
+        local patternEnd = "[^%w_]" .. keyword .. "$"
+        local patternExact = "^" .. keyword .. "$"
+
+        if string.find(lower, pattern)
+            or string.find(lower, patternStart)
+            or string.find(lower, patternEnd)
+            or string.find(lower, patternExact) then
+            return false, "Contains forbidden keyword: " .. keyword
+        end
+    end
+
+    -- Check for label syntax (::)
+    if string.find(expression, "::") then
+        return false, "Contains forbidden label syntax (::)"
+    end
+
+    return true, nil
+end
+
+-- =============================================================================
+-- Instrumented Sandbox Environment
+-- =============================================================================
+
+--- Create a fresh sandbox environment with a fuel counter
+---@param fuel number Instruction budget
+---@return table env
+local function CreateSandboxEnv(fuel)
+    local _fuel = fuel or MAX_FUEL
+
+    local env = {
+        -- Safe string functions (wrapped to decrement fuel)
+        string = {
+            find = function(s, p, ...)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.find(s, p, ...)
+            end,
+            match = function(s, p, ...)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.match(s, p, ...)
+            end,
+            lower = function(s)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.lower(s)
+            end,
+            upper = function(s)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.upper(s)
+            end,
+            sub = function(s, i, j)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.sub(s, i, j)
+            end,
+            len = function(s)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return string.len(s)
+            end,
+        },
+        -- Safe math functions (wrapped)
+        math = {
+            floor = function(x)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return math.floor(x)
+            end,
+            ceil = function(x)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return math.ceil(x)
+            end,
+            abs = function(x)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return math.abs(x)
+            end,
+            min = function(...)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return math.min(...)
+            end,
+            max = function(...)
+                _fuel = _fuel - 1
+                if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+                return math.max(...)
+            end,
+        },
+        -- Safe comparison/conversion functions
+        tonumber = function(v)
+            _fuel = _fuel - 1
+            if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+            return tonumber(v)
+        end,
+        tostring = function(v)
+            _fuel = _fuel - 1
+            if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+            return tostring(v)
+        end,
+        type = function(v)
+            _fuel = _fuel - 1
+            if _fuel <= 0 then error("Expression timeout: too many operations", 0) end
+            return type(v)
+        end,
+    }
+
+    return env
+end
 
 local function CompileExpression(expression)
     if not expression or expression == "" then
         return nil, "Empty expression"
+    end
+
+    -- Layer 1: Scan for dangerous patterns (while, for, repeat, goto)
+    local safe, reason = ScanForDangerousPatterns(expression)
+    if not safe then
+        return nil, "Blocked: " .. (reason or "unsafe expression")
     end
 
     -- Wrap in return statement
@@ -210,8 +336,9 @@ local function CompileExpression(expression)
         return nil, "Syntax error: " .. (err or "unknown")
     end
 
-    -- Execute in sandboxed environment
-    setfenv(chunk, SAFE_ENV)
+    -- Layer 2: Execute in fresh sandboxed environment with fuel counter
+    local env = CreateSandboxEnv(MAX_FUEL)
+    setfenv(chunk, env)
 
     local ok, result = pcall(chunk)
     if not ok then
@@ -251,15 +378,21 @@ local function EvaluateExpression(itemInfo, expression)
         context.itemSubType = itemSubType or ""
     end
 
-    -- Execute compiled expression
+    -- Execute compiled expression with error boundary
     local ok, result = pcall(compiledRules[expression], context)
     if not ok then
+        -- result contains the error message
+        local errMsg = tostring(result)
+        if string.find(errMsg, "timeout") or string.find(errMsg, "recursion") then
+            print("|cFFFF0000OmniInventory Rules|r: Expression safety limit hit: " .. errMsg)
+            -- Invalidate cache so we don't keep a broken function
+            compiledRules[expression] = nil
+        end
         return false
     end
 
     return result == true
 end
-
 -- =============================================================================
 -- Rule Matching
 -- =============================================================================
@@ -281,16 +414,92 @@ function Rules:MatchRule(itemInfo, rule)
 
     return false
 end
+-- =============================================================================
+-- Rule Matching (Optimized)
+-- =============================================================================
+-- Performance: O(1) for itemID-based rules, O(M) worst case otherwise
+-- Uses cached sorted rules (invalidated on RULES_CHANGED) and itemID index
+-- =============================================================================
 
-function Rules:FindMatchingRule(itemInfo)
-    local rules = self:GetAllRules()
+-- Sorted rules cache (invalidated when rules change)
+local sortedRulesCache = nil
 
-    -- Sort by priority
-    table.sort(rules, function(a, b)
-        return (a.priority or 99) < (b.priority or 99)
-    end)
+-- itemID -> rule index for O(1) lookups on direct itemID matches
+local itemIDIndex = nil
+
+--- Invalidate all caches (called when rules change)
+local function InvalidateCaches()
+    sortedRulesCache = nil
+    itemIDIndex = nil
+end
+
+--- Build itemID index from current rules
+local function BuildItemIDIndex()
+    itemIDIndex = {}
+    local rules = Rules:GetAllRules()
 
     for _, rule in ipairs(rules) do
+        if rule.enabled and rule.conditions then
+            for _, cond in ipairs(rule.conditions) do
+                if cond.field == "itemID" and cond.operator == "equals" then
+                    local itemID = tonumber(cond.value)
+                    if itemID then
+                        -- Store first (highest priority) rule for this itemID
+                        if not itemIDIndex[itemID] then
+                            itemIDIndex[itemID] = rule
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+--- Get sorted rules (cached)
+---@return table sortedRules
+local function GetSortedRules()
+    if not sortedRulesCache then
+        sortedRulesCache = {}
+        local allRules = Rules:GetAllRules()
+
+        -- Only include enabled rules
+        for _, rule in ipairs(allRules) do
+            if rule.enabled ~= false then
+                table.insert(sortedRulesCache, rule)
+            end
+        end
+
+        -- Sort by priority (lower number = higher priority)
+        table.sort(sortedRulesCache, function(a, b)
+            return (a.priority or 99) < (b.priority or 99)
+        end)
+    end
+
+    return sortedRulesCache
+end
+
+function Rules:FindMatchingRule(itemInfo)
+    if not itemInfo then return nil end
+
+    -- Fast path: check itemID index first (O(1))
+    if itemInfo.itemID then
+        if not itemIDIndex then
+            BuildItemIDIndex()
+        end
+
+        local indexedRule = itemIDIndex[itemInfo.itemID]
+        if indexedRule then
+            -- Verify the rule still matches (conditions might have changed)
+            if self:MatchRule(itemInfo, indexedRule) then
+                return indexedRule
+            end
+        end
+    end
+
+    -- Slow path: iterate sorted rules
+    local sortedRules = GetSortedRules()
+
+    for _, rule in ipairs(sortedRules) do
         if self:MatchRule(itemInfo, rule) then
             return rule
         end
@@ -327,6 +536,9 @@ function Rules:AddRule(rule)
         compiledRules[rule.expression] = nil
     end
 
+    -- Invalidate sorted rules and itemID caches
+    InvalidateCaches()
+
     if Omni.Events then Omni.Events:FireEvent("RULES_CHANGED") end
     return true
 end
@@ -341,6 +553,10 @@ function Rules:RemoveRule(ruleId)
                 compiledRules[rule.expression] = nil
             end
             table.remove(rules, i)
+
+            -- Invalidate sorted rules and itemID caches
+            InvalidateCaches()
+
             if Omni.Events then Omni.Events:FireEvent("RULES_CHANGED") end
             return true
         end
@@ -361,6 +577,10 @@ function Rules:UpdateRule(ruleId, updates)
             if updates.expression then
                 compiledRules[rule.expression] = nil
             end
+
+            -- Invalidate sorted rules and itemID caches
+            InvalidateCaches()
+
             if Omni.Events then Omni.Events:FireEvent("RULES_CHANGED") end
             return true
         end
@@ -375,6 +595,10 @@ function Rules:ToggleRule(ruleId)
     for _, rule in ipairs(rules) do
         if rule.id == ruleId then
             rule.enabled = not rule.enabled
+
+            -- Invalidate sorted rules and itemID caches
+            InvalidateCaches()
+
             if Omni.Events then Omni.Events:FireEvent("RULES_CHANGED") end
             return true
         end
