@@ -1,17 +1,11 @@
 # STATE.md — OmniInventory
 
-## Current Phase
+## Current Position
 
-**Phase 5B: Async Data & Event Reliability**
-
-## Status
-
-- Planning initialized: 2026-04-01
-- Phase 5A completed: 2026-04-01
-  - Rule engine sandbox safety: keyword blocking, instruction counter (fuel limit), recursion depth limit
-  - Rule matching optimization: sorted rules cache, itemID index for O(1) lookups
-  - Cache invalidation on all rule changes (Add, Remove, Update, Toggle)
-- Ready to begin Phase 5B execution
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for Milestone v2.1
+Last activity: 2026-04-22 — Milestone v2.1 "The Definitive Bag Addon" started
 
 ## Milestones
 
@@ -19,30 +13,30 @@
 - [x] Phase 2: Filter Engine (Visual Editor)
 - [x] Phase 3: Visual Polish & Masque
 - [x] Phase 4: Integrations (Offline Bank, Pawn)
-- [ ] Phase 5: Release v2.0-beta
-  - [x] 5A: Rule Engine Hardening ✅
-  - [ ] 5B: Async Data & Event Reliability
-  - [ ] 5C: Cross-Character Features
-  - [ ] 5D: Polish & Documentation
+- [x] Phase 5A: Rule Engine Hardening
+- [x] Phase 5B-D: Absorbed into Milestone v2.1
+- [ ] Milestone v2.1: The Definitive Bag Addon
+  - [ ] Phase 6: Bug Fixes & Performance
+  - [ ] Phase 7: Essential QoL (Restack, iLvl, Cooldowns, Durability)
+  - [ ] Phase 8: Information Powerhouse (Tooltip counts, Auto-vendor, Bag Bar)
+  - [ ] Phase 9: Advanced Power User (Alt Viewer, Gear Sets)
+  - [ ] Phase 10: Polish & Compatibility
 
-## Phase 5A Changes
-
-- `Omni/Rules.lua`: Added 3-layer sandbox safety
-  - Layer 1: Keyword blocking (while, for, repeat, goto)
-  - Layer 2: Instruction counter (MAX_FUEL = 1000 operations)
-  - Layer 3: Error boundary for timeout/recursion errors
-- `Omni/Rules.lua`: Optimized rule matching
-  - Sorted rules cache (invalidated on RULES_CHANGED)
-  - itemID index for O(1) lookups on direct itemID matches
-  - Cache invalidation in AddRule, RemoveRule, UpdateRule, ToggleRule
-
-## Notes
+## Accumulated Context
 
 - Project health check completed (docs/project_health_check.md)
 - GET_ITEM_INFO_RECEIVED already handled in Events.lua
 - pcall error boundaries already added in RenderFlowView and RenderListView
 - Rule engine sandbox now has infinite loop protection
 - Rule matching optimized for large rule sets
+- Deep codebase audit performed on 2026-04-22
+- 5 critical bugs identified for Phase 6
+
+## Notes
+
+- Previous Phase 5B-5D requirements (async data, cross-character UI, search history) absorbed into v2.1 phases.
+- No seeds planted.
+- No MILESTONE-CONTEXT.md consumed.
 
 ---
-*Last updated: 2026-04-01 after Phase 5A completion*
+*Last updated: 2026-04-22 after v2.1 milestone start*

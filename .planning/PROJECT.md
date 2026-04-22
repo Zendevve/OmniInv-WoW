@@ -10,10 +10,27 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 
 ## Context
 
-- **Current state:** v2.0-alpha, Phases 1-4 complete (Foundation, Filter Engine, Visual Polish, Integrations)
-- **Phase 5 pending:** Release v2.0-beta — production hardening, bug fixes, performance optimization
+- **Current state:** v2.0-beta delivered (Phases 1-5A complete). Milestone v2.1 in planning.
+- **Milestone v2.1 goal:** Transform OmniInventory from "solid beta" to "best in class" — fix critical bugs, add essential QoL, and build information-rich tools.
 - **Tech stack:** Lua 5.1, WoW 3.3.5a API, no external dependencies (self-contained)
 - **Architecture:** Layered (UI → Logic → Data → API Shim), forward-compatible with Retail via OmniC_Container shim
+
+## Current Milestone: v2.1 "The Definitive Bag Addon"
+
+**Goal:** Fix all critical bugs, add essential missing QoL, and build information-rich tools that make OmniInventory objectively the best WotLK 3.3.5a bag addon.
+
+**Target features:**
+- Bug Fixes & Performance — Fix 5 critical Lua errors, cache tooltip scans, fix nil references
+- Restack / Compress Stacks — Combine partial stacks across bags
+- Item Level Overlay — Show iLvl on gear icons (toggleable)
+- Cooldown Spirals — Show remaining cooldown on consumables/trinkets
+- Durability Indicator — Red overlay on gear below 20% durability
+- Profession Bag Highlighting — Tint slots matching profession bag types
+- Tooltip Total Count — "Bags: 12 | Bank: 5 | Alts: 3" on item hover
+- Smart Auto-Vendor Junk — Auto-sell greys at merchant (with gold threshold)
+- Bag Bar — Show equipped bags; click empty slot to equip from inventory
+- Offline Alt Bank Viewer — Dropdown to view any alt's inventory/bank
+- Gear Set Assignment — Right-click gear → assign to Tank/Heal/DPS custom sections
 
 ## Requirements
 
@@ -22,6 +39,8 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 - ✓ Multi-mode view engine (Grid, Flow, List)
 - ✓ Smart item categorization (Quest, Equipment, Consumables, Trade Goods)
 - ✓ Custom rule engine with condition-based and Lua expression rules
+- ✓ Rule engine sandbox safety (infinite loop protection via fuel limit)
+- ✓ Rule matching optimization (itemID index, sorted cache)
 - ✓ Stable merge sort (eliminates "dancing items")
 - ✓ Event bucketing (coalesces rapid BAG_UPDATE events)
 - ✓ Object pooling (zero GC churn)
@@ -38,21 +57,28 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 - ✓ Favorites/pin system
 - ✓ Auto-sort on close option
 
-### Active (Phase 5 — v2.0-beta)
+### Active (Milestone v2.1)
 
-- [ ] Rule engine sandbox safety (infinite loop protection)
-- [ ] Performance optimization for large rule sets
-- [ ] Cross-character item viewing UI
-- [ ] Search history
-- [ ] Tooltip enhancements (item count across alts)
-- [ ] Error handling hardening
+- [ ] Bug Fixes — nil references, missing CloseBag override, event handler scope
+- [ ] Performance — cache tooltip binding scans, reduce BAG_UPDATE churn
+- [ ] Restack / Compress Stacks across bags
+- [ ] Item Level Overlay on gear icons
+- [ ] Cooldown Spirals on consumables/trinkets
+- [ ] Durability Indicator on damaged gear
+- [ ] Profession Bag Highlighting
+- [ ] Tooltip Total Count (bags + bank + alts)
+- [ ] Smart Auto-Vendor Junk with threshold
+- [ ] Bag Bar (equipped bags + swap)
+- [ ] Offline Alt Bank Viewer UI
+- [ ] Gear Set Assignment (right-click → custom sets)
 
-### Out of Scope (v2.0)
+### Out of Scope (v2.1)
 
 - Localization (L10n) — deferred to post-release
-- Item Set Manager integration — future roadmap
+- Guild Bank support — high complexity, low usage; future milestone
 - Retail port — future milestone
-- Auctionator/TSM deep integration — basic hooks only
+- Deep Auctionator/TSM integration — basic hooks only
+- Custom theme/skin presets — deferred to v2.2 polish phase
 
 ## Key Decisions
 
@@ -83,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-01 after initialization*
+*Last updated: 2026-04-22 after v2.1 milestone start*
