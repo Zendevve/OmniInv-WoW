@@ -1223,6 +1223,8 @@ function Frame:UpdateLayout(changedBags)
 
     -- Get items based on current mode
     local items = {}
+    local isBankMode = (currentMode == "bank")
+
     if currentViewedChar then
         -- Viewing an alt character's inventory
         items = {}
@@ -1318,6 +1320,11 @@ function Frame:UpdateLayout(changedBags)
         else
             items = OmniC_Container.GetAllBagItems()
         end
+    end
+
+    -- Virtual stack combination (before categorization)
+    if Omni.VirtualStacks and OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.enableVirtualStacks ~= false then
+        items = Omni.VirtualStacks:CombineItems(items, isBankMode)
     end
 
     -- Categorize items and check for new items
