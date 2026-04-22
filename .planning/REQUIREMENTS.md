@@ -110,10 +110,10 @@
 | MENU-02 | Phase 13 | Pending |
 | MENU-03 | Phase 13 | Pending |
 | MENU-04 | Phase 13 | Pending |
-| GSET-01 | Phase 14 | Pending |
-| GSET-02 | Phase 14 | Pending |
-| GSET-03 | Phase 14 | Pending |
-| GSET-04 | Phase 14 | Pending |
+| GSET-01 | Phase 14 | Complete |
+| GSET-02 | Phase 14 | Complete |
+| GSET-03 | Phase 14 | Complete |
+| GSET-04 | Phase 14 | Complete |
 
 ---
 *Last updated: 2026-04-22 — Milestone v2.3 requirements defined*
