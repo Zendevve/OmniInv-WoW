@@ -37,6 +37,7 @@ local listRows = {}  -- Track list row frames
 local currentView = "grid"
 local currentMode = "bags"
 local isBankOpen = false
+local currentViewedChar = nil  -- nil = current character, string = alt name
 local isMerchantOpen = false
 local isSearchActive = false
 local searchText = ""
@@ -632,6 +633,46 @@ function Frame:CreateFooter()
         Frame:SellJunk()
     end)
 
+    -- Alt Character Dropdown
+    footer.altDropdown = CreateFrame("Frame", "OmniAltDropdown", footer, "UIDropDownMenuTemplate")
+    footer.altDropdown:SetPoint("RIGHT", footer.money, "LEFT", -10, -2)
+    UIDropDownMenu_SetWidth(footer.altDropdown, 120)
+    UIDropDownMenu_Initialize(footer.altDropdown, function(self, level)
+        local info = UIDropDownMenu_CreateInfo()
+
+        -- Current character
+        local currentName = UnitName("player")
+        info.text = currentName .. " (Current)"
+        info.func = function()
+            Frame:SetViewedCharacter(nil)
+            UIDropDownMenu_SetSelectedValue(footer.altDropdown, "current")
+        end
+        info.checked = (currentViewedChar == nil)
+        UIDropDownMenu_AddButton(info, level)
+
+        -- Alts
+        if OmniInventoryDB and OmniInventoryDB.realm then
+            local realmName = GetRealmName()
+            local realmData = OmniInventoryDB.realm[realmName]
+            if realmData then
+                for charName, _ in pairs(realmData) do
+                    if charName ~= currentName then
+                        info = UIDropDownMenu_CreateInfo()
+                        info.text = charName
+                        info.func = function()
+                            Frame:SetViewedCharacter(charName)
+                            UIDropDownMenu_SetSelectedValue(footer.altDropdown, charName)
+                        end
+                        info.checked = (currentViewedChar == charName)
+                        UIDropDownMenu_AddButton(info, level)
+                    end
+                end
+            end
+        end
+    end)
+    UIDropDownMenu_SetSelectedValue(footer.altDropdown, "current")
+    UIDropDownMenu_SetText(footer.altDropdown, currentName or "Character")
+
     -- Money display
     footer.money = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     footer.money:SetPoint("RIGHT", -6, 0)
@@ -780,6 +821,26 @@ function Frame:CycleView()
     Frame:SetView(modes[nextIdx])
 end
 
+function Frame:SetViewedCharacter(charName)
+    currentViewedChar = charName
+    if charName then
+        currentMode = "bags"
+        isBankOpen = false
+    end
+
+    -- Update header title
+    if mainFrame and mainFrame.header and mainFrame.header.title then
+        if charName then
+            mainFrame.header.title:SetText("OmniInventory — " .. charName)
+        else
+            mainFrame.header.title:SetText("OmniInventory")
+        end
+    end
+
+    Frame:UpdateBankTabState()
+    Frame:UpdateLayout()
+end
+
 function Frame:CycleSort()
     if not Omni.Sorter then return end
 
@@ -860,7 +921,51 @@ function Frame:UpdateLayout(changedBags)
 
     -- Get items based on current mode
     local items = {}
-    if OmniC_Container then
+    if currentViewedChar then
+        -- Viewing an alt character's inventory
+        items = {}
+        if OmniInventoryDB and OmniInventoryDB.realm then
+            local realmName = GetRealmName()
+            local realmData = OmniInventoryDB.realm[realmName]
+            local char = realmData and realmData[currentViewedChar]
+            local sourceData = nil
+            if currentMode == "bank" then
+                sourceData = char and char.bank
+            else
+                sourceData = char and char.bags
+            end
+            if sourceData then
+                for _, savedItem in ipairs(sourceData) do
+                    if Omni.API and savedItem.link then
+                        local info = Omni.API:GetExtendedItemInfo(savedItem.link)
+                        if info then
+                            local item = {
+                                iconFileID = info.iconFileID,
+                                itemID = tonumber(string.match(savedItem.link, "item:(%d+)")),
+                                hyperlink = savedItem.link,
+                                stackCount = savedItem.count or 1,
+                                quality = info.quality,
+                                isLocked = false,
+                                isReadable = false,
+                                hasLoot = false,
+                                isBound = true,
+                                bindType = nil,
+                                isFiltered = false,
+                                bagID = -1,
+                                slotID = 0,
+                                itemType = info.itemType,
+                                itemSubType = info.itemSubType,
+                                itemLevel = info.itemLevel,
+                                equipSlot = info.equipSlot,
+                                vendorPrice = info.vendorPrice,
+                            }
+                            table.insert(items, item)
+                        end
+                    end
+                end
+            end
+        end
+    elseif OmniC_Container then
         if currentMode == "bank" then
             if isBankOpen then
                 items = OmniC_Container.GetAllBankItems()
