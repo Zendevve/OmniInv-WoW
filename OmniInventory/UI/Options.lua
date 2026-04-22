@@ -144,9 +144,26 @@ function Settings:CreateControls(parent)
     end)
     self.sortBtn = sortBtn
 
-    yOffset = yOffset - SPACING - 20
+    yOffset = yOffset - SPACING - 10
 
-    -- 4. Category Editor Button
+    -- 4. Virtual Stacks Toggle
+    local vsCheckbox = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    vsCheckbox:SetSize(24, 24)
+    vsCheckbox:SetPoint("TOP", 0, yOffset)
+    local vsLabel = vsCheckbox:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    vsLabel:SetPoint("LEFT", vsCheckbox, "RIGHT", 2, 1)
+    vsLabel:SetText("Enable Virtual Stacks")
+    vsCheckbox:SetScript("OnClick", function(self)
+        OmniInventoryDB.global.enableVirtualStacks = self:GetChecked() and true or false
+        if Omni.Frame then
+            Omni.Frame:UpdateLayout()
+        end
+    end)
+    self.vsCheckbox = vsCheckbox
+
+    yOffset = yOffset - SPACING - 10
+
+    -- 5. Category Editor Button
     local catBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     catBtn:SetSize(160, 24)
     catBtn:SetPoint("TOP", 0, yOffset)
@@ -316,6 +333,10 @@ function Settings:UpdateValues()
     end
 
     local attune = GetAttuneSettings()
+    if self.vsCheckbox then
+        self.vsCheckbox:SetChecked(OmniInventoryDB.global.enableVirtualStacks ~= false)
+    end
+
     if self.attuneEnabled then self.attuneEnabled:SetChecked(attune.enabled == true) end
     if self.attuneProgressText then self.attuneProgressText:SetChecked(attune.showProgressText == true) end
     if self.attuneBounty then self.attuneBounty:SetChecked(attune.showBountyIcons == true) end
