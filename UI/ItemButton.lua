@@ -147,6 +147,34 @@ function ItemButton:Create(parent)
     button.pinIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -1, -1)
     button.pinIcon:Hide()
 
+    -- Cooldown spiral
+    button.cooldown = CreateFrame("Cooldown", nil, button, "CooldownFrameTemplate")
+    button.cooldown:SetAllPoints(button.icon)
+    button.cooldown:Hide()
+
+    -- Item Level overlay (bottom-left, small yellow text)
+    button.iLvlText = button:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    button.iLvlText:SetPoint("BOTTOMLEFT", button.icon, "BOTTOMLEFT", 1, 1)
+    button.iLvlText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+    button.iLvlText:SetTextColor(1.0, 0.82, 0.0, 1) -- Gold/yellow
+    button.iLvlText:Hide()
+
+    -- Durability warning overlay (red corner)
+    button.durabilityWarn = button:CreateTexture(nil, "OVERLAY")
+    button.durabilityWarn:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.durabilityWarn:SetSize(8, 8)
+    button.durabilityWarn:SetPoint("BOTTOMLEFT", button.icon, "BOTTOMLEFT", 0, 0)
+    button.durabilityWarn:SetVertexColor(1, 0, 0, 0.85)
+    button.durabilityWarn:Hide()
+
+    -- Profession bag highlight overlay (subtle tint)
+    button.profTint = button:CreateTexture(nil, "OVERLAY")
+    button.profTint:SetAllPoints(button.icon)
+    button.profTint:SetTexture("Interface\\Buttons\\WHITE8X8")
+    button.profTint:SetBlendMode("ADD")
+    button.profTint:SetVertexColor(1, 1, 1, 0)
+    button.profTint:Hide()
+
     -- Store item info reference
     button.itemInfo = nil
 
@@ -173,6 +201,42 @@ function ItemButton:Create(parent)
     end)
 
     return button
+end
+
+-- =============================================================================
+-- Durability Scanning
+-- =============================================================================
+
+local durabilityTooltip = CreateFrame("GameTooltip", "OmniDurabilityTooltip", nil, "GameTooltipTemplate")
+durabilityTooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+--- Scan tooltip for durability percentage
+---@param bagID number|nil
+---@param slotID number|nil
+---@return number|nil percent Durability percentage (0-100) or nil
+function ItemButton:ScanDurability(bagID, slotID)
+    if not bagID or not slotID then return nil end
+
+    durabilityTooltip:ClearLines()
+    durabilityTooltip:SetBagItem(bagID, slotID)
+
+    for i = 2, durabilityTooltip:NumLines() do
+        local textFrame = _G["OmniDurabilityTooltipTextLeft" .. i]
+        if textFrame then
+            local line = textFrame:GetText()
+            if line then
+                local current, maxVal = string.match(line, "Durability%s+(%d+)%s*/%s*(%d+)")
+                if current and maxVal then
+                    local maxNum = tonumber(maxVal)
+                    if maxNum and maxNum > 0 then
+                        return (tonumber(current) / maxNum) * 100
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
 end
 
 -- =============================================================================
@@ -272,6 +336,70 @@ function ItemButton:SetItem(button, itemInfo)
         button.pinIcon:Show()
     else
         button.pinIcon:Hide()
+    end
+
+    -- Cooldown spiral
+    if itemInfo.bagID and itemInfo.slotID then
+        local start, duration, enable = GetContainerItemCooldown(itemInfo.bagID, itemInfo.slotID)
+        if duration and duration > 0 then
+            button.cooldown:SetCooldown(start, duration)
+            button.cooldown:Show()
+        else
+            button.cooldown:Hide()
+        end
+    else
+        button.cooldown:Hide()
+    end
+
+    -- Item Level overlay (gear only, toggleable)
+    local showILvl = OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.showItemLevel ~= false
+    if showILvl and itemInfo.hyperlink then
+        local name, _, iLvl, _, _, itemType, itemSubType, _, equipSlot = GetItemInfo(itemInfo.hyperlink)
+        if equipSlot and equipSlot ~= "" and iLvl and iLvl > 1 then
+            button.iLvlText:SetText(tostring(iLvl))
+            button.iLvlText:Show()
+        else
+            button.iLvlText:Hide()
+        end
+    else
+        button.iLvlText:Hide()
+    end
+
+    -- Durability warning (equipment items only)
+    button.durabilityWarn:Hide()
+    if itemInfo.hyperlink and itemInfo.category == "Equipment" then
+        local durPercent = ItemButton:ScanDurability(itemInfo.bagID, itemInfo.slotID)
+        if durPercent and durPercent < 20 then
+            button.durabilityWarn:Show()
+        end
+    end
+
+    -- Profession bag highlighting
+    button.profTint:Hide()
+    if itemInfo.bagID and itemInfo.bagID >= 1 and itemInfo.hyperlink then
+        local _, bagType = GetContainerNumFreeSlots(itemInfo.bagID)
+        local itemFamily = GetItemFamily(itemInfo.hyperlink) or 0
+        if bagType and bagType > 0 and itemFamily and bit.band(itemFamily, bagType) ~= 0 then
+            -- Subtle color tint based on bag type
+            local tintColor = { 0.3, 0.3, 0.3, 0.25 }
+            if bagType == 8 then       -- Herbs
+                tintColor = { 0.2, 0.8, 0.2, 0.25 }
+            elseif bagType == 256 then -- Mining
+                tintColor = { 0.5, 0.6, 0.7, 0.25 }
+            elseif bagType == 16 then  -- Enchanting
+                tintColor = { 0.6, 0.2, 0.8, 0.25 }
+            elseif bagType == 32 then  -- Engineering
+                tintColor = { 0.8, 0.5, 0.1, 0.25 }
+            elseif bagType == 512 then -- Leatherworking
+                tintColor = { 0.6, 0.4, 0.2, 0.25 }
+            elseif bagType == 1024 then -- Inscription
+                tintColor = { 0.2, 0.5, 0.8, 0.25 }
+            elseif bagType == 128 then -- Gems
+                tintColor = { 0.1, 0.7, 0.7, 0.25 }
+            end
+            button.profTint:SetVertexColor(tintColor[1], tintColor[2], tintColor[3], tintColor[4])
+            button.profTint:Show()
+        end
     end
 end
 
@@ -451,6 +579,10 @@ function ItemButton:Reset(button)
     button.dimOverlay:Hide()
     button.icon:SetDesaturated(false)
     button.icon:SetAlpha(1)
+    button.cooldown:Hide()
+    button.iLvlText:Hide()
+    button.durabilityWarn:Hide()
+    button.profTint:Hide()
     button:Hide()
 end
 

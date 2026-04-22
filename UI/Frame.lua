@@ -218,7 +218,7 @@ function Frame:CreateHeader()
     -- Options Button
     local optBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
     optBtn:SetSize(24, 24)
-    optBtn:SetPoint("RIGHT", header.closeBtn, "LEFT", -5, 0)
+    optBtn:SetPoint("RIGHT", header.sortBtn, "LEFT", -5, 0)
     optBtn:SetText("O")
     optBtn:SetScript("OnClick", function()
         if Omni.CategoryEditor then
@@ -475,6 +475,23 @@ function Frame:CreateFooter()
     footer.slots = footer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     footer.slots:SetPoint("LEFT", 6, 0)
     footer.slots:SetText("0/0")
+
+    -- Restack Button
+    footer.restackBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
+    footer.restackBtn:SetSize(70, 20)
+    footer.restackBtn:SetPoint("LEFT", footer.slots, "RIGHT", 6, 0)
+    footer.restackBtn:SetText("Restack")
+    footer.restackBtn:SetScript("OnClick", function()
+        Frame:RestackBags()
+    end)
+    footer.restackBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("Combine partial stacks across bags")
+        GameTooltip:Show()
+    end)
+    footer.restackBtn:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+    end)
 
     -- Sell Junk Button
     footer.sellBtn = CreateFrame("Button", nil, footer, "UIPanelButtonTemplate")
@@ -1250,6 +1267,100 @@ end
 
 -- =============================================================================
 -- Sell Junk Logic
+-- =============================================================================
+-- Restack / Compress Stacks
+-- =============================================================================
+
+local restackFrame = nil
+local restackQueue = {}
+
+function Frame:RestackBags()
+    -- Build a map of itemID -> list of slots with partial stacks
+    local stacks = {}
+    for bagID = 0, 4 do
+        local numSlots = GetContainerNumSlots(bagID)
+        for slotID = 1, numSlots do
+            local texture, count, locked, quality, readable, lootable, link = GetContainerItemInfo(bagID, slotID)
+            if link and count then
+                local itemID = tonumber(string.match(link, "item:(%d+)"))
+                local _, _, _, _, _, _, _, _, _, _, _, _, _, maxStack = GetItemInfo(link)
+                if itemID and maxStack and maxStack > 1 and count < maxStack then
+                    stacks[itemID] = stacks[itemID] or {}
+                    table.insert(stacks[itemID], {
+                        bag = bagID,
+                        slot = slotID,
+                        count = count,
+                        max = maxStack,
+                        link = link,
+                    })
+                end
+            end
+        end
+    end
+
+    -- Build move queue: for each item, sort by count ascending and pair up
+    restackQueue = {}
+    for itemID, slots in pairs(stacks) do
+        if #slots > 1 then
+            table.sort(slots, function(a, b) return a.count < b.count end)
+            for i = 1, #slots - 1 do
+                local src = slots[i]
+                local dst = slots[i + 1]
+                if src.count < src.max and dst.count < dst.max then
+                    table.insert(restackQueue, { src = src, dst = dst })
+                end
+            end
+        end
+    end
+
+    if #restackQueue == 0 then
+        print("|cFF00FF00OmniInventory|r: No partial stacks to restack.")
+        return
+    end
+
+    print("|cFF00FF00OmniInventory|r: Restacking " .. #restackQueue .. " moves...")
+
+    -- Process moves one per frame to avoid cursor taint
+    if not restackFrame then
+        restackFrame = CreateFrame("Frame")
+        restackFrame:Hide()
+        restackFrame:SetScript("OnUpdate", function(self, elapsed)
+            self.elapsed = (self.elapsed or 0) + elapsed
+            if self.elapsed < 0.05 then return end
+            self.elapsed = 0
+
+            if #restackQueue == 0 then
+                self:Hide()
+                print("|cFF00FF00OmniInventory|r: Restack complete.")
+                return
+            end
+
+            local move = table.remove(restackQueue, 1)
+            local src = move.src
+            local dst = move.dst
+
+            -- Verify slots still contain expected items
+            local srcLink = GetContainerItemLink(src.bag, src.slot)
+            local dstLink = GetContainerItemLink(dst.bag, dst.slot)
+            if not srcLink or not dstLink then return end
+            if srcLink ~= src.link or dstLink ~= dst.link then return end
+
+            -- Perform the merge: pickup from source, then pickup from dest
+            -- If dest has room, this auto-merges. Cursor holds overflow.
+            PickupContainerItem(src.bag, src.slot)
+            PickupContainerItem(dst.bag, dst.slot)
+
+            -- If cursor still has item (overflow), place back in source
+            if CursorHasItem() then
+                PickupContainerItem(src.bag, src.slot)
+            end
+        end)
+    end
+
+    restackFrame.elapsed = 0
+    restackFrame:Show()
+end
+
 -- =============================================================================
 
 function Frame:SellJunk()
