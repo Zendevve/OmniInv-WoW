@@ -354,8 +354,75 @@ function Frame:CreateSearchBar()
         self:ClearFocus()
     end)
 
+    -- Search history navigation (Up/Down arrows)
+    local historyIndex = 0
+    searchBar.editBox:SetScript("OnEnterPressed", function(self)
+        local text = self:GetText() or ""
+        if text ~= "" then
+            Frame:AddSearchHistory(text)
+        end
+        self:ClearFocus()
+    end)
+
+    searchBar.editBox:SetScript("OnEditFocusGained", function(self)
+        historyIndex = 0
+    end)
+
+    searchBar.editBox:SetScript("OnKeyDown", function(self, key)
+        local history = Frame:GetSearchHistory()
+        if #history == 0 then return end
+
+        if key == "UP" then
+            historyIndex = historyIndex + 1
+            if historyIndex > #history then historyIndex = #history end
+            self:SetText(history[historyIndex])
+            self:HighlightText()
+        elseif key == "DOWN" then
+            historyIndex = historyIndex - 1
+            if historyIndex < 1 then
+                historyIndex = 0
+                self:SetText("")
+            else
+                self:SetText(history[historyIndex])
+                self:HighlightText()
+            end
+        end
+    end)
+
     mainFrame.searchBar = searchBar
     mainFrame.searchBox = searchBar.editBox
+end
+
+function Frame:GetSearchHistory()
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.global = OmniInventoryDB.global or {}
+    return OmniInventoryDB.global.searchHistory or {}
+end
+
+function Frame:AddSearchHistory(text)
+    if not text or text == "" then return end
+    text = string.lower(text)
+
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.global = OmniInventoryDB.global or {}
+    OmniInventoryDB.global.searchHistory = OmniInventoryDB.global.searchHistory or {}
+    local history = OmniInventoryDB.global.searchHistory
+
+    -- Remove existing entry if present
+    for i, entry in ipairs(history) do
+        if entry == text then
+            table.remove(history, i)
+            break
+        end
+    end
+
+    -- Add to front
+    table.insert(history, 1, text)
+
+    -- Limit to 20 entries
+    while #history > 20 do
+        table.remove(history)
+    end
 end
 
 -- =============================================================================
@@ -1708,6 +1775,12 @@ function Frame:Hide()
     if mainFrame then
         mainFrame:Hide()
     end
+
+    -- Aggressive pool cleanup: release all item buttons to free memory
+    if Omni.Pool then
+        Omni.Pool:ReleaseAll("ItemButton")
+    end
+    itemButtons = {}
 end
 
 function Frame:Toggle()
