@@ -244,6 +244,21 @@ function Events:Init()
             -- but re-snapshotting here ensures it catches late-loading items
             Omni.Categorizer:SnapshotInventory()
         end
+
+        -- Build Blizzard gear set cache on login
+        if Omni.Data and Omni.Data.BuildBlizzardSetCache then
+            Omni.Data:BuildBlizzardSetCache()
+        end
+    end)
+
+    -- Equipment sets changed (Blizzard Equipment Manager)
+    self:RegisterBucketEvent("EQUIPMENT_SETS_CHANGED", function()
+        if Omni.Data and Omni.Data.BuildBlizzardSetCache then
+            Omni.Data:BuildBlizzardSetCache()
+        end
+        if Omni.Frame then
+            Omni.Frame:UpdateLayout()
+        end
     end)
 end
 

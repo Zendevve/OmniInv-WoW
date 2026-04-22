@@ -331,6 +331,126 @@ function Data:GetItemGearSets(itemID)
 end
 
 -- =============================================================================
+-- Blizzard Gear Set Cache
+-- =============================================================================
+
+function Data:BuildBlizzardSetCache()
+    local numSets = OmniC_Equipment and OmniC_Equipment.GetNumEquipmentSets()
+        and OmniC_Equipment.GetNumEquipmentSets() or 0
+
+    OmniInventoryDB.char.blizzardSetCache = {}
+    self.blizzardItemToSets = {}
+
+    for i = 1, numSets do
+        local setName = OmniC_Equipment and OmniC_Equipment.GetEquipmentSetInfo(i)
+        if setName then
+            local itemIDs = OmniC_Equipment and OmniC_Equipment.GetEquipmentSetItemIDs(setName)
+            if itemIDs then
+                OmniInventoryDB.char.blizzardSetCache[setName] = {}
+                for _, itemID in pairs(itemIDs) do
+                    if itemID and itemID ~= 0 then
+                        OmniInventoryDB.char.blizzardSetCache[setName][tostring(itemID)] = true
+                        self.blizzardItemToSets[itemID] = self.blizzardItemToSets[itemID] or {}
+                        if not self:_tableContains(self.blizzardItemToSets[itemID], setName) then
+                            table.insert(self.blizzardItemToSets[itemID], setName)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Sort set names for each item
+    for itemID, sets in pairs(self.blizzardItemToSets) do
+        table.sort(sets)
+    end
+end
+
+function Data:_tableContains(tbl, value)
+    for _, v in ipairs(tbl) do
+        if v == value then return true end
+    end
+    return false
+end
+
+function Data:GetBlizzardSetsForItem(itemID)
+    if not itemID then return {} end
+    if not self.blizzardItemToSets then
+        self:BuildBlizzardSetCache()
+    end
+    return self.blizzardItemToSets[itemID] or {}
+end
+
+function Data:GetAllSetMemberships(itemID)
+    if not itemID then return {} end
+
+    local allSets = {}
+    local seen = {}
+
+    -- Manual sets
+    local manualSets = self:GetItemGearSets(itemID)
+    for _, setName in ipairs(manualSets) do
+        if not seen[setName] then
+            seen[setName] = true
+            table.insert(allSets, setName)
+        end
+    end
+
+    -- Blizzard sets
+    local blizzardSets = self:GetBlizzardSetsForItem(itemID)
+    for _, setName in ipairs(blizzardSets) do
+        if not seen[setName] then
+            seen[setName] = true
+            table.insert(allSets, setName)
+        end
+    end
+
+    table.sort(allSets)
+    return allSets
+end
+
+function Data:IsItemInAnySet(itemID)
+    if not itemID then return false end
+    local allSets = self:GetAllSetMemberships(itemID)
+    return #allSets > 0
+end
+
+function Data:GetPrimarySetName(itemID)
+    local allSets = self:GetAllSetMemberships(itemID)
+    if #allSets > 0 then
+        return allSets[1]
+    end
+    return nil
+end
+
+function Data:GetAllGearSetNames()
+    local names = {}
+    local seen = {}
+
+    -- Manual sets
+    local manualSets = self:GetGearSets()
+    for setName, _ in pairs(manualSets) do
+        if not seen[setName] then
+            seen[setName] = true
+            table.insert(names, setName)
+        end
+    end
+
+    -- Blizzard sets
+    if OmniInventoryDB.char.blizzardSetCache then
+        for setName, _ in pairs(OmniInventoryDB.char.blizzardSetCache) do
+            if not seen[setName] then
+                seen[setName] = true
+                table.insert(names, setName)
+            end
+        end
+    end
+
+    table.sort(names)
+    return names
+end
+
+-- =============================================================================
 -- Category Collapse State
 -- =============================================================================
 

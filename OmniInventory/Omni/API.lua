@@ -241,6 +241,27 @@ function OmniC_Container.GetAllBankItems()
 end
 
 -- =============================================================================
+-- Namespace: OmniC_Equipment (Equipment Manager Polyfill)
+-- =============================================================================
+-- Provides forward-compatible wrappers for WoW Equipment Manager APIs.
+
+OmniC_Equipment = {}
+
+function OmniC_Equipment.GetNumEquipmentSets()
+    return GetNumEquipmentSets and GetNumEquipmentSets() or 0
+end
+
+function OmniC_Equipment.GetEquipmentSetInfo(index)
+    if not GetEquipmentSetInfo then return nil end
+    return GetEquipmentSetInfo(index)
+end
+
+function OmniC_Equipment.GetEquipmentSetItemIDs(setName)
+    if not GetEquipmentSetItemIDs then return nil end
+    return GetEquipmentSetItemIDs(setName)
+end
+
+-- =============================================================================
 -- Extended Item Info (GetItemInfo Wrapper)
 -- =============================================================================
 
