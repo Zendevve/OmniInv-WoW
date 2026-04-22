@@ -889,6 +889,16 @@ function ItemButton:OnEnter(button)
         end
     end
 
+    -- Gear set tooltip indicator
+    if button.itemInfo.itemID and Omni.Data then
+        local sets = Omni.Data:GetAllSetMemberships(button.itemInfo.itemID)
+        if #sets > 0 then
+            GameTooltip:AddLine(" ")
+            local setList = table.concat(sets, ", ")
+            GameTooltip:AddLine("Part of Sets: " .. setList, 1, 0.82, 0)
+        end
+    end
+
     GameTooltip:Show()
     UpdateTooltipCompareState()
     if bagID and bagID >= 0 and slotID and MerchantFrame and MerchantFrame:IsShown() and (not CursorHasItem or not CursorHasItem()) then

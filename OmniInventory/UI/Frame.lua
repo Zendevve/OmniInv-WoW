@@ -641,7 +641,8 @@ end
 -- =============================================================================
 
 local FILTER_HEIGHT = 22
-local activeFilter = nil  -- Current active filter
+local activeFilter = nil  -- Current active quick filter
+local activeGearSetFilter = nil  -- Current active gear set filter (from right-click on Gear button)
 
 local QUICK_FILTERS = {
     { name = "All", filter = nil },
@@ -689,8 +690,12 @@ function Frame:CreateFilterBar()
 
         btn.filterName = filterInfo.filter
 
-        btn:SetScript("OnClick", function(self)
-            Frame:SetQuickFilter(self.filterName)
+        btn:SetScript("OnClick", function(self, mouseButton)
+            if mouseButton == "RightButton" and self.filterName == "Equipment" then
+                Frame:ShowGearSetDropdown(self)
+            else
+                Frame:SetQuickFilter(self.filterName)
+            end
         end)
 
         btn:SetScript("OnEnter", function(self)
@@ -714,6 +719,11 @@ end
 function Frame:SetQuickFilter(filterName)
     activeFilter = filterName
 
+    -- Clear gear set filter when "All" is selected
+    if not filterName then
+        self:ClearGearSetFilter()
+    end
+
     -- Update button visuals
     if mainFrame.filterBar and mainFrame.filterBar.buttons then
         for _, btn in ipairs(mainFrame.filterBar.buttons) do
@@ -733,6 +743,150 @@ end
 
 function Frame:GetActiveFilter()
     return activeFilter
+end
+
+-- =============================================================================
+-- Gear Set Filter Dropdown
+-- =============================================================================
+
+local gearSetDropdown = nil
+
+local function CreateGearSetDropdown()
+    local frame = CreateFrame("Frame", nil, UIParent)
+    frame:SetFrameStrata("DIALOG")
+    frame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    frame:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+    frame:SetBackdropBorderColor(0.3, 0.3, 0.3, 1)
+    frame:EnableMouse(true)
+    frame:Hide()
+
+    frame.rows = {}
+    return frame
+end
+
+function Frame:ShowGearSetDropdown(anchorButton)
+    if not gearSetDropdown then
+        gearSetDropdown = CreateGearSetDropdown()
+    end
+
+    -- Clear old rows
+    for _, row in ipairs(gearSetDropdown.rows) do
+        row:Hide()
+    end
+    gearSetDropdown.rows = {}
+
+    local ROW_HEIGHT = 20
+    local MENU_WIDTH = 140
+    local entries = {}
+
+    -- "All Equipment" option
+    table.insert(entries, { text = "All Equipment", setName = nil })
+
+    -- Separator
+    table.insert(entries, { text = "", setName = nil, isSeparator = true })
+
+    -- Gear sets
+    if Omni.Data then
+        local sets = Omni.Data:GetAllGearSetNames()
+        for _, setName in ipairs(sets) do
+            table.insert(entries, { text = setName, setName = setName })
+        end
+    end
+
+    -- Create rows
+    for i, entry in ipairs(entries) do
+        if entry.isSeparator then
+            local sep = gearSetDropdown:CreateTexture(nil, "ARTWORK")
+            sep:SetHeight(1)
+            sep:SetWidth(MENU_WIDTH - 8)
+            sep:SetPoint("TOPLEFT", gearSetDropdown, "TOPLEFT", 4, -((i - 1) * ROW_HEIGHT) - 4)
+            sep:SetTexture("Interface\\Buttons\\WHITE8X8")
+            sep:SetVertexColor(0.3, 0.3, 0.3, 1)
+            table.insert(gearSetDropdown.rows, sep)
+        else
+            local row = CreateFrame("Button", nil, gearSetDropdown)
+            row:SetSize(MENU_WIDTH - 2, ROW_HEIGHT)
+            row:SetPoint("TOPLEFT", gearSetDropdown, "TOPLEFT", 1, -((i - 1) * ROW_HEIGHT) - 1)
+
+            row.text = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.text:SetPoint("LEFT", 6, 0)
+            row.text:SetText(entry.text)
+            row.text:SetTextColor(1, 1, 1)
+
+            row:SetScript("OnEnter", function(self)
+                self:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8X8" })
+                self:SetBackdropColor(0.2, 0.4, 0.6, 1)
+            end)
+            row:SetScript("OnLeave", function(self)
+                self:SetBackdrop(nil)
+            end)
+            row:SetScript("OnClick", function()
+                Frame:SetGearSetFilter(entry.setName)
+                gearSetDropdown:Hide()
+            end)
+
+            table.insert(gearSetDropdown.rows, row)
+        end
+    end
+
+    gearSetDropdown:SetWidth(MENU_WIDTH)
+    gearSetDropdown:SetHeight((#entries * ROW_HEIGHT) + 2)
+
+    -- Position below the anchor button
+    local x, y = anchorButton:GetCenter()
+    gearSetDropdown:ClearAllPoints()
+    gearSetDropdown:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x - 10, y - 10)
+    gearSetDropdown:Show()
+
+    -- Hide on outside click
+    gearSetDropdown:SetScript("OnHide", function() end)
+    local clickHandler = CreateFrame("Frame")
+    clickHandler:SetFrameStrata("TOOLTIP")
+    clickHandler:EnableMouse(true)
+    clickHandler:SetAllPoints(UIParent)
+    clickHandler:SetScript("OnMouseDown", function(self)
+        gearSetDropdown:Hide()
+        self:Hide()
+        self:SetScript("OnMouseDown", nil)
+    end)
+    clickHandler:Show()
+    gearSetDropdown.clickHandler = clickHandler
+end
+
+function Frame:SetGearSetFilter(setName)
+    activeGearSetFilter = setName
+
+    -- Update Gear button text
+    if mainFrame.filterBar and mainFrame.filterBar.buttons then
+        for _, btn in ipairs(mainFrame.filterBar.buttons) do
+            if btn.filterName == "Equipment" then
+                if setName then
+                    btn.text:SetText(setName)
+                else
+                    btn.text:SetText("Gear")
+                end
+                break
+            end
+        end
+    end
+
+    self:UpdateLayout()
+end
+
+function Frame:ClearGearSetFilter()
+    activeGearSetFilter = nil
+    if mainFrame.filterBar and mainFrame.filterBar.buttons then
+        for _, btn in ipairs(mainFrame.filterBar.buttons) do
+            if btn.filterName == "Equipment" then
+                btn.text:SetText("Gear")
+                break
+            end
+        end
+    end
 end
 
 -- =============================================================================
@@ -1396,6 +1550,27 @@ function Frame:UpdateLayout(changedBags)
         for _, item in ipairs(items) do
             item.isQuickFiltered = false
         end
+    end
+
+    -- Apply gear set filter (true filter — hide non-matching items)
+    if activeGearSetFilter then
+        local filtered = {}
+        for _, item in ipairs(items) do
+            local inSet = false
+            if item.itemID and Omni.Data then
+                local sets = Omni.Data:GetAllSetMemberships(item.itemID)
+                for _, setName in ipairs(sets) do
+                    if setName == activeGearSetFilter then
+                        inSet = true
+                        break
+                    end
+                end
+            end
+            if inSet then
+                table.insert(filtered, item)
+            end
+        end
+        items = filtered
     end
 
     -- Sort items
