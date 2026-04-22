@@ -10,7 +10,7 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 
 ## Context
 
-- **Current state:** v2.1 "The Definitive Bag Addon" and v2.2 deferred features complete. Milestone v2.3 in planning.
+- **Current state:** v2.1 and v2.2 complete. Milestone v2.3 Phases 11-14 complete (Virtual Stacks, Empty Slot Compression, Context Menu, Gear Set Integration). Phase 15 (Integration & Hardening) remaining.
 - **Milestone v2.3 goal:** Retrofit features from modern Retail bag addons (BetterBags, ArkInventory, Retail Bagnon) that provide massive UX value for WoW 3.3.5a players.
 - **Tech stack:** Lua 5.1, WoW 3.3.5a API, no external dependencies (self-contained)
 - **Architecture:** Layered (UI → Logic → Data → API Shim), forward-compatible with Retail via OmniC_Container shim
@@ -67,10 +67,10 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 
 ### Active (Milestone v2.3)
 
-- [ ] Virtual Stacks — combine partial stacks into one visual stack with total count
-- [ ] Empty Slot Compression — compact empty slots into a single section or grid
-- [ ] Right-Click Item Context Menu — Add to Category, Pin, Search Similar, Send to Alt, Disenchant
-- [ ] Gear Set Integration — filter/view by equipment set, tooltip set name
+- [x] Virtual Stacks — combine partial stacks into one visual stack with total count (Phase 11)
+- [x] Empty Slot Compression — compact empty slots into a single section or grid (Phase 12)
+- [x] Right-Click Item Context Menu — Add to Category, Pin, Search Similar, Send to Alt, Disenchant (Phase 13)
+- [x] Gear Set Integration — filter/view by equipment set, tooltip set name (Phase 14)
 
 ### Out of Scope (v2.3)
 
@@ -109,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 — Milestone v2.3 started*
+*Last updated: 2026-04-22 — Phase 14 complete, Phase 15 pending*
