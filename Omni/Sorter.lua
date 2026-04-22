@@ -212,6 +212,21 @@ local function ILvlComparator(a, b)
     return DefaultComparator(a, b)
 end
 
+-- Usage-based comparator (most used first)
+local function UsageComparator(a, b)
+    if not a and not b then return false end
+    if not a then return false end
+    if not b then return true end
+
+    local usageA = Omni.Data and Omni.Data:GetItemUsage(a.itemID) or 0
+    local usageB = Omni.Data and Omni.Data:GetItemUsage(b.itemID) or 0
+    if usageA ~= usageB then
+        return usageA > usageB
+    end
+
+    return DefaultComparator(a, b)
+end
+
 -- =============================================================================
 -- Public API
 -- =============================================================================
@@ -221,6 +236,7 @@ local COMPARATORS = {
     quality = QualityComparator,
     name = NameComparator,
     ilvl = ILvlComparator,
+    usage = UsageComparator,
 }
 
 --- Sort items using stable merge-sort
@@ -263,7 +279,7 @@ end
 --- Get available sort modes
 ---@return table Array of mode names
 function Sorter:GetModes()
-    return { "category", "quality", "name", "ilvl" }
+    return { "category", "quality", "name", "ilvl", "usage" }
 end
 
 --- Get current default sort mode

@@ -27,12 +27,49 @@ local ITEM_SIZE = 37
 local ITEM_SPACING = 4
 
 -- =============================================================================
+-- Theme Definitions
+-- =============================================================================
+
+local THEMES = {
+    dark = {
+        frameBg = { 0.08, 0.08, 0.08, 0.95 },
+        headerBg = { 0.12, 0.12, 0.12, 1 },
+        footerBg = { 0.12, 0.12, 0.12, 1 },
+        bagBarBg = { 0.1, 0.1, 0.1, 1 },
+        searchBg = { 0.1, 0.1, 0.1, 1 },
+        filterBg = { 0.08, 0.08, 0.08, 1 },
+        contentBg = { 0.08, 0.08, 0.08, 0.95 },
+        borderColor = { 0.3, 0.3, 0.3, 1 },
+    },
+    glass = {
+        frameBg = { 0.05, 0.05, 0.05, 0.75 },
+        headerBg = { 0.1, 0.1, 0.1, 0.8 },
+        footerBg = { 0.1, 0.1, 0.1, 0.8 },
+        bagBarBg = { 0.08, 0.08, 0.08, 0.8 },
+        searchBg = { 0.08, 0.08, 0.08, 0.8 },
+        filterBg = { 0.05, 0.05, 0.05, 0.8 },
+        contentBg = { 0.05, 0.05, 0.05, 0.75 },
+        borderColor = { 0.4, 0.4, 0.4, 0.6 },
+    },
+    classic = {
+        frameBg = { 0.0, 0.0, 0.0, 1 },
+        headerBg = { 0.15, 0.15, 0.25, 1 },
+        footerBg = { 0.15, 0.15, 0.25, 1 },
+        bagBarBg = { 0.1, 0.1, 0.2, 1 },
+        searchBg = { 0.1, 0.1, 0.2, 1 },
+        filterBg = { 0.08, 0.08, 0.15, 1 },
+        contentBg = { 0.0, 0.0, 0.0, 1 },
+        borderColor = { 0.5, 0.5, 0.5, 1 },
+    },
+}
+
+-- =============================================================================
 -- Frame State
 -- =============================================================================
 
 local mainFrame = nil
 local itemButtons = {}  -- Active item buttons
-local categoryHeaders = {}  -- Active category header FontStrings
+local categoryHeaders = {}  -- Active category header buttons
 local listRows = {}  -- Track list row frames
 local currentView = "grid"
 local currentMode = "bags"
@@ -85,6 +122,11 @@ function Frame:CreateMainFrame()
     self:CreateContentArea()
     self:CreateBagBar()
     self:CreateFooter()
+
+    -- Apply theme
+    local theme = Omni.Data and Omni.Data:GetTheme() or "dark"
+    self:ApplyTheme(theme)
+
     self:CreateResizeHandle()
 
     -- Register for updates
@@ -897,7 +939,9 @@ function Frame:SetViewedCharacter(charName)
 
     -- Update header title
     if mainFrame and mainFrame.header and mainFrame.header.title then
-        if charName then
+        if currentMode == "guildbank" then
+            mainFrame.header.title:SetText("OmniInventory — Guild Bank")
+        elseif charName then
             mainFrame.header.title:SetText("OmniInventory — " .. charName)
         else
             mainFrame.header.title:SetText("OmniInventory")
@@ -962,6 +1006,9 @@ function Frame:UpdateBankTabState()
     if currentMode == "bags" then
         header.bagsTab:SetBackdropColor(0.3, 0.5, 0.3, 1)  -- Active (green tint)
         header.bankTab:SetBackdropColor(0.2, 0.2, 0.2, 1)  -- Inactive
+    elseif currentMode == "guildbank" then
+        header.bagsTab:SetBackdropColor(0.2, 0.2, 0.2, 1)  -- Inactive
+        header.bankTab:SetBackdropColor(0.3, 0.3, 0.5, 1)  -- Guild bank (blue tint)
     else
         header.bagsTab:SetBackdropColor(0.2, 0.2, 0.2, 1)  -- Inactive
         if isBankOpen then
@@ -971,8 +1018,10 @@ function Frame:UpdateBankTabState()
         end
     end
 
-    -- Show bank unavailable hint
-    if currentMode == "bank" and not isBankOpen then
+    -- Show bank/guildbank hint
+    if currentMode == "guildbank" then
+        header.bankTab.text:SetText("GBank")
+    elseif currentMode == "bank" and not isBankOpen then
         header.bankTab.text:SetText("Bank*")
     else
         header.bankTab.text:SetText("Bank")
@@ -1078,6 +1127,8 @@ function Frame:UpdateLayout(changedBags)
                     end
                 end
             end
+        elseif currentMode == "guildbank" then
+            items = Frame:GetGuildBankItems()
         else
             items = OmniC_Container.GetAllBagItems()
         end
@@ -1225,15 +1276,28 @@ function Frame:RenderFlowView(items)
         local catItems = categories[catName]
         if catItems and #catItems > 0 then
 
+            -- Check if category is collapsed
+            local isCollapsed = Omni.Data and Omni.Data:IsCategoryCollapsed(catName)
+
             -- Render Header (only if not Grid)
             if currentView ~= "grid" then
                 headerIndex = headerIndex + 1
                 local header = categoryHeaders[headerIndex]
                 if not header then
-                    header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    header = CreateFrame("Button", nil, scrollChild)
+                    header:SetSize(200, 18)
+                    header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                    header.text:SetPoint("LEFT", 2, 0)
+                    header:SetScript("OnClick", function(self)
+                        if self.catName and Omni.Data then
+                            Omni.Data:ToggleCategoryCollapsed(self.catName)
+                            Frame:UpdateLayout()
+                        end
+                    end)
                     categoryHeaders[headerIndex] = header
                 end
 
+                header.catName = catName
                 header:ClearAllPoints()
                 header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", ITEM_SPACING, yOffset)
 
@@ -1241,52 +1305,58 @@ function Frame:RenderFlowView(items)
                 if Omni.Categorizer then
                     r, g, b = Omni.Categorizer:GetCategoryColor(catName)
                 end
-                header:SetTextColor(r, g, b)
-                header:SetText(catName .. " (" .. #catItems .. ")")
+                header.text:SetTextColor(r, g, b)
+                local indicator = isCollapsed and "[+] " or "[-] "
+                header.text:SetText(indicator .. catName .. " (" .. #catItems .. ")")
                 header:Show()
 
                 yOffset = yOffset - sectionHeaderHeight
             end
 
-            -- Render Items in this section
-            for i, itemInfo in ipairs(catItems) do
-                local btn
-                if Omni.Pool then
-                    btn = Omni.Pool:Acquire("ItemButton")
-                else
-                    btn = Omni.ItemButton:Create(scrollChild)
-                end
-
-                if btn then
-                    btn:SetParent(scrollChild)
-
-                    local col = ((i - 1) % columns)
-                    local row = math.floor((i - 1) / columns)
-                    local x = ITEM_SPACING + col * (ITEM_SIZE + ITEM_SPACING)
-                    local y = yOffset - row * (ITEM_SIZE + ITEM_SPACING)
-
-                    btn:ClearAllPoints()
-                    btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
-
-                    -- Error boundary: Protect against rendering bad items
-                    local success, err = pcall(function()
-                         btn:SetItem(itemInfo)
-                         btn:Show()
-                    end)
-
-                    if not success then
-                        btn:SetItem(nil)
-                        if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
-                        btn:Show()
+            -- Render Items in this section (skip if collapsed)
+            if not isCollapsed then
+                for i, itemInfo in ipairs(catItems) do
+                    local btn
+                    if Omni.Pool then
+                        btn = Omni.Pool:Acquire("ItemButton")
+                    else
+                        btn = Omni.ItemButton:Create(scrollChild)
                     end
 
-                    table.insert(itemButtons, btn)
-                end
-            end
+                    if btn then
+                        btn:SetParent(scrollChild)
 
-            -- Update yOffset for next section
-            local catRows = math.ceil(#catItems / columns)
-            yOffset = yOffset - (catRows * (ITEM_SIZE + ITEM_SPACING)) - sectionSpacing
+                        local col = ((i - 1) % columns)
+                        local row = math.floor((i - 1) / columns)
+                        local x = ITEM_SPACING + col * (ITEM_SIZE + ITEM_SPACING)
+                        local y = yOffset - row * (ITEM_SIZE + ITEM_SPACING)
+
+                        btn:ClearAllPoints()
+                        btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+
+                        -- Error boundary: Protect against rendering bad items
+                        local success, err = pcall(function()
+                             btn:SetItem(itemInfo)
+                             btn:Show()
+                        end)
+
+                        if not success then
+                            btn:SetItem(nil)
+                            if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
+                            btn:Show()
+                        end
+
+                        table.insert(itemButtons, btn)
+                    end
+                end
+
+                -- Update yOffset for next section
+                local catRows = math.ceil(#catItems / columns)
+                yOffset = yOffset - (catRows * (ITEM_SIZE + ITEM_SPACING)) - sectionSpacing
+            else
+                -- Small spacing even when collapsed
+                yOffset = yOffset - 4
+            end
         end
     end
 
@@ -1810,8 +1880,132 @@ end
 -- Initialization
 -- =============================================================================
 
+-- =============================================================================
+-- Theme System
+-- =============================================================================
+
+function Frame:ApplyTheme(themeName)
+    local theme = THEMES[themeName] or THEMES.dark
+    if not mainFrame then return end
+
+    mainFrame:SetBackdropColor(unpack(theme.frameBg))
+    mainFrame:SetBackdropBorderColor(unpack(theme.borderColor))
+
+    if mainFrame.header and mainFrame.header.bg then
+        mainFrame.header.bg:SetVertexColor(unpack(theme.headerBg))
+    end
+    if mainFrame.footer and mainFrame.footer.bg then
+        mainFrame.footer.bg:SetVertexColor(unpack(theme.footerBg))
+    end
+    if mainFrame.bagBar and mainFrame.bagBar.bg then
+        mainFrame.bagBar.bg:SetVertexColor(unpack(theme.bagBarBg))
+    end
+    if mainFrame.searchBar and mainFrame.searchBar.bg then
+        mainFrame.searchBar.bg:SetVertexColor(unpack(theme.searchBg))
+    end
+    if mainFrame.filterBar and mainFrame.filterBar.bg then
+        mainFrame.filterBar.bg:SetVertexColor(unpack(theme.filterBg))
+    end
+end
+
+function Frame:CycleTheme()
+    local themeNames = { "dark", "glass", "classic" }
+    local current = Omni.Data and Omni.Data:GetTheme() or "dark"
+    local nextIdx = 1
+    for i, name in ipairs(themeNames) do
+        if name == current then
+            nextIdx = (i % #themeNames) + 1
+            break
+        end
+    end
+    local nextTheme = themeNames[nextIdx]
+    if Omni.Data then
+        Omni.Data:SetTheme(nextTheme)
+    end
+    self:ApplyTheme(nextTheme)
+    print("|cFF00FF00OmniInventory|r: Theme set to " .. nextTheme)
+end
+
+-- =============================================================================
+-- Guild Bank Support
+-- =============================================================================
+
+local guildBankItems = {}
+local isGuildBankOpen = false
+
+function Frame:SetGuildBankOpen(isOpen)
+    isGuildBankOpen = isOpen
+    if isOpen then
+        Frame:ScanGuildBank()
+        currentMode = "guildbank"
+        self:Show()
+        self:UpdateLayout()
+    else
+        currentMode = "bags"
+        self:UpdateLayout()
+    end
+end
+
+function Frame:ScanGuildBank()
+    guildBankItems = {}
+    if not IsInGuild() then return end
+
+    local numTabs = GetNumGuildBankTabs() or 0
+    for tab = 1, numTabs do
+        local name, icon, isViewable, canDeposit, numWithdrawals = GetGuildBankTabInfo(tab)
+        if isViewable then
+            for slot = 1, 98 do
+                local link = GetGuildBankItemLink(tab, slot)
+                if link then
+                    local texture, count, locked = GetGuildBankItemInfo(tab, slot)
+                    local itemID = tonumber(string.match(link, "item:(%d+)"))
+                    local info = Omni.API and Omni.API:GetExtendedItemInfo(link) or {}
+                    table.insert(guildBankItems, {
+                        iconFileID = texture,
+                        itemID = itemID,
+                        hyperlink = link,
+                        stackCount = count or 1,
+                        quality = info.quality or 1,
+                        isLocked = locked or false,
+                        bagID = -2, -- Guild bank marker
+                        slotID = slot,
+                        guildTab = tab,
+                        itemType = info.itemType,
+                        itemSubType = info.itemSubType,
+                        itemLevel = info.itemLevel,
+                        equipSlot = info.equipSlot,
+                    })
+                end
+            end
+        end
+    end
+end
+
+function Frame:GetGuildBankItems()
+    return guildBankItems
+end
+
+-- =============================================================================
+-- Initialization
+-- =============================================================================
+
 function Frame:Init()
     -- Frame is created on first show
+    -- Register guild bank events
+    if Omni.Events then
+        Omni.Events:RegisterEvent("GUILDBANKFRAME_OPENED", function()
+            Frame:SetGuildBankOpen(true)
+        end)
+        Omni.Events:RegisterEvent("GUILDBANKFRAME_CLOSED", function()
+            Frame:SetGuildBankOpen(false)
+        end)
+        Omni.Events:RegisterEvent("GUILDBANKBAGSLOTS_CHANGED", function()
+            if isGuildBankOpen then
+                Frame:ScanGuildBank()
+                Frame:UpdateLayout()
+            end
+        end)
+    end
 end
 
 print("|cFF00FF00OmniInventory|r: Frame loaded")

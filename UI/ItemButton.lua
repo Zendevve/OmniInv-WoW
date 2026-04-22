@@ -492,9 +492,90 @@ function ItemButton:OnClick(button, mouseButton)
             if Omni.Frame then
                 Omni.Frame:UpdateLayout()
             end
+        elseif IsControlKeyDown() and button.itemInfo.itemID then
+            -- Ctrl+Right-click for gear set assignment
+            ItemButton:ShowGearSetMenu(button)
         end
     end
     -- Right-click item usage is handled by SecureActionButtonTemplate
+end
+
+-- Gear Set context menu
+local gearSetMenuFrame = nil
+
+function ItemButton:ShowGearSetMenu(button)
+    if not button or not button.itemInfo or not button.itemInfo.itemID then return end
+    local itemID = button.itemInfo.itemID
+
+    if not gearSetMenuFrame then
+        gearSetMenuFrame = CreateFrame("Frame", "OmniGearSetMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+
+    local menuList = {}
+
+    -- Header
+    table.insert(menuList, {
+        text = "Assign to Gear Set",
+        isTitle = true,
+        notCheckable = true,
+    })
+
+    -- List existing sets
+    local sets = Omni.Data and Omni.Data:GetGearSets() or {}
+    local hasSets = false
+    for setName, _ in pairs(sets) do
+        hasSets = true
+        local isInSet = Omni.Data:IsItemInGearSet(itemID, setName)
+        table.insert(menuList, {
+            text = setName,
+            checked = isInSet,
+            func = function()
+                if isInSet then
+                    Omni.Data:RemoveItemFromGearSet(itemID, setName)
+                else
+                    Omni.Data:AddItemToGearSet(itemID, setName)
+                end
+                if Omni.Frame then
+                    Omni.Frame:UpdateLayout()
+                end
+            end,
+        })
+    end
+
+    if hasSets then
+        table.insert(menuList, { text = "", notCheckable = true, notClickable = true })
+    end
+
+    -- Create new set
+    table.insert(menuList, {
+        text = "Create New Set...",
+        notCheckable = true,
+        func = function()
+            StaticPopupDialogs["OMNI_NEW_GEARSET"] = {
+                text = "Enter new gear set name:",
+                button1 = "Create",
+                button2 = "Cancel",
+                hasEditBox = true,
+                OnAccept = function(self)
+                    local name = self.editBox:GetText()
+                    if name and name ~= "" and Omni.Data then
+                        Omni.Data:CreateGearSet(name)
+                        Omni.Data:AddItemToGearSet(itemID, name)
+                        if Omni.Frame then
+                            Omni.Frame:UpdateLayout()
+                        end
+                    end
+                end,
+                timeout = 0,
+                whileDead = true,
+                hideOnEscape = true,
+                preferredIndex = 3,
+            }
+            StaticPopup_Show("OMNI_NEW_GEARSET")
+        end,
+    })
+
+    EasyMenu(menuList, gearSetMenuFrame, "cursor", 0, 0, "MENU")
 end
 
 --- Get total item count across bags, bank, and alts

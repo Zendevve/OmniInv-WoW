@@ -197,4 +197,119 @@ function Data:TogglePin(itemID)
     end
 end
 
+-- =============================================================================
+-- Item Usage Tracking
+-- =============================================================================
+
+function Data:TrackItemUsage(itemID)
+    if not itemID then return end
+    OmniInventoryDB.global.itemUsage = OmniInventoryDB.global.itemUsage or {}
+    OmniInventoryDB.global.itemUsage[itemID] = (OmniInventoryDB.global.itemUsage[itemID] or 0) + 1
+end
+
+function Data:GetItemUsage(itemID)
+    if not itemID then return 0 end
+    return OmniInventoryDB.global.itemUsage and OmniInventoryDB.global.itemUsage[itemID] or 0
+end
+
+-- =============================================================================
+-- Gear Sets
+-- =============================================================================
+
+function Data:GetGearSets()
+    OmniInventoryDB.global.gearSets = OmniInventoryDB.global.gearSets or {}
+    return OmniInventoryDB.global.gearSets
+end
+
+function Data:GetGearSet(name)
+    local sets = self:GetGearSets()
+    return sets[name] or {}
+end
+
+function Data:CreateGearSet(name)
+    if not name or name == "" then return false end
+    local sets = self:GetGearSets()
+    if not sets[name] then
+        sets[name] = {}
+        return true
+    end
+    return false
+end
+
+function Data:DeleteGearSet(name)
+    local sets = self:GetGearSets()
+    if sets[name] then
+        sets[name] = nil
+        return true
+    end
+    return false
+end
+
+function Data:AddItemToGearSet(itemID, setName)
+    if not itemID or not setName then return false end
+    local sets = self:GetGearSets()
+    if not sets[setName] then
+        sets[setName] = {}
+    end
+    sets[setName][tostring(itemID)] = true
+    return true
+end
+
+function Data:RemoveItemFromGearSet(itemID, setName)
+    if not itemID or not setName then return false end
+    local sets = self:GetGearSets()
+    if sets[setName] then
+        sets[setName][tostring(itemID)] = nil
+    end
+    return true
+end
+
+function Data:IsItemInGearSet(itemID, setName)
+    if not itemID or not setName then return false end
+    local sets = self:GetGearSets()
+    return sets[setName] and sets[setName][tostring(itemID)] == true
+end
+
+function Data:GetItemGearSets(itemID)
+    if not itemID then return {} end
+    local sets = self:GetGearSets()
+    local result = {}
+    for setName, items in pairs(sets) do
+        if items[tostring(itemID)] then
+            table.insert(result, setName)
+        end
+    end
+    return result
+end
+
+-- =============================================================================
+-- Category Collapse State
+-- =============================================================================
+
+function Data:IsCategoryCollapsed(category)
+    if not category then return false end
+    OmniInventoryDB.char.collapsedCategories = OmniInventoryDB.char.collapsedCategories or {}
+    return OmniInventoryDB.char.collapsedCategories[category] == true
+end
+
+function Data:ToggleCategoryCollapsed(category)
+    if not category then return false end
+    OmniInventoryDB.char.collapsedCategories = OmniInventoryDB.char.collapsedCategories or {}
+    local isCollapsed = OmniInventoryDB.char.collapsedCategories[category] == true
+    OmniInventoryDB.char.collapsedCategories[category] = not isCollapsed
+    return not isCollapsed
+end
+
+-- =============================================================================
+-- Theme
+-- =============================================================================
+
+function Data:GetTheme()
+    return OmniInventoryDB.global.theme or "dark"
+end
+
+function Data:SetTheme(theme)
+    OmniInventoryDB.global.theme = theme
+end
+
 print("|cFF00FF00OmniInventory|r: Data module loaded")

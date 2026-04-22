@@ -197,8 +197,38 @@ end
 -- =============================================================================
 
 function Categorizer:GetCategory(itemInfo)
-    if not itemInfo then
-        return "Miscellaneous"
+    if not itemInfo then return "Miscellaneous" end
+
+    -- Check manual override first
+    if itemInfo.itemID and manualOverrides[itemInfo.itemID] then
+        return manualOverrides[itemInfo.itemID]
+    end
+
+    -- Check custom rules (highest priority after manual)
+    if Omni.Rules then
+        local matchedRule = Omni.Rules:FindMatchingRule(itemInfo)
+        if matchedRule and matchedRule.category then
+            return matchedRule.category
+        end
+    end
+
+    -- Check gear sets
+    if Omni.Data and itemInfo.itemID then
+        local sets = Omni.Data:GetItemGearSets(itemInfo.itemID)
+        if #sets > 0 then
+            -- Return the first matching set as category
+            return "Set: " .. sets[1]
+        end
+    end
+
+    -- Check if it's a new item (highest visibility)
+    if itemInfo.itemID and newItems[itemInfo.itemID] then
+        return "New Items"
+    end
+
+    -- Equipment sets
+    if itemInfo.equipSlot and itemInfo.equipSlot ~= "" then
+        return "Equipment"
     end
 
     -- Priority 1: Manual Override
@@ -285,7 +315,27 @@ function Categorizer:RegisterCategory(name, priority, icon, color, filterFunc)
 end
 
 function Categorizer:GetCategoryInfo(name)
-    return categories[name] or {
+    if categories[name] then
+        return categories[name]
+    end
+
+    -- Auto-register gear set categories with a distinct color
+    if name and string.sub(name, 1, 5) == "Set: " then
+        local setName = string.sub(name, 6)
+        -- Generate a consistent color from the set name
+        local hash = 0
+        for i = 1, #setName do
+            hash = (hash * 31 + string.byte(setName, i)) % 1000
+        end
+        local r = 0.4 + (hash % 100) / 200
+        local g = 0.4 + ((math.floor(hash / 100)) % 100) / 200
+        local b = 0.5 + ((math.floor(hash / 10000)) % 100) / 200
+
+        self:RegisterCategory(name, 5, nil, { r = math.min(r, 1), g = math.min(g, 1), b = math.min(b, 1) })
+        return categories[name]
+    end
+
+    return {
         name = name,
         priority = 99,
         color = CATEGORY_COLORS[name] or { r = 0.5, g = 0.5, b = 0.5 },

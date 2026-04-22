@@ -142,6 +142,19 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 containerFrame:Hide()
             end
         end
+
+        -- Hook UseContainerItem for usage tracking
+        local origUseContainerItem = UseContainerItem
+        UseContainerItem = function(bag, slot, ...)
+            local link = GetContainerItemLink(bag, slot)
+            if link and Omni.Data then
+                local itemID = tonumber(string.match(link, "item:(%d+)"))
+                if itemID then
+                    Omni.Data:TrackItemUsage(itemID)
+                end
+            end
+            return origUseContainerItem(bag, slot, ...)
+        end
     end
 end)
 
@@ -179,10 +192,16 @@ local function HandleSlashCommand(msg)
         end
         -- Add other resets here if needed
 
+    elseif msg == "theme" then
+        if Omni.Frame then
+            Omni.Frame:CycleTheme()
+        end
+
     elseif msg == "help" then
         print("|cFF00FF00OmniInventory|r Commands:")
         print("  |cFFFFFF00/zb|r or |cFFFFFF00/oi|r - Toggle bags")
         print("  |cFFFFFF00/zb config|r - Open settings")
+        print("  |cFFFFFF00/zb theme|r - Cycle UI theme")
         print("  |cFFFFFF00/zb reset|r - Reset addon data/positions")
         print("  |cFFFFFF00/zb debug|r - Show pool stats")
 
