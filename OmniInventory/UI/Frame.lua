@@ -2079,6 +2079,18 @@ function Frame:ApplySearch(text)
     end
 end
 
+function Frame:SetSearchText(text)
+    searchText = text or ""
+    isSearchActive = (searchText ~= "")
+
+    -- Update search box if it exists
+    if mainFrame and mainFrame.searchBox then
+        mainFrame.searchBox:SetText(searchText)
+    end
+
+    self:ApplySearch(searchText)
+end
+
 -- =============================================================================
 -- Footer Updates
 -- =============================================================================

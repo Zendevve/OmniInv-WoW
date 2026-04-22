@@ -745,8 +745,9 @@ ConfigureSecureItemUse = function(button, bagID, slotID)
         button.secureItemRef = itemRef
         button:SetAttribute("type1", "item")
         button:SetAttribute("item1", itemRef)
-        button:SetAttribute("type2", "item")
-        button:SetAttribute("item2", itemRef)
+        -- Right-click now opens context menu, not secure use
+        button:SetAttribute("type2", nil)
+        button:SetAttribute("item2", nil)
         button.secureUseConfigured = true
     else
         button.secureItemRef = nil
@@ -780,15 +781,10 @@ function ItemButton:OnPreClick(button, mouseButton)
             button:SetAttribute("item1", button.secureItemRef)
         end
     elseif mouseButton == "RightButton" then
-        if IsShiftKeyDown() or (MerchantFrame and MerchantFrame:IsShown()) then
-            button:SetAttribute("type2", nil)
-            button:SetAttribute("item2", nil)
-            button.forceContainerUse = true
-        else
-            button:SetAttribute("type2", "item")
-            button:SetAttribute("item2", button.secureItemRef)
-            button.forceContainerUse = false
-        end
+        -- Right-click opens context menu (secure action disabled above)
+        button:SetAttribute("type2", nil)
+        button:SetAttribute("item2", nil)
+        button.forceContainerUse = false
     end
 end
 
@@ -855,28 +851,9 @@ function ItemButton:OnClick(button, mouseButton)
             end
         end
     elseif mouseButton == "RightButton" then
-        -- Shift+Right-click to toggle pin/favorite
-        if IsShiftKeyDown() and button.itemInfo.itemID then
-            local isPinned = Omni.Data:TogglePin(button.itemInfo.itemID)
-
-            -- Update pin icon immediately
-            if isPinned then
-                button.pinIcon:Show()
-                print("|cFF00FF00Omni|r: Item pinned!")
-            else
-                button.pinIcon:Hide()
-                print("|cFF00FF00Omni|r: Item unpinned.")
-            end
-
-            -- Refresh layout to re-sort with pinned items first
-            if Omni.Frame then
-                Omni.Frame:UpdateLayout()
-            end
-        elseif canUseContainer and (button.forceContainerUse or not button.secureUseConfigured) then
-            if not InCombatLockdown or not InCombatLockdown() then
-                UseContainerItem(bagID, slotID)
-            end
-            button.forceContainerUse = false
+        -- Show context menu
+        if Omni.ContextMenu then
+            Omni.ContextMenu:Show(button.itemInfo, bagID, slotID, button)
         end
     end
 end
