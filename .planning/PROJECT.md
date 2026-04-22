@@ -10,27 +10,20 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 
 ## Context
 
-- **Current state:** v2.0-beta delivered (Phases 1-5A complete). Milestone v2.1 in planning.
-- **Milestone v2.1 goal:** Transform OmniInventory from "solid beta" to "best in class" — fix critical bugs, add essential QoL, and build information-rich tools.
+- **Current state:** v2.1 "The Definitive Bag Addon" and v2.2 deferred features complete. Milestone v2.3 in planning.
+- **Milestone v2.3 goal:** Retrofit features from modern Retail bag addons (BetterBags, ArkInventory, Retail Bagnon) that provide massive UX value for WoW 3.3.5a players.
 - **Tech stack:** Lua 5.1, WoW 3.3.5a API, no external dependencies (self-contained)
 - **Architecture:** Layered (UI → Logic → Data → API Shim), forward-compatible with Retail via OmniC_Container shim
 
-## Current Milestone: v2.1 "The Definitive Bag Addon"
+## Current Milestone: v2.3 "Modern Bag Features"
 
-**Goal:** Fix all critical bugs, add essential missing QoL, and build information-rich tools that make OmniInventory objectively the best WotLK 3.3.5a bag addon.
+**Goal:** Retrofit features from modern Retail bag addons (BetterBags, ArkInventory, Retail Bagnon) that provide massive UX value for WoW 3.3.5a players.
 
 **Target features:**
-- Bug Fixes & Performance — Fix 5 critical Lua errors, cache tooltip scans, fix nil references
-- Restack / Compress Stacks — Combine partial stacks across bags
-- Item Level Overlay — Show iLvl on gear icons (toggleable)
-- Cooldown Spirals — Show remaining cooldown on consumables/trinkets
-- Durability Indicator — Red overlay on gear below 20% durability
-- Profession Bag Highlighting — Tint slots matching profession bag types
-- Tooltip Total Count — "Bags: 12 | Bank: 5 | Alts: 3" on item hover
-- Smart Auto-Vendor Junk — Auto-sell greys at merchant (with gold threshold)
-- Bag Bar — Show equipped bags; click empty slot to equip from inventory
-- Offline Alt Bank Viewer — Dropdown to view any alt's inventory/bank
-- Gear Set Assignment — Right-click gear → assign to Tank/Heal/DPS custom sections
+- Virtual Stacks — ArkInventory-style: combine multiple partial stacks of the same item into one visual stack with a total count.
+- Empty Slot Compression — Instead of rendering 80 empty slots, show a single "Empty (28)" section or a compact grid of empty slots.
+- Right-Click Item Context Menu — Right-click an item for actions: "Add to Category", "Pin", "Search Similar", "Send to Alt", "Disenchant".
+- Gear Set Integration — Filter/view items by equipment set membership. Show "Part of Set: Tank" in tooltips.
 
 ## Requirements
 
@@ -56,29 +49,36 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 - ✓ Category Editor UI
 - ✓ Favorites/pin system
 - ✓ Auto-sort on close option
+- ✓ Bug Fixes & Performance — nil references fixed, binding scan cached, event scope fixed
+- ✓ Restack / Compress Stacks across bags
+- ✓ Item Level Overlay on gear icons
+- ✓ Cooldown Spirals on consumables/trinkets
+- ✓ Durability Indicator on damaged gear
+- ✓ Profession Bag Highlighting
+- ✓ Tooltip Total Count (bags + bank + alts)
+- ✓ Smart Auto-Vendor Junk with threshold
+- ✓ Bag Bar (equipped bags + swap)
+- ✓ Offline Alt Bank Viewer UI
+- ✓ Gear Set Assignment (Ctrl+Right-click)
+- ✓ Usage-Based Sorting
+- ✓ Per-Category Collapse
+- ✓ Custom Themes (dark/glass/classic)
+- ✓ Guild Bank Support
 
-### Active (Milestone v2.1)
+### Active (Milestone v2.3)
 
-- [ ] Bug Fixes — nil references, missing CloseBag override, event handler scope
-- [ ] Performance — cache tooltip binding scans, reduce BAG_UPDATE churn
-- [ ] Restack / Compress Stacks across bags
-- [ ] Item Level Overlay on gear icons
-- [ ] Cooldown Spirals on consumables/trinkets
-- [ ] Durability Indicator on damaged gear
-- [ ] Profession Bag Highlighting
-- [ ] Tooltip Total Count (bags + bank + alts)
-- [ ] Smart Auto-Vendor Junk with threshold
-- [ ] Bag Bar (equipped bags + swap)
-- [ ] Offline Alt Bank Viewer UI
-- [ ] Gear Set Assignment (right-click → custom sets)
+- [ ] Virtual Stacks — combine partial stacks into one visual stack with total count
+- [ ] Empty Slot Compression — compact empty slots into a single section or grid
+- [ ] Right-Click Item Context Menu — Add to Category, Pin, Search Similar, Send to Alt, Disenchant
+- [ ] Gear Set Integration — filter/view by equipment set, tooltip set name
 
-### Out of Scope (v2.1)
+### Out of Scope (v2.3)
 
 - Localization (L10n) — deferred to post-release
-- Guild Bank support — high complexity, low usage; future milestone
 - Retail port — future milestone
 - Deep Auctionator/TSM integration — basic hooks only
-- Custom theme/skin presets — deferred to v2.2 polish phase
+- Full gear set auto-swap — only viewing/filtering in this milestone
+- Cross-realm alt support — same realm only
 
 ## Key Decisions
 
@@ -109,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 after v2.1 milestone start*
+*Last updated: 2026-04-22 — Milestone v2.3 started*
