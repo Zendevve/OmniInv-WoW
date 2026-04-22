@@ -21,9 +21,12 @@ Last activity: 2026-04-22 — Milestone v2.1 "The Definitive Bag Addon" started
     - Added binding scan cache (50%+ speedup on bag open)
   - [x] Phase 7: Essential QoL — Completed 2026-04-22
     - Restack, iLvl overlay, cooldown spirals, durability warning, prof bag tint
-  - [ ] Phase 8: Information Powerhouse (Tooltip counts, Auto-vendor, Bag Bar)
-  - [ ] Phase 9: Advanced Power User (Alt Viewer, Gear Sets)
-  - [ ] Phase 10: Polish & Compatibility
+  - [x] Phase 8: Information Powerhouse — Completed 2026-04-22
+    - Tooltip total counts, auto-vendor junk, bag bar, clear new button, match counts
+  - [x] Phase 9: Advanced Power User — Completed 2026-04-22
+    - Offline alt bank viewer with dropdown character switcher
+  - [x] Phase 10: Polish & Compatibility — Completed 2026-04-22
+    - Search history, pool cleanup on hide
 
 ## Accumulated Context
 
