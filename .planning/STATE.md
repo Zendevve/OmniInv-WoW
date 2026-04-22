@@ -2,9 +2,9 @@
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements for Milestone v2.1
+Phase: Ready to build
+Plan: ROADMAP.md created (Phases 6-10)
+Status: Requirements and roadmap approved for Milestone v2.1
 Last activity: 2026-04-22 — Milestone v2.1 "The Definitive Bag Addon" started
 
 ## Milestones
