@@ -1215,6 +1215,31 @@ function Frame:UpdateBankTabState()
 end
 
 -- =============================================================================
+-- Empty Slot Calculation
+-- =============================================================================
+
+function Frame:CalculateEmptySlots()
+    local emptySlots = {}
+    local totalEmpty = 0
+
+    for bagID = 0, 4 do
+        local numSlots = GetContainerNumSlots(bagID)
+        for slotID = 1, numSlots do
+            local texture, count = GetContainerItemInfo(bagID, slotID)
+            if not texture then
+                totalEmpty = totalEmpty + 1
+                table.insert(emptySlots, { bagID = bagID, slotID = slotID })
+            end
+        end
+    end
+
+    return {
+        slots = emptySlots,
+        total = totalEmpty,
+    }
+end
+
+-- =============================================================================
 -- Layout Update
 -- =============================================================================
 
@@ -1378,6 +1403,12 @@ function Frame:UpdateLayout(changedBags)
         items = Omni.Sorter:Sort(items, Omni.Sorter:GetDefaultMode())
     end
 
+    -- Calculate empty slots for compression
+    self.emptySlotsData = nil
+    if OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.enableEmptySlotCompression ~= false then
+        self.emptySlotsData = self:CalculateEmptySlots()
+    end
+
     -- Render based on view mode
     if currentView == "list" then
         self:RenderListView(items)
@@ -1435,6 +1466,15 @@ function Frame:RenderFlowView(items)
     -- Hide existing headers and list rows
     for _, header in ipairs(categoryHeaders) do header:Hide() end
     for _, row in ipairs(listRows) do row:Hide() end
+
+    -- Clean up compressed empty slot frames
+    if self.compressedEmptySlotFrames then
+        for _, frame in ipairs(self.compressedEmptySlotFrames) do
+            frame:Hide()
+            frame:SetParent(nil)
+        end
+        self.compressedEmptySlotFrames = {}
+    end
 
     -- Layout Constants
     local contentWidth = mainFrame.content:GetWidth() - 20
@@ -1575,6 +1615,124 @@ function Frame:RenderFlowView(items)
                 -- Small spacing even when collapsed
                 yOffset = yOffset - 4
             end
+        end
+    end
+
+    -- Render Empty Slots (compressed or expanded)
+    if self.emptySlotsData and self.emptySlotsData.total > 0 then
+        local emptyData = self.emptySlotsData
+        local isExpanded = self.emptySlotsExpanded == true
+
+        -- Section header (if not grid mode)
+        if currentView ~= "grid" then
+            headerIndex = headerIndex + 1
+            local header = categoryHeaders[headerIndex]
+            if not header then
+                header = CreateFrame("Button", nil, scrollChild)
+                header:SetSize(200, 18)
+                header.text = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                header.text:SetPoint("LEFT", 2, 0)
+                header:SetScript("OnClick", function(self)
+                    if Omni.Frame then
+                        Omni.Frame.emptySlotsExpanded = not (Omni.Frame.emptySlotsExpanded or false)
+                        Omni.Frame:UpdateLayout()
+                    end
+                end)
+                categoryHeaders[headerIndex] = header
+            end
+
+            header.catName = "Empty Slots"
+            header:ClearAllPoints()
+            header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", ITEM_SPACING, yOffset)
+            header.text:SetTextColor(0.6, 0.6, 0.6)
+            local indicator = isExpanded and "[-] " or "[+] "
+            header.text:SetText(indicator .. "Empty Slots (" .. emptyData.total .. ")")
+            header:Show()
+
+            yOffset = yOffset - sectionHeaderHeight
+        end
+
+        if not isExpanded then
+            -- Compressed: simple frame showing "Empty (N)"
+            local compressedBtn = CreateFrame("Button", nil, scrollChild)
+            compressedBtn:SetSize(ITEM_SIZE, ITEM_SIZE)
+            compressedBtn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", ITEM_SPACING, yOffset)
+
+            -- Dark background
+            compressedBtn.bg = compressedBtn:CreateTexture(nil, "BACKGROUND")
+            compressedBtn.bg:SetAllPoints()
+            compressedBtn.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+            compressedBtn.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
+
+            -- Border
+            local border = compressedBtn:CreateTexture(nil, "OVERLAY")
+            border:SetAllPoints()
+            border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+            border:SetVertexColor(0.25, 0.25, 0.25, 1)
+
+            -- Text
+            compressedBtn.text = compressedBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            compressedBtn.text:SetPoint("CENTER")
+            compressedBtn.text:SetText("Empty (" .. emptyData.total .. ")")
+            compressedBtn.text:SetTextColor(0.6, 0.6, 0.6)
+
+            -- Click to expand
+            compressedBtn:SetScript("OnClick", function(self, mouseButton)
+                if mouseButton == "LeftButton" and Omni.Frame then
+                    Omni.Frame.emptySlotsExpanded = true
+                    Omni.Frame:UpdateLayout()
+                end
+            end)
+            compressedBtn:SetScript("OnEnter", function(self)
+                self.bg:SetVertexColor(0.2, 0.2, 0.2, 1)
+            end)
+            compressedBtn:SetScript("OnLeave", function(self)
+                self.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
+            end)
+
+            compressedBtn:Show()
+            -- Track for cleanup on next render
+            if not self.compressedEmptySlotFrames then
+                self.compressedEmptySlotFrames = {}
+            end
+            table.insert(self.compressedEmptySlotFrames, compressedBtn)
+
+            yOffset = yOffset - (ITEM_SIZE + ITEM_SPACING)
+        else
+            -- Expanded: render individual empty slots using ItemButton
+            for i, slotInfo in ipairs(emptyData.slots) do
+                local btn
+                if Omni.Pool then
+                    btn = Omni.Pool:Acquire("ItemButton")
+                else
+                    btn = Omni.ItemButton:Create(scrollChild)
+                end
+
+                if btn then
+                    btn:SetParent(scrollChild)
+
+                    local col = ((i - 1) % columns)
+                    local row = math.floor((i - 1) / columns)
+                    local x = ITEM_SPACING + col * (ITEM_SIZE + ITEM_SPACING)
+                    local y = yOffset - row * (ITEM_SIZE + ITEM_SPACING)
+
+                    btn:ClearAllPoints()
+                    btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+
+                    -- Render as empty slot (nil itemInfo) — OnClick now handles drop targets
+                    SetButtonItem(btn, nil)
+
+                    -- Store bag/slot for drop target
+                    btn.bagID = slotInfo.bagID
+                    btn.slotID = slotInfo.slotID
+
+                    btn:Show()
+                    table.insert(itemButtons, btn)
+                end
+            end
+
+            local emptyRows = math.ceil(#emptyData.slots / columns)
+            yOffset = yOffset - (emptyRows * (ITEM_SIZE + ITEM_SPACING)) - sectionSpacing
         end
     end
 
@@ -1802,6 +1960,51 @@ function Frame:RenderListView(items)
         ConfigureSecureRowUse(row, itemInfo.bagID, itemInfo.slotID)
 
         row:Show()
+        yOffset = yOffset - ROW_HEIGHT
+    end
+
+    -- Render Empty Slots in List View
+    if self.emptySlotsData and self.emptySlotsData.total > 0 then
+        local emptyData = self.emptySlotsData
+
+        -- Add a separator row
+        local rowIndex = #items + 1
+        local row = listRows[rowIndex]
+        if not row then
+            row = CreateFrame("Button", nil, scrollChild, "SecureActionButtonTemplate")
+            row:SetHeight(ROW_HEIGHT)
+            row.bg = row:CreateTexture(nil, "BACKGROUND")
+            row.bg:SetAllPoints()
+            row.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+            row.icon:SetPoint("LEFT", 4, 0)
+            row.name = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.name:SetPoint("LEFT", row.icon, "RIGHT", 6, 0)
+            row.name:SetWidth(180)
+            row.name:SetJustifyH("LEFT")
+            row.itemType = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.itemType:SetPoint("LEFT", row.name, "RIGHT", 8, 0)
+            row.itemType:SetWidth(80)
+            row.itemType:SetJustifyH("LEFT")
+            row.qty = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.qty:SetPoint("RIGHT", -8, 0)
+            row.qty:SetWidth(30)
+            row.qty:SetJustifyH("RIGHT")
+            listRows[rowIndex] = row
+        end
+
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, yOffset)
+        row:SetPoint("TOPRIGHT", scrollChild, "TOPRIGHT", 0, yOffset)
+        row.bg:SetVertexColor(0.2, 0.2, 0.2, 1)
+        row.icon:SetTexture(nil)
+        row.name:SetText("Empty Slots (" .. emptyData.total .. ")")
+        row.name:SetTextColor(0.6, 0.6, 0.6)
+        row.itemType:SetText("")
+        row.qty:SetText("")
+        row:Show()
+
         yOffset = yOffset - ROW_HEIGHT
     end
 

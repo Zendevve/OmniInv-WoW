@@ -22,6 +22,7 @@ local defaults = {
         scale = 1.0,
         opacity = 0.95,
         enableVirtualStacks = true,
+        enableEmptySlotCompression = true,
         attune = {
             enabled = true,
             showRedForNonAttunable = true,

@@ -793,7 +793,19 @@ function ItemButton:OnPreClick(button, mouseButton)
 end
 
 function ItemButton:OnClick(button, mouseButton)
-    if not button or not button.itemInfo then return end
+    if not button then return end
+
+    -- Handle empty slots (drop targets)
+    if not button.itemInfo then
+        if mouseButton == "LeftButton" and CursorHasItem and CursorHasItem() then
+            local bagID = button.bagID
+            local slotID = button.slotID
+            if bagID and slotID then
+                PickupContainerItem(bagID, slotID)
+            end
+        end
+        return
+    end
 
     -- Resolve virtual stack to real bag/slot for clicks
     local bagID = button.bagID
@@ -987,6 +999,12 @@ function ItemButton:Reset(button)
     button.icon:SetDesaturated(false)
     button.icon:SetAlpha(1)
     ConfigureSecureItemUse(button, nil, nil)
+
+    -- Reset click handler to default (clears any overrides from special uses)
+    button:SetScript("OnClick", function(self, mouseButton)
+        ItemButton:OnClick(self, mouseButton)
+    end)
+
     button:Hide()
 end
 

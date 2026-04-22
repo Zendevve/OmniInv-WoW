@@ -161,6 +161,21 @@ function Settings:CreateControls(parent)
     end)
     self.vsCheckbox = vsCheckbox
 
+    -- Empty Slot Compression Toggle
+    local escCheckbox = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    escCheckbox:SetSize(24, 24)
+    escCheckbox:SetPoint("TOP", 0, yOffset)
+    local escLabel = escCheckbox:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    escLabel:SetPoint("LEFT", escCheckbox, "RIGHT", 2, 1)
+    escLabel:SetText("Compress Empty Slots")
+    escCheckbox:SetScript("OnClick", function(self)
+        OmniInventoryDB.global.enableEmptySlotCompression = self:GetChecked() and true or false
+        if Omni.Frame then
+            Omni.Frame:UpdateLayout()
+        end
+    end)
+    self.escCheckbox = escCheckbox
+
     yOffset = yOffset - SPACING - 10
 
     -- 5. Category Editor Button
@@ -335,6 +350,9 @@ function Settings:UpdateValues()
     local attune = GetAttuneSettings()
     if self.vsCheckbox then
         self.vsCheckbox:SetChecked(OmniInventoryDB.global.enableVirtualStacks ~= false)
+    end
+    if self.escCheckbox then
+        self.escCheckbox:SetChecked(OmniInventoryDB.global.enableEmptySlotCompression ~= false)
     end
 
     if self.attuneEnabled then self.attuneEnabled:SetChecked(attune.enabled == true) end
