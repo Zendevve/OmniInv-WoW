@@ -22,6 +22,13 @@ API.isWotLK = clientVersion < 40000
 API.isRetail = clientVersion >= 100000
 
 -- =============================================================================
+-- Namespace: OmniC_Container (C_Container Polyfill)
+-- =============================================================================
+-- Provides a modern, table-based API for item data.
+
+OmniC_Container = {}
+
+-- =============================================================================
 -- Polyfill: Tooltip Scanner (WotLK 3.3.5a)
 -- =============================================================================
 -- Legacy API does not return binding status (Soulbound/BoE/BoP) directly.
@@ -35,14 +42,39 @@ local BOE_TEXT = ITEM_BIND_ON_EQUIP or "Binds when equipped"
 local BOP_TEXT = ITEM_BIND_ON_PICKUP or "Binds when picked up"
 local BOA_TEXT = ITEM_BIND_TO_ACCOUNT or "Binds to account"
 
+-- =============================================================================
+-- Binding Scan Cache
+-- =============================================================================
+-- Tooltip scanning is expensive (O(n) per item). Cache results by itemLink
+-- since binding status is stable for a given item instance.
+-- Cache is invalidated on BAG_UPDATE via ClearBindingCache().
+
+local bindingCache = {}  -- { [itemLink] = { isBound = bool, bindType = string } }
+
+--- Clear the binding scan cache. Call this when bag contents change.
+function OmniC_Container.ClearBindingCache()
+    bindingCache = {}
+end
+
 --- Scan tooltip for binding status (Polyfill for WotLK)
 ---@param bag number
 ---@param slot number
+---@param itemLink string|nil Optional itemLink for cache lookup
 ---@return boolean isBound
 ---@return string|nil bindType "Soulbound", "BoE", "BoP", "BoA"
-local function ScanTooltipForBinding(bag, slot)
+local function ScanTooltipForBinding(bag, slot, itemLink)
+    -- Fast path: check cache by itemLink
+    if itemLink then
+        local cached = bindingCache[itemLink]
+        if cached then
+            return cached.isBound, cached.bindType
+        end
+    end
+
     scanningTooltip:ClearLines()
     scanningTooltip:SetBagItem(bag, slot)
+
+    local isBound, bindType = false, nil
 
     -- Scan only the first few lines where binding text usually appears
     for i = 2, math.min(5, scanningTooltip:NumLines()) do
@@ -51,27 +83,33 @@ local function ScanTooltipForBinding(bag, slot)
             local line = textFrame:GetText()
             if line then
                 if line == SOULBOUND_TEXT then
-                    return true, "Soulbound"
+                    isBound, bindType = true, "Soulbound"
+                    break
                 elseif line == BOE_TEXT then
-                    return false, "BoE"
+                    isBound, bindType = false, "BoE"
+                    break
                 elseif line == BOP_TEXT then
-                    return false, "BoP"
+                    isBound, bindType = false, "BoP"
+                    break
                 elseif line == BOA_TEXT then
-                    return true, "BoA"
+                    isBound, bindType = true, "BoA"
+                    break
                 end
             end
         end
     end
 
-    return false, nil
+    -- Cache result if we have an itemLink
+    if itemLink then
+        bindingCache[itemLink] = { isBound = isBound, bindType = bindType }
+    end
+
+    return isBound, bindType
 end
 
 -- =============================================================================
--- Namespace: OmniC_Container (C_Container Polyfill)
+-- OmniC_Container Methods
 -- =============================================================================
--- Provides a modern, table-based API for item data.
-
-OmniC_Container = {}
 
 --- Get container item info in modern table format.
 --- Replaces `GetContainerItemInfo` (returns 9 values) with a single table.
@@ -93,7 +131,7 @@ function OmniC_Container.GetContainerItemInfo(bagID, slotID)
     end
 
     -- Polyfill: Get binding status (WotLK needs tooltip scan)
-    local isBound, bindType = ScanTooltipForBinding(bagID, slotID)
+    local isBound, bindType = ScanTooltipForBinding(bagID, slotID, itemLink)
 
     -- Polyfill: Fix missing quality info in 3.3.5a
     -- GetContainerItemInfo often returns -1/nil for quality; fetch from GetItemInfo

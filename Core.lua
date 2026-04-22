@@ -114,6 +114,13 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 end
             end
 
+            -- CRITICAL: Override CloseBag to prevent default frames from showing
+            CloseBag = function(id)
+                if Omni.Frame then
+                    Omni.Frame:Hide()
+                end
+            end
+
             -- Hide all default container frames permanently
             for i = 1, 13 do
                 local containerFrame = _G["ContainerFrame" .. i]

@@ -41,7 +41,7 @@ local CATEGORY_COLORS = {
 local sessionItems = {}  -- Items present at login
 local newItems = {}      -- Items acquired this session
 
-local function SnapshotInventory()
+function Categorizer:SnapshotInventory()
     sessionItems = {}
     for bagID = 0, 4 do
         local numSlots = GetContainerNumSlots(bagID) or 0
@@ -56,6 +56,9 @@ local function SnapshotInventory()
         end
     end
 end
+
+-- Keep local alias for internal use
+local SnapshotInventory = function() Categorizer:SnapshotInventory() end
 
 -- Public API for new item tracking
 function Categorizer:IsNewItem(itemID)

@@ -218,7 +218,7 @@ function Frame:CreateHeader()
     -- Options Button
     local optBtn = CreateFrame("Button", nil, header, "UIPanelButtonTemplate")
     optBtn:SetSize(24, 24)
-    optBtn:SetPoint("RIGHT", closeBtn, "LEFT", -5, 0)
+    optBtn:SetPoint("RIGHT", header.closeBtn, "LEFT", -5, 0)
     optBtn:SetText("O")
     optBtn:SetScript("OnClick", function()
         if Omni.CategoryEditor then

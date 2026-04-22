@@ -86,6 +86,48 @@ function Events:UnregisterEvent(eventName)
 end
 
 -- =============================================================================
+-- Custom Event System
+-- =============================================================================
+
+local customListeners = {}  -- { eventName = { callback1, callback2, ... } }
+
+--- Register a callback for a custom event
+---@param eventName string
+---@param callback function
+function Events:RegisterCustomEvent(eventName, callback)
+    customListeners[eventName] = customListeners[eventName] or {}
+    table.insert(customListeners[eventName], callback)
+end
+
+--- Unregister a callback for a custom event
+---@param eventName string
+---@param callback function
+function Events:UnregisterCustomEvent(eventName, callback)
+    local listeners = customListeners[eventName]
+    if not listeners then return end
+    for i, cb in ipairs(listeners) do
+        if cb == callback then
+            table.remove(listeners, i)
+            return
+        end
+    end
+end
+
+--- Fire a custom event, notifying all registered listeners
+---@param eventName string
+---@param ... any Arguments to pass to callbacks
+function Events:FireEvent(eventName, ...)
+    local listeners = customListeners[eventName]
+    if not listeners then return end
+    for _, callback in ipairs(listeners) do
+        local ok, err = pcall(callback, ...)
+        if not ok then
+            print("|cFFFF0000OmniInventory|r: Custom event '" .. eventName .. "' handler error: " .. tostring(err))
+        end
+    end
+end
+
+-- =============================================================================
 -- Event Handler
 -- =============================================================================
 
@@ -123,6 +165,11 @@ function Events:Init()
     -- The callback receives a table of modified bagIDs
 
     self:RegisterBucketEvent("BAG_UPDATE", function(modifiedBags)
+        -- Invalidate binding scan cache since bag contents changed
+        if OmniC_Container and OmniC_Container.ClearBindingCache then
+            OmniC_Container.ClearBindingCache()
+        end
+
         -- Detect new items in modified bags
         if Omni.Categorizer then
             for bagID in pairs(modifiedBags) do
