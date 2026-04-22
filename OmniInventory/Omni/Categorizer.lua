@@ -23,7 +23,7 @@ local CATEGORY_COLORS = {
     ["Attunable"]       = { r = 0.0, g = 0.9, b = 0.5 },
     ["BoE"]             = { r = 0.4, g = 0.9, b = 1.0 },
     ["Equipment"]       = { r = 0.0, g = 0.8, b = 0.0 },
-    ["Equipment Sets"]  = { r = 0.4, g = 0.8, b = 1.0 },
+    ["Gear Sets"]       = { r = 0.8, g = 0.6, b = 1.0 },
     ["Consumables"]     = { r = 1.0, g = 0.5, b = 0.5 },
     ["Trade Goods"]     = { r = 0.8, g = 0.6, b = 0.4 },
     ["Reagents"]        = { r = 0.6, g = 0.4, b = 0.8 },
@@ -330,21 +330,17 @@ function Categorizer:GetCategory(itemInfo)
         end
     end
 
-    -- Check gear sets
-    if Omni.Data and itemInfo.itemID then
-        local sets = Omni.Data:GetItemGearSets(itemInfo.itemID)
-        if #sets > 0 then
-            -- Return the first matching set as category
-            return "Set: " .. sets[1]
-        end
-    end
-
     -- Check if it's a new item (highest visibility)
     if itemInfo.itemID and newItems[itemInfo.itemID] then
         return "New Items"
     end
 
-    -- Equipment sets
+    -- Check if item belongs to any gear set (manual or Blizzard)
+    if Omni.Data and itemInfo.itemID and Omni.Data:IsItemInAnySet(itemInfo.itemID) then
+        return "Gear Sets"
+    end
+
+    -- Equipment (not in any set)
     if itemInfo.equipSlot and itemInfo.equipSlot ~= "" then
         return "Equipment"
     end
@@ -375,12 +371,7 @@ function Categorizer:GetCategory(itemInfo)
         return "Attunable"
     end
 
-    -- Priority 4: Equipment Sets
-    if IsEquipmentSetItem(itemInfo) then
-        return "Equipment Sets"
-    end
-
-    -- Priority 5: BoE equipment
+    -- Priority 4: BoE equipment
     if IsBoEItem(itemInfo) then
         return "BoE"
     end
@@ -447,22 +438,6 @@ function Categorizer:GetCategoryInfo(name)
         return categories[name]
     end
 
-    -- Auto-register gear set categories with a distinct color
-    if name and string.sub(name, 1, 5) == "Set: " then
-        local setName = string.sub(name, 6)
-        -- Generate a consistent color from the set name
-        local hash = 0
-        for i = 1, #setName do
-            hash = (hash * 31 + string.byte(setName, i)) % 1000
-        end
-        local r = 0.4 + (hash % 100) / 200
-        local g = 0.4 + ((math.floor(hash / 100)) % 100) / 200
-        local b = 0.5 + ((math.floor(hash / 10000)) % 100) / 200
-
-        self:RegisterCategory(name, 5, nil, { r = math.min(r, 1), g = math.min(g, 1), b = math.min(b, 1) })
-        return categories[name]
-    end
-
     return {
         name = name,
         priority = 99,
@@ -494,6 +469,12 @@ function Categorizer:CategorizeItems(items)
         end
 
         itemInfo.category = category
+
+        -- Add primary set name for gear set items
+        if category == "Gear Sets" and Omni.Data and itemInfo.itemID then
+            itemInfo.primarySet = Omni.Data:GetPrimarySetName(itemInfo.itemID)
+        end
+
         table.insert(categorized[category], itemInfo)
     end
 
@@ -508,9 +489,9 @@ function Categorizer:Init()
     -- Register default categories
     self:RegisterCategory("Quest Items", 2, nil, CATEGORY_COLORS["Quest Items"])
     self:RegisterCategory("Attunable", 3, nil, CATEGORY_COLORS["Attunable"])
-    self:RegisterCategory("Equipment Sets", 4, nil, CATEGORY_COLORS["Equipment Sets"])
-    self:RegisterCategory("BoE", 5, nil, CATEGORY_COLORS["BoE"])
-    self:RegisterCategory("New Items", 6, nil, CATEGORY_COLORS["New Items"])
+    self:RegisterCategory("BoE", 4, nil, CATEGORY_COLORS["BoE"])
+    self:RegisterCategory("New Items", 5, nil, CATEGORY_COLORS["New Items"])
+    self:RegisterCategory("Gear Sets", 7, nil, CATEGORY_COLORS["Gear Sets"])
     self:RegisterCategory("Equipment", 10, nil, CATEGORY_COLORS["Equipment"])
     self:RegisterCategory("Consumables", 11, nil, CATEGORY_COLORS["Consumables"])
     self:RegisterCategory("Trade Goods", 12, nil, CATEGORY_COLORS["Trade Goods"])
