@@ -795,8 +795,14 @@ end
 function ItemButton:OnClick(button, mouseButton)
     if not button or not button.itemInfo then return end
 
+    -- Resolve virtual stack to real bag/slot for clicks
     local bagID = button.bagID
     local slotID = button.slotID
+
+    if button.itemInfo.isVirtual and Omni.VirtualStacks then
+        bagID, slotID = Omni.VirtualStacks:GetConsumptionSlot(button.itemInfo)
+    end
+
     local canUseContainer = bagID and slotID and bagID >= 0 and slotID > 0
 
     if not bagID or not slotID then return end
@@ -886,6 +892,14 @@ function ItemButton:OnEnter(button)
          -- Auctionator usually hooks SetBagItem/SetHyperlink, but we can allow extra logic here if needed
     end
 
+    -- Virtual stack tooltip indicator
+    if button.itemInfo.isVirtual and Omni.VirtualStacks then
+        local tooltipLines = Omni.VirtualStacks:GetTooltipText(button.itemInfo)
+        for _, line in ipairs(tooltipLines) do
+            GameTooltip:AddLine(line, 0.8, 0.8, 0.8)
+        end
+    end
+
     GameTooltip:Show()
     UpdateTooltipCompareState()
     if bagID and bagID >= 0 and slotID and MerchantFrame and MerchantFrame:IsShown() and (not CursorHasItem or not CursorHasItem()) then
@@ -917,6 +931,11 @@ function ItemButton:OnDragStart(button)
     local bagID = button.bagID
     local slotID = button.slotID
 
+    -- Resolve virtual stack to real bag/slot
+    if button.itemInfo and button.itemInfo.isVirtual and Omni.VirtualStacks then
+        bagID, slotID = Omni.VirtualStacks:GetConsumptionSlot(button.itemInfo)
+    end
+
     if bagID and slotID then
         PickupContainerItem(bagID, slotID)
     end
@@ -927,6 +946,11 @@ function ItemButton:OnReceiveDrag(button)
 
     local bagID = button.bagID
     local slotID = button.slotID
+
+    -- Resolve virtual stack to real bag/slot
+    if button.itemInfo and button.itemInfo.isVirtual and Omni.VirtualStacks then
+        bagID, slotID = Omni.VirtualStacks:GetConsumptionSlot(button.itemInfo)
+    end
 
     if bagID and slotID then
         PickupContainerItem(bagID, slotID)
