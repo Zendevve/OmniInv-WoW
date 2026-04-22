@@ -21,6 +21,7 @@ local defaults = {
         itemSize = 37,
         scale = 1.0,
         opacity = 0.95,
+        enableVirtualStacks = true,
         attune = {
             enabled = true,
             showRedForNonAttunable = true,
@@ -49,6 +50,7 @@ local defaults = {
         position = nil,         -- { point, x, y }
         customRules = {},
         collapsedCategories = {},
+        virtualStackOverrides = {},  -- { [itemID] = true }
     },
     realm = {},  -- Cross-character data stored here
 }
@@ -355,6 +357,25 @@ end
 
 function Data:SetTheme(theme)
     OmniInventoryDB.global.theme = theme
+end
+
+-- =============================================================================
+-- Virtual Stack Overrides
+-- =============================================================================
+
+function Data:SetVirtualStackOverride(itemID, enabled)
+    if not itemID then return end
+    OmniInventoryDB.char.virtualStackOverrides = OmniInventoryDB.char.virtualStackOverrides or {}
+    if enabled then
+        OmniInventoryDB.char.virtualStackOverrides[itemID] = true
+    else
+        OmniInventoryDB.char.virtualStackOverrides[itemID] = nil
+    end
+end
+
+function Data:GetVirtualStackOverride(itemID)
+    if not itemID then return false end
+    return OmniInventoryDB.char.virtualStackOverrides and OmniInventoryDB.char.virtualStackOverrides[itemID] == true
 end
 
 print("|cFF00FF00OmniInventory|r: Data module loaded")
