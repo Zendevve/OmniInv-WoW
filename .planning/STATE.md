@@ -27,6 +27,12 @@ Last activity: 2026-04-22 — Milestone v2.1 "The Definitive Bag Addon" started
     - Offline alt bank viewer with dropdown character switcher
   - [x] Phase 10: Polish & Compatibility — Completed 2026-04-22
     - Search history, pool cleanup on hide
+  - [x] v2.2 Deferred Features — Completed 2026-04-22
+    - Gear Set Assignment (Ctrl+Right-click)
+    - Usage-Based Sorting
+    - Per-Category Collapse
+    - Custom Themes (dark/glass/classic)
+    - Guild Bank Support
 
 ## Accumulated Context
 
