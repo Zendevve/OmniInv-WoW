@@ -20,6 +20,7 @@ local FRAME_DEFAULT_WIDTH = 450
 local FRAME_DEFAULT_HEIGHT = 400
 local HEADER_HEIGHT = 24
 local FOOTER_HEIGHT = 24
+local BAGBAR_HEIGHT = 28
 local SEARCH_HEIGHT = 24
 local PADDING = 8
 local ITEM_SIZE = 37
@@ -81,6 +82,7 @@ function Frame:CreateMainFrame()
     self:CreateSearchBar()
     self:CreateFilterBar()
     self:CreateContentArea()
+    self:CreateBagBar()
     self:CreateFooter()
     self:CreateResizeHandle()
 
@@ -234,6 +236,31 @@ function Frame:CreateHeader()
     end)
     optBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     header.optBtn = optBtn
+
+    -- Clear New Items button
+    header.clearNewBtn = CreateFrame("Button", nil, header)
+    header.clearNewBtn:SetSize(18, 18)
+    header.clearNewBtn:SetPoint("LEFT", header.title, "RIGHT", 8, 0)
+    header.clearNewBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    header.clearNewBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    header.clearNewBtn:SetBackdropBorderColor(0.5, 0.5, 0.5, 1)
+    header.clearNewBtn.text = header.clearNewBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    header.clearNewBtn.text:SetPoint("CENTER")
+    header.clearNewBtn.text:SetText("N")
+    header.clearNewBtn:SetScript("OnClick", function()
+        Frame:ClearNewItems()
+    end)
+    header.clearNewBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText("Clear New Item Highlights")
+        GameTooltip:Show()
+    end)
+    header.clearNewBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    header.clearNewBtn:Hide()
 
     -- Bags/Bank toggle tabs
     header.bagsTab = CreateFrame("Button", nil, header)
@@ -436,7 +463,7 @@ end
 function Frame:CreateContentArea()
     local content = CreateFrame("ScrollFrame", "OmniContentScroll", mainFrame, "UIPanelScrollFrameTemplate")
     content:SetPoint("TOPLEFT", mainFrame.filterBar, "BOTTOMLEFT", 0, -4)
-    content:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING - 20, PADDING + FOOTER_HEIGHT + 4)
+    content:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING - 20, PADDING + FOOTER_HEIGHT + BAGBAR_HEIGHT + 8)
 
     -- Scroll child
     local scrollChild = CreateFrame("Frame", "OmniContentChild", content)
@@ -453,6 +480,108 @@ function Frame:CreateContentArea()
 
     mainFrame.content = content
     mainFrame.scrollChild = scrollChild
+end
+
+-- =============================================================================
+-- Bag Bar
+-- =============================================================================
+
+function Frame:CreateBagBar()
+    local bagBar = CreateFrame("Frame", nil, mainFrame)
+    bagBar:SetHeight(BAGBAR_HEIGHT)
+    bagBar:SetPoint("BOTTOMLEFT", mainFrame, "BOTTOMLEFT", PADDING, PADDING + FOOTER_HEIGHT + 4)
+    bagBar:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -PADDING, PADDING + FOOTER_HEIGHT + 4)
+
+    bagBar.bg = bagBar:CreateTexture(nil, "BACKGROUND")
+    bagBar.bg:SetAllPoints()
+    bagBar.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+    bagBar.bg:SetVertexColor(0.1, 0.1, 0.1, 1)
+
+    bagBar.slots = {}
+    local slotSize = 24
+    local spacing = 4
+
+    for i = 0, 4 do
+        local slot = CreateFrame("Button", nil, bagBar)
+        slot:SetSize(slotSize, slotSize)
+        slot:SetPoint("LEFT", spacing + i * (slotSize + spacing), 0)
+
+        slot.bg = slot:CreateTexture(nil, "BACKGROUND")
+        slot.bg:SetAllPoints()
+        slot.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
+        slot.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
+
+        slot.icon = slot:CreateTexture(nil, "ARTWORK")
+        slot.icon:SetAllPoints()
+        slot.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        slot.border = slot:CreateTexture(nil, "OVERLAY")
+        slot.border:SetAllPoints()
+        slot.border:SetTexture("Interface\\Buttons\\UI-ActionButton-Border")
+        slot.border:Hide()
+
+        slot.bagID = i
+        slot:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            if i == 0 then
+                GameTooltip:SetText("Backpack")
+            else
+                local invID = ContainerIDToInventoryID(i)
+                local link = GetInventoryItemLink("player", invID)
+                if link then
+                    GameTooltip:SetHyperlink(link)
+                else
+                    GameTooltip:SetText("Empty Bag Slot")
+                end
+            end
+            GameTooltip:Show()
+        end)
+        slot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        slot:SetScript("OnClick", function(self, mouseBtn)
+            if i == 0 then return end -- Backpack can't be clicked
+            if mouseBtn == "RightButton" then
+                -- Remove bag
+                local invID = ContainerIDToInventoryID(i)
+                PickupInventoryItem(invID)
+            else
+                -- Equip bag from cursor or open bag slot
+                local invID = ContainerIDToInventoryID(i)
+                if CursorHasItem() then
+                    PutItemInBag(invID)
+                else
+                    PickupBagFromSlot(invID)
+                end
+            end
+        end)
+
+        bagBar.slots[i] = slot
+    end
+
+    bagBar:SetScript("OnShow", function() Frame:UpdateBagBar() end)
+    mainFrame.bagBar = bagBar
+end
+
+function Frame:UpdateBagBar()
+    local bagBar = mainFrame and mainFrame.bagBar
+    if not bagBar then return end
+
+    for i = 0, 4 do
+        local slot = bagBar.slots[i]
+        if not slot then return end
+
+        if i == 0 then
+            -- Backpack icon
+            slot.icon:SetTexture("Interface\\Icons\\INV_Misc_Bag_08")
+        else
+            local invID = ContainerIDToInventoryID(i)
+            local texture = GetInventoryItemTexture("player", invID)
+            if texture then
+                slot.icon:SetTexture(texture)
+            else
+                slot.icon:SetTexture(nil)
+            end
+        end
+    end
 end
 
 -- =============================================================================
@@ -558,6 +687,7 @@ function Frame:RegisterEvents()
         Omni.Events:RegisterEvent("MERCHANT_SHOW", function()
             isMerchantOpen = true
             Frame:UpdateFooterButton()
+            Frame:AutoVendorJunk()
         end)
 
         Omni.Events:RegisterEvent("MERCHANT_CLOSED", function()
@@ -830,9 +960,26 @@ function Frame:UpdateLayout(changedBags)
         self:RenderFlowView(items)
     end
 
-    -- Update footer
+    -- Update footer and bag bar
     self:UpdateSlotCount()
     self:UpdateMoney()
+    self:UpdateBagBar()
+
+    -- Update "Clear New" button visibility
+    if mainFrame.header and mainFrame.header.clearNewBtn then
+        local hasNew = false
+        for _, item in ipairs(items) do
+            if item.isNew then
+                hasNew = true
+                break
+            end
+        end
+        if hasNew then
+            mainFrame.header.clearNewBtn:Show()
+        else
+            mainFrame.header.clearNewBtn:Hide()
+        end
+    end
 
     -- Apply search if active
     if searchText and searchText ~= "" then
@@ -1265,8 +1412,16 @@ function Frame:UpdateFooterButton()
     end
 end
 
--- =============================================================================
--- Sell Junk Logic
+function Frame:ClearNewItems()
+    if Omni.Categorizer then
+        Omni.Categorizer:ClearAllNewItems()
+    end
+    if mainFrame and mainFrame.header and mainFrame.header.clearNewBtn then
+        mainFrame.header.clearNewBtn:Hide()
+    end
+    self:UpdateLayout()
+end
+
 -- =============================================================================
 -- Restack / Compress Stacks
 -- =============================================================================
@@ -1359,6 +1514,42 @@ function Frame:RestackBags()
 
     restackFrame.elapsed = 0
     restackFrame:Show()
+end
+
+-- =============================================================================
+
+function Frame:AutoVendorJunk()
+    local autoVendor = OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.autoVendorJunk
+    if not autoVendor then return end
+
+    local threshold = OmniInventoryDB.global.autoVendorThreshold or 50000 -- Default 5g
+    local totalValue = 0
+    local sellCandidates = {}
+
+    for bagID = 0, 4 do
+        local numSlots = GetContainerNumSlots(bagID)
+        for slotID = 1, numSlots do
+            local texture, count, locked, quality, readable, lootable, link = GetContainerItemInfo(bagID, slotID)
+            if link and (quality == 0) then
+                local _, _, _, _, _, _, _, _, _, _, vendorPrice = GetItemInfo(link)
+                if vendorPrice and vendorPrice > 0 then
+                    local value = vendorPrice * (count or 1)
+                    totalValue = totalValue + value
+                    table.insert(sellCandidates, { bag = bagID, slot = slotID, value = value })
+                end
+            end
+        end
+    end
+
+    if totalValue <= threshold and #sellCandidates > 0 then
+        for _, item in ipairs(sellCandidates) do
+            UseContainerItem(item.bag, item.slot)
+        end
+        local gold = math.floor(totalValue / 10000)
+        local silver = math.floor((totalValue % 10000) / 100)
+        local copper = totalValue % 100
+        print(string.format("|cFF00FF00OmniInventory|r: Auto-sold %d junk items for %dg %ds %dc", #sellCandidates, gold, silver, copper))
+    end
 end
 
 -- =============================================================================

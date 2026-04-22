@@ -379,6 +379,12 @@ function Editor:RefreshRuleList()
     end
     table.sort(rules, function(a,b) return (a.priority or 0) > (b.priority or 0) end)
 
+    -- Gather current bag items for match counting
+    local currentItems = {}
+    if OmniC_Container then
+        currentItems = OmniC_Container.GetAllBagItems() or {}
+    end
+
     for i, rule in ipairs(rules) do
         local btn = child.buttons[i]
         if not btn then
@@ -388,9 +394,21 @@ function Editor:RefreshRuleList()
             child.buttons[i] = btn
         end
 
+        -- Count matching items
+        local matchCount = 0
+        for _, item in ipairs(currentItems) do
+            if Omni.Rules:MatchRule(item, rule) then
+                matchCount = matchCount + 1
+            end
+        end
+
         btn:SetPoint("TOPLEFT", 0, -((i-1)*20))
         btn.rule = rule
-        btn:SetText(rule.name)
+        local text = rule.name
+        if matchCount > 0 then
+            text = text .. " (" .. matchCount .. ")"
+        end
+        btn:SetText(text)
         btn:Show()
 
         if self.selectedRule and self.selectedRule.id == rule.id then btn:LockHighlight() else btn:UnlockHighlight() end

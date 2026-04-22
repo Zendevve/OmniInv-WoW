@@ -497,6 +497,86 @@ function ItemButton:OnClick(button, mouseButton)
     -- Right-click item usage is handled by SecureActionButtonTemplate
 end
 
+--- Get total item count across bags, bank, and alts
+---@param itemID number
+---@return table counts { bags = n, bank = n, alts = n, total = n }
+function ItemButton:GetItemCounts(itemID)
+    local counts = { bags = 0, bank = 0, alts = 0, total = 0 }
+    if not itemID then return counts end
+
+    -- Count in current bags
+    for bag = 0, 4 do
+        local numSlots = GetContainerNumSlots(bag) or 0
+        for slot = 1, numSlots do
+            local link = GetContainerItemLink(bag, slot)
+            if link then
+                local id = tonumber(string.match(link, "item:(%d+)"))
+                if id == itemID then
+                    local _, ct = GetContainerItemInfo(bag, slot)
+                    counts.bags = counts.bags + (ct or 1)
+                end
+            end
+        end
+    end
+
+    -- Count in current bank (if data module has saved it)
+    if Omni.Data then
+        local realm = OmniInventoryDB and OmniInventoryDB.realm
+        local realmName = GetRealmName()
+        local playerName = UnitName("player")
+        if realm and realm[realmName] and realm[realmName][playerName] then
+            local charData = realm[realmName][playerName]
+            if charData.bank then
+                for _, entry in ipairs(charData.bank) do
+                    if entry.link then
+                        local id = tonumber(string.match(entry.link, "item:(%d+)"))
+                        if id == itemID then
+                            counts.bank = counts.bank + (entry.count or 1)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Count across alts
+    if OmniInventoryDB and OmniInventoryDB.realm then
+        local realmName = GetRealmName()
+        local playerName = UnitName("player")
+        for rName, realmData in pairs(OmniInventoryDB.realm) do
+            for pName, charData in pairs(realmData) do
+                if pName ~= playerName or rName ~= realmName then
+                    -- Count bags
+                    if charData.bags then
+                        for _, entry in ipairs(charData.bags) do
+                            if entry.link then
+                                local id = tonumber(string.match(entry.link, "item:(%d+)"))
+                                if id == itemID then
+                                    counts.alts = counts.alts + (entry.count or 1)
+                                end
+                            end
+                        end
+                    end
+                    -- Count bank
+                    if charData.bank then
+                        for _, entry in ipairs(charData.bank) do
+                            if entry.link then
+                                local id = tonumber(string.match(entry.link, "item:(%d+)"))
+                                if id == itemID then
+                                    counts.alts = counts.alts + (entry.count or 1)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    counts.total = counts.bags + counts.bank + counts.alts
+    return counts
+end
+
 function ItemButton:OnEnter(button)
     if not button or not button.itemInfo then return end
 
@@ -513,6 +593,19 @@ function ItemButton:OnEnter(button)
         GameTooltip:SetHyperlink(button.itemInfo.hyperlink)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine("Bank Item (Offline)", 0.5, 0.5, 0.5)
+    end
+
+    -- Cross-character total count tooltip
+    if button.itemInfo.itemID then
+        local counts = ItemButton:GetItemCounts(button.itemInfo.itemID)
+        if counts.total > 0 then
+            GameTooltip:AddLine(" ")
+            local parts = {}
+            if counts.bags > 0 then table.insert(parts, "Bags: " .. counts.bags) end
+            if counts.bank > 0 then table.insert(parts, "Bank: " .. counts.bank) end
+            if counts.alts > 0 then table.insert(parts, "Alts: " .. counts.alts) end
+            GameTooltip:AddLine(table.concat(parts, " | "), 0.8, 0.8, 0.8)
+        end
     end
 
     -- Hook for Auctionator (if it doesn't hook automatically)

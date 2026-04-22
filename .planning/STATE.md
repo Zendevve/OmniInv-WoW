@@ -19,7 +19,8 @@ Last activity: 2026-04-22 — Milestone v2.1 "The Definitive Bag Addon" started
   - [x] Phase 6: Bug Fixes & Performance — Completed 2026-04-22
     - Fixed nil closeBtn, SnapshotInventory scope, FireEvent API, CloseBag override
     - Added binding scan cache (50%+ speedup on bag open)
-  - [ ] Phase 7: Essential QoL (Restack, iLvl, Cooldowns, Durability)
+  - [x] Phase 7: Essential QoL — Completed 2026-04-22
+    - Restack, iLvl overlay, cooldown spirals, durability warning, prof bag tint
   - [ ] Phase 8: Information Powerhouse (Tooltip counts, Auto-vendor, Bag Bar)
   - [ ] Phase 9: Advanced Power User (Alt Viewer, Gear Sets)
   - [ ] Phase 10: Polish & Compatibility
