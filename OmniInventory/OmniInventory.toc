@@ -23,6 +23,7 @@ Omni\Data.lua
 Omni\Categorizer.lua
 Omni\Sorter.lua
 Omni\Rules.lua
+Omni\VirtualStacks.lua
 
 # =============================================================================
 # UI Components
