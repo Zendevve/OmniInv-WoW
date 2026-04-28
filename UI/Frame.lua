@@ -1372,7 +1372,7 @@ end
 -- Empty Slot Calculation
 -- =============================================================================
 
-function Frame:CalculateEmptySlots()
+function Frame:CalculateEmptySlots(items)
     local emptySlots = {}
     local totalEmpty = 0
 
@@ -1385,6 +1385,16 @@ function Frame:CalculateEmptySlots()
                 table.insert(emptySlots, { bagID = bagID, slotID = slotID })
             end
         end
+    end
+
+    -- When a gear set filter is active, compress all empty slots into a single count
+    -- since the layout doesn't match raw bag structure
+    if items and activeGearSetFilter then
+        return {
+            slots = emptySlots,
+            total = totalEmpty,
+            gearSetFiltered = true,
+        }
     end
 
     return {
@@ -1402,6 +1412,10 @@ function Frame:UpdateLayout(changedBags)
 
     if self._updatingLayout then return end
     self._updatingLayout = true
+
+    if Omni.Data then
+        Omni.Data:ClearSetMembershipCache()
+    end
 
     local ok, err = pcall(function()
         -- Get items based on current mode
@@ -1585,7 +1599,7 @@ function Frame:UpdateLayout(changedBags)
     -- Calculate empty slots for compression
     self.emptySlotsData = nil
     if OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.enableEmptySlotCompression ~= false then
-        self.emptySlotsData = self:CalculateEmptySlots()
+        self.emptySlotsData = self:CalculateEmptySlots(items)
     end
 
     -- Render based on view mode

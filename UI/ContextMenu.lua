@@ -99,6 +99,16 @@ end
 local Actions = {}
 
 function Actions.UseItem()
+    if currentItemInfo and currentItemInfo.isVirtual and Omni.VirtualStacks then
+        local resolvedBag, resolvedSlot = Omni.VirtualStacks:GetConsumptionSlot(currentItemInfo)
+        if not resolvedBag or not resolvedSlot then
+            print("|cFFFF0000OmniInventory|r: Virtual stack item no longer available")
+            ContextMenu:Hide()
+            return
+        end
+        currentBagID = resolvedBag
+        currentSlotID = resolvedSlot
+    end
     if currentBagID and currentSlotID then
         UseContainerItem(currentBagID, currentSlotID)
     end
@@ -140,6 +150,16 @@ function Actions.SendToAlt()
         print("|cFF00FF00Omni|r: Open a mailbox to send items.")
         return
     end
+    if currentItemInfo and currentItemInfo.isVirtual and Omni.VirtualStacks then
+        local resolvedBag, resolvedSlot = Omni.VirtualStacks:GetConsumptionSlot(currentItemInfo)
+        if not resolvedBag or not resolvedSlot then
+            print("|cFFFF0000OmniInventory|r: Virtual stack item no longer available")
+            ContextMenu:Hide()
+            return
+        end
+        currentBagID = resolvedBag
+        currentSlotID = resolvedSlot
+    end
     if currentItemInfo and currentBagID and currentSlotID then
         PickupContainerItem(currentBagID, currentSlotID)
         ClickSendMailItemButton()
@@ -147,6 +167,16 @@ function Actions.SendToAlt()
 end
 
 function Actions.Disenchant()
+    if currentItemInfo and currentItemInfo.isVirtual and Omni.VirtualStacks then
+        local resolvedBag, resolvedSlot = Omni.VirtualStacks:GetConsumptionSlot(currentItemInfo)
+        if not resolvedBag or not resolvedSlot then
+            print("|cFFFF0000OmniInventory|r: Virtual stack item no longer available")
+            ContextMenu:Hide()
+            return
+        end
+        currentBagID = resolvedBag
+        currentSlotID = resolvedSlot
+    end
     if currentItemInfo and currentBagID and currentSlotID then
         local quality = currentItemInfo.quality or 0
         if quality >= 2 then

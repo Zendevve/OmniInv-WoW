@@ -373,16 +373,24 @@ function Data:_tableContains(tbl, value)
     return false
 end
 
+Data._setMembershipCache = {}
+
+function Data:ClearSetMembershipCache()
+    self._setMembershipCache = {}
+end
+
 function Data:GetBlizzardSetsForItem(itemID)
     if not itemID then return {} end
-    if not self.blizzardItemToSets then
-        self:BuildBlizzardSetCache()
-    end
+    if not self.blizzardItemToSets then return {} end
     return self.blizzardItemToSets[itemID] or {}
 end
 
 function Data:GetAllSetMemberships(itemID)
     if not itemID then return {} end
+
+    if self._setMembershipCache[itemID] then
+        return self._setMembershipCache[itemID]
+    end
 
     local allSets = {}
     local seen = {}
@@ -396,16 +404,19 @@ function Data:GetAllSetMemberships(itemID)
         end
     end
 
-    -- Blizzard sets
-    local blizzardSets = self:GetBlizzardSetsForItem(itemID)
-    for _, setName in ipairs(blizzardSets) do
-        if not seen[setName] then
-            seen[setName] = true
-            table.insert(allSets, setName)
+    -- Blizzard sets (only if cache is already built)
+    if self.blizzardItemToSets then
+        local blizzardSets = self:GetBlizzardSetsForItem(itemID)
+        for _, setName in ipairs(blizzardSets) do
+            if not seen[setName] then
+                seen[setName] = true
+                table.insert(allSets, setName)
+            end
         end
     end
 
     table.sort(allSets)
+    self._setMembershipCache[itemID] = allSets
     return allSets
 end
 

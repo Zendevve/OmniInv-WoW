@@ -103,29 +103,6 @@ local function IsQuestItem(itemInfo)
     return isQuestItem or false
 end
 
--- Check if item belongs to an equipment set
-local function IsEquipmentSetItem(itemInfo)
-    if not itemInfo or not itemInfo.hyperlink then return false end
-
-    -- Check against saved equipment sets
-    local numSets = GetNumEquipmentSets and GetNumEquipmentSets() or 0
-    for i = 1, numSets do
-        local name = GetEquipmentSetInfo(i)
-        if name then
-            local itemIDs = GetEquipmentSetItemIDs(name)
-            if itemIDs then
-                for slot, itemID in pairs(itemIDs) do
-                    if itemID == itemInfo.itemID then
-                        return true
-                    end
-                end
-            end
-        end
-    end
-
-    return false
-end
-
 local function GetItemID(itemInfo)
     if not itemInfo then
         return nil
