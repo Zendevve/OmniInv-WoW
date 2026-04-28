@@ -191,7 +191,10 @@ function Events:Init()
 
         -- Update the frame
         if Omni.Frame then
-            Omni.Frame:UpdateLayout(modifiedBags)
+            local ok, err = pcall(Omni.Frame.UpdateLayout, Omni.Frame, modifiedBags)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: BAG_UPDATE handler error: " .. tostring(err))
+            end
         end
     end)
 
@@ -201,18 +204,31 @@ function Events:Init()
         if Omni.Frame then
             Omni.Frame:SetBankOpen(true)
             Omni.Frame:SetMode("bank")
-            Omni.Frame:Show()
+            local ok, err = pcall(Omni.Frame.Show, Omni.Frame)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: BANKFRAME_OPENED handler error: " .. tostring(err))
+            end
         end
     end)
 
     self:RegisterEvent("PLAYERBANKSLOTS_CHANGED", function()
         if Omni.Data then Omni.Data:SaveBankItems() end
-        if Omni.Frame then Omni.Frame:UpdateLayout() end
+        if Omni.Frame then
+            local ok, err = pcall(Omni.Frame.UpdateLayout, Omni.Frame)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: PLAYERBANKSLOTS_CHANGED handler error: " .. tostring(err))
+            end
+        end
     end)
 
     self:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
         if Omni.Data then Omni.Data:SaveBankItems() end
-         if Omni.Frame then Omni.Frame:UpdateLayout() end
+        if Omni.Frame then
+            local ok, err = pcall(Omni.Frame.UpdateLayout, Omni.Frame)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: PLAYERBANKBAGSLOTS_CHANGED handler error: " .. tostring(err))
+            end
+        end
     end)
 
     self:RegisterEvent("BANKFRAME_CLOSED", function()
@@ -233,7 +249,10 @@ function Events:Init()
     self:RegisterBucketEvent("GET_ITEM_INFO_RECEIVED", function()
         if Omni.Frame and Omni.Frame:IsShown() then
             -- Refresh layout to fix "Miscellaneous" items that now have data
-            Omni.Frame:UpdateLayout()
+            local ok, err = pcall(Omni.Frame.UpdateLayout, Omni.Frame)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: GET_ITEM_INFO_RECEIVED handler error: " .. tostring(err))
+            end
         end
     end)
 
@@ -257,7 +276,10 @@ function Events:Init()
             Omni.Data:BuildBlizzardSetCache()
         end
         if Omni.Frame then
-            Omni.Frame:UpdateLayout()
+            local ok, err = pcall(Omni.Frame.UpdateLayout, Omni.Frame)
+            if not ok then
+                print("|cFFFF0000OmniInventory|r: EQUIPMENT_SETS_CHANGED handler error: " .. tostring(err))
+            end
         end
     end)
 end

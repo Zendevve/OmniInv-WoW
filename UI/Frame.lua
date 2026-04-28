@@ -1400,8 +1400,12 @@ end
 function Frame:UpdateLayout(changedBags)
     if not mainFrame or not mainFrame:IsShown() then return end
 
-    -- Get items based on current mode
-    local items = {}
+    if self._updatingLayout then return end
+    self._updatingLayout = true
+
+    local ok, err = pcall(function()
+        -- Get items based on current mode
+        local items = {}
     local isBankMode = (currentMode == "bank")
 
     if currentViewedChar then
@@ -1615,9 +1619,16 @@ function Frame:UpdateLayout(changedBags)
         end
     end
 
-    -- Apply search if active
-    if searchText and searchText ~= "" then
-        self:ApplySearch(searchText)
+        -- Apply search if active
+        if searchText and searchText ~= "" then
+            self:ApplySearch(searchText)
+        end
+    end)
+
+    self._updatingLayout = nil
+
+    if not ok then
+        print("|cFFFF0000OmniInventory|r: UpdateLayout error: " .. tostring(err))
     end
 end
 
