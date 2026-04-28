@@ -10,7 +10,7 @@ OmniInventory is the definitive inventory management addon for World of Warcraft
 
 ## Context
 
-- **Current state:** v2.1 and v2.2 complete. Milestone v2.3 Phases 11-14 complete (Virtual Stacks, Empty Slot Compression, Context Menu, Gear Set Integration). Phase 15 (Integration & Hardening) remaining.
+- **Current state:** v2.1, v2.2, and v2.3 "Modern Bag Features" complete. All 5 phases executed, all 16 requirements validated. Ready for in-game verification.
 - **Milestone v2.3 goal:** Retrofit features from modern Retail bag addons (BetterBags, ArkInventory, Retail Bagnon) that provide massive UX value for WoW 3.3.5a players.
 - **Tech stack:** Lua 5.1, WoW 3.3.5a API, no external dependencies (self-contained)
 - **Architecture:** Layered (UI → Logic → Data → API Shim), forward-compatible with Retail via OmniC_Container shim
@@ -109,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 — Phase 14 complete, Phase 15 pending*
+*Last updated: 2026-04-28 — Milestone v2.3 complete*
