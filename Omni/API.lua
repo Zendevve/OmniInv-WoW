@@ -132,6 +132,9 @@ end
 ---@param bagID number
 ---@return number numSlots
 function OmniC_Container.GetContainerNumSlots(bagID)
+    if bagID == -2 then
+        return GetKeyRingSize() or 0
+    end
     return GetContainerNumSlots(bagID) or 0
 end
 
@@ -200,6 +203,12 @@ function OmniC_Container.GetAllBankItems()
     end
 
     return items
+end
+
+--- Get all items in player keyring (Bag -2).
+---@return table items Array of item info tables
+function OmniC_Container.GetAllKeyringItems()
+    return OmniC_Container.GetContainerItems(-2)
 end
 
 -- =============================================================================
@@ -277,6 +286,53 @@ function API:IsItemUnusableLink(link)
             if r > 0.9 and g < 0.2 and b < 0.2 then
                 return true
             end
+        end
+    end
+
+    return false
+end
+
+-- =============================================================================
+-- Tooltip Text Scanning (for Rules Engine)
+-- =============================================================================
+
+--- Scan tooltip for text substring (used by Rules.Tooltip() builtin)
+---@param bag number
+---@param slot number
+---@param searchText string
+---@return boolean found
+function API:TooltipContains(bag, slot, searchText)
+    if not bag or not slot or not searchText then return false end
+    scanningTooltip:ClearLines()
+    scanningTooltip:SetBagItem(bag, slot)
+
+    local lowerSearch = string.lower(searchText)
+    for i = 1, scanningTooltip:NumLines() do
+        local textFrame = _G["OmniScanningTooltipTextLeft" .. i]
+        local line = textFrame and textFrame:GetText()
+        if line and string.find(string.lower(line), lowerSearch, 1, true) then
+            return true
+        end
+    end
+
+    return false
+end
+
+--- Scan tooltip for text substring using hyperlink
+---@param link string
+---@param searchText string
+---@return boolean found
+function API:TooltipLinkContains(link, searchText)
+    if not link or not searchText then return false end
+    scanningTooltip:ClearLines()
+    scanningTooltip:SetHyperlink(link)
+
+    local lowerSearch = string.lower(searchText)
+    for i = 1, scanningTooltip:NumLines() do
+        local textFrame = _G["OmniScanningTooltipTextLeft" .. i]
+        local line = textFrame and textFrame:GetText()
+        if line and string.find(string.lower(line), lowerSearch, 1, true) then
+            return true
         end
     end
 

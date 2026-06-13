@@ -78,15 +78,16 @@ local OPERATORS = {
         end
         return false
     end,
-    in_list = function(a, b)
+    not_in_list = function(a, b)
         if type(b) ~= "table" then return false end
         for _, v in ipairs(b) do
-            if a == v then return true end
+            if a == v then return false end
         end
-        return false
+        return true
     end,
 }
 
+--- Get available rule operator types
 function Rules:GetRuleTypes()
     -- Map operators to user-friendly names and input types
     return {
@@ -97,6 +98,99 @@ function Rules:GetRuleTypes()
         { id = "greater_than", name = "Greater Than", type = "number" },
         { id = "less_than", name = "Less Than", type = "number" },
         { id = "in_list", name = "In List (comma sep)", type = "text" },
+        { id = "not_in_list", name = "Not In List", type = "text" },
+    }
+end
+
+--- Get built-in expression functions available in the sandbox
+function Rules:GetBuiltinFunctions()
+    return {
+        { name = "Name", desc = "Item name contains text", example = "Name(\"Flask\")" },
+        { name = "Type", desc = "Item type/subtype matches", example = "Type(\"Armor\")" },
+        { name = "Quality", desc = "Item quality equals level", example = "Quality(3)" },
+        { name = "Tooltip", desc = "Tooltip contains text", example = "Tooltip(\"Use:\")" },
+        { name = "BindsOnEquip", desc = "Item binds on equip (BoE)", example = "BindsOnEquip()" },
+        { name = "BindsOnPickup", desc = "Item binds on pickup (BoP)", example = "BindsOnPickup()" },
+        { name = "ProfessionReagent", desc = "Is a crafting reagent", example = "ProfessionReagent()" },
+        { name = "IsNew", desc = "Acquired this session", example = "IsNew()" },
+    }
+end
+
+--- Get pre-built rule templates for common categorization patterns
+function Rules:GetRuleTemplates()
+    return {
+        {
+            name = "Flasks & Potions",
+            description = "Group consumable flasks and potions together",
+            expression = "Name(\"Flask\") or Name(\"Potion\") or Name(\"Elixir\")",
+            category = "Consumables",
+        },
+        {
+            name = "Health/Mana Stones",
+            description = "Health and mana stones for quick access",
+            expression = "Name(\"Health Stone\") or Name(\"Mana Stone\") or Name(\"Soulstone\")",
+            category = "Consumables",
+        },
+        {
+            name = "Food & Drink",
+            description = "Bread, water, and other food items",
+            expression = "Type(\"Consumable\") and (Name(\"Bread\") or Name(\"Water\") or Name(\"Cheese\") or Name(\"Fish\") or Name(\"Meat\") or Name(\"Fruit\"))",
+            category = "Consumables",
+        },
+        {
+            name = "BoE Equipment (Sellable)",
+            description = "Bind-on-equip items that can be sold on AH",
+            expression = "BindsOnEquip() and Type(\"Weapon\") or Type(\"Armor\")",
+            category = "Equipment",
+        },
+        {
+            name = "BoP Equipment (Keep)",
+            description = "Bind-on-pickup items to keep for personal use",
+            expression = "BindsOnPickup() and (Type(\"Weapon\") or Type(\"Armor\"))",
+            category = "Equipment",
+        },
+        {
+            name = "Gems & Gems",
+            description = "Precious gems for socketing",
+            expression = "Type(\"Gem\")",
+            category = "Gems",
+        },
+        {
+            name = "Enchanting Materials",
+            description = "Dust, shards, and essences for enchanting",
+            expression = "Name(\"Dust\") or Name(\"Shard\") or Name(\"Essence\") or Name(\"Crystal\")",
+            category = "Professions",
+        },
+        {
+            name = "Herbs & Alchemy",
+            description = "Herbs gathered for alchemy and inscription",
+            expression = "ProfessionReagent() and (Name(\"Herb\") or Name(\"Leaf\") or Name(\"Bloom\") or Name(\"Thorn\") or Name(\"Root\"))",
+            category = "Professions",
+        },
+        {
+            name = "Quest Items",
+            description = "Items needed for active quests",
+            expression = "Tooltip(\"Quest\") or Tooltip(\"Quest Item\")",
+            category = "Quest Items",
+        },
+        {
+            name = "Keys & Passes",
+            description = "Keys, lockboxes, and instance passes",
+            expression = "Type(\"Key\") or Name(\"Key\") or Name(\"Pass\") or Name(\"Lock\")",
+            category = "Miscellaneous",
+        },
+        {
+            name = "Junk (Gray Items)",
+            description = "Gray quality items safe to sell",
+            expression = "Quality(0)",
+            category = "Junk",
+        },
+        {
+            name = "New Items (Session)",
+            description = "Items acquired this session",
+            expression = "IsNew()",
+            category = "Special",
+        },
     }
 end
 
@@ -176,8 +270,100 @@ local function EvaluateConditions(itemInfo, conditions, matchType)
 end
 
 -- =============================================================================
--- Sandboxed Lua Expression Execution
+-- Sandboxed Lua Expression Execution & Built-in Expression Functions
 -- =============================================================================
+-- Provides BagShui-equivalent functions available in expression sandbox.
+-- Usage in expressions:
+--   Name("suffix")    -- item name contains string
+--   Type("Armor")     -- item type/subtype matches
+--   Quality(3)        -- item quality equals or exceeds
+--   Tooltip("text")   -- tooltip scan contains string
+--   BindsOnEquip()    -- item binds when equipped
+--   ProfessionReagent() -- item is a reagent (bagFamily check)
+-- =============================================================================
+
+local BUILTIN_FUNCTIONS = {}
+
+--- Name(substring) - matches against item name (case-insensitive contains)
+function BUILTIN_FUNCTIONS.Name(substring)
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    if not item.name or item.name == "" then return false end
+    return string.find(string.lower(item.name), string.lower(tostring(substring)), 1, true) ~= nil
+end
+
+--- Type(typeStr) - matches itemType or itemSubType (partial match)
+function BUILTIN_FUNCTIONS.Type(typeStr)
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    if not typeStr then return false end
+    local t = string.lower(tostring(typeStr))
+    if item.itemType and string.find(string.lower(item.itemType), t, 1, true) then return true end
+    if item.itemSubType and string.find(string.lower(item.itemSubType), t, 1, true) then return true end
+    return false
+end
+
+--- Quality(level) - matches item quality (numeric equality)
+function BUILTIN_FUNCTIONS.Quality(level)
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    return item.quality == tonumber(level)
+end
+
+--- Tooltip(text) - scans tooltip for text match
+function BUILTIN_FUNCTIONS.Tooltip(text)
+    local item = _G.__ruleItemContext
+    if not item or not item.bagID or not item.slotID then return false end
+    if not Omni.API then return false end
+    if item.bagID >= 0 then
+        return Omni.API:TooltipContains(item.bagID, item.slotID, tostring(text))
+    else
+        return Omni.API:TooltipLinkContains(item.hyperlink, tostring(text))
+    end
+end
+
+--- BindsOnEquip() - returns true for BoE items
+function BUILTIN_FUNCTIONS.BindsOnEquip()
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    return item.bindType == "BoE"
+end
+
+--- BindsOnPickup() - returns true for BoP items
+function BUILTIN_FUNCTIONS.BindsOnPickup()
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    return item.bindType == "BoP"
+end
+
+--- ProfessionReagent() - checks if item is a reagent via item type/subtype
+function BUILTIN_FUNCTIONS.ProfessionReagent()
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    if item.itemType == "Reagent" then return true end
+    if item.itemType == "Trade Goods" then return true end
+    local reagents = { Herb = true, Enchanting = true, Jewelcrafting = true, Metal = true, Stone = true, Leather = true, Cloth = true }
+    if item.itemSubType and reagents[item.itemSubType] then return true end
+    return false
+end
+
+--- IsNew() - returns true if item was acquired this session
+function BUILTIN_FUNCTIONS.IsNew()
+    local item = _G.__ruleItemContext
+    if not item then return false end
+    if item.isNew then return true end
+    if item.itemID and Omni.Categorizer then
+        return Omni.Categorizer:IsNewItem(item.itemID)
+    end
+    return false
+end
+
+-- Copy built-in functions into sandbox
+local function AddBuiltinFunctions(env)
+    for k, v in pairs(BUILTIN_FUNCTIONS) do
+        env[k] = v
+    end
+end
 
 local SAFE_ENV = {
     -- Safe string functions
@@ -201,6 +387,8 @@ local SAFE_ENV = {
     tonumber = tonumber,
     tostring = tostring,
     type = type,
+    -- Global table reference (needed for builtin context)
+    _G = _G,
 }
 
 local function CompileExpression(expression)
@@ -209,7 +397,14 @@ local function CompileExpression(expression)
     end
 
     -- Wrap in return statement
-    local code = "return function(item) return " .. expression .. " end"
+    local code = "return function() return " .. expression .. " end"
+
+    -- Build full sandbox for compilation
+    local compileSandbox = {}
+    for k, v in pairs(SAFE_ENV) do
+        compileSandbox[k] = v
+    end
+    AddBuiltinFunctions(compileSandbox)
 
     -- Compile with loadstring
     local chunk, err = loadstring(code)
@@ -217,8 +412,8 @@ local function CompileExpression(expression)
         return nil, "Syntax error: " .. (err or "unknown")
     end
 
-    -- Execute in sandboxed environment
-    setfenv(chunk, SAFE_ENV)
+    -- Execute in full sandbox environment
+    setfenv(chunk, compileSandbox)
 
     local ok, result = pcall(chunk)
     if not ok then
@@ -258,8 +453,19 @@ local function EvaluateExpression(itemInfo, expression)
         context.itemSubType = itemSubType or ""
     end
 
+    -- Load built-in functions into sandbox environment
+    local sandbox = {}
+    for k, v in pairs(SAFE_ENV) do
+        sandbox[k] = v
+    end
+    AddBuiltinFunctions(sandbox)
+
+    -- Set global item context for builtin functions
+    _G.__ruleItemContext = context
+
     -- Execute compiled expression
-    local ok, result = pcall(compiledRules[expression], context)
+    local ok, result = pcall(compiledRules[expression])
+    _G.__ruleItemContext = nil
     if not ok then
         return false
     end

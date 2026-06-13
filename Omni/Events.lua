@@ -209,6 +209,32 @@ function Events:Init()
             Omni.Categorizer:SnapshotInventory()
         end
     end)
+
+    -- Auto-Display Events (Merchant, Mail, Trade, AH)
+    self:RegisterEvent("MERCHANT_SHOW", function()
+        if Omni.Frame then Omni.Frame:Show() end
+    end)
+    self:RegisterEvent("MERCHANT_CLOSED", function()
+        if Omni.Frame then Omni.Frame:Hide() end
+    end)
+
+    self:RegisterEvent("MAIL_CLOSED", function()
+        if Omni.Frame then Omni.Frame:Hide() end
+    end)
+
+    self:RegisterEvent("AUCTION_HOUSE_SHOW", function()
+        if Omni.Frame then Omni.Frame:Show() end
+    end)
+    self:RegisterEvent("AUCTION_HOUSE_CLOSED", function()
+        if Omni.Frame then Omni.Frame:Hide() end
+    end)
+
+    self:RegisterEvent("TRADE_SHOW", function()
+        if Omni.Frame then Omni.Frame:Show() end
+    end)
+    self:RegisterEvent("TRADE_CLOSED", function()
+        if Omni.Frame then Omni.Frame:Hide() end
+    end)
 end
 
 print("|cFF00FF00OmniInventory|r: Event Bucketing system loaded")

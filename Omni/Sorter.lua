@@ -10,6 +10,21 @@ local addonName, Omni = ...
 Omni.Sorter = {}
 local Sorter = Omni.Sorter
 
+-- Bitwise AND fallback for Lua versions without the bit library
+local band = (bit and bit.band) or function(a, b)
+    local result = 0
+    local bitVal = 1
+    while a > 0 or b > 0 do
+        if (a % 2 == 1) and (b % 2 == 1) then
+            result = result + bitVal
+        end
+        a = math.floor(a / 2)
+        b = math.floor(b / 2)
+        bitVal = bitVal * 2
+    end
+    return result
+end
+
 -- =============================================================================
 -- Merge Sort Implementation (Stable)
 -- =============================================================================
@@ -439,7 +454,7 @@ function Sorter:FindNextMove(isBank)
                     local itemFamily = GetItemFamily(itemLink) or 0
                     if itemFamily > 0 then
                         for family, targetBags in pairs(specBags) do
-                            if bit.band(family, itemFamily) ~= 0 then
+                            if band(family, itemFamily) ~= 0 then
                                 for _, targetBag in ipairs(targetBags) do
                                     local freeSlots = {}
                                     GetContainerFreeSlots(targetBag, freeSlots)

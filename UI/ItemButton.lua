@@ -133,6 +133,18 @@ function ItemButton:Create(parent)
     button.upgradeArrow:SetPoint("TOPLEFT", button, "TOPLEFT", 1, -1)
     button.upgradeArrow:Hide()
 
+    -- Stock change badge (up/down/new from previous session)
+    button.stockBadge = button:CreateTexture(nil, "OVERLAY")
+    button.stockBadge:SetSize(14, 14)
+    button.stockBadge:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", 0, 0)
+    button.stockBadge:Hide()
+
+    button.stockText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    button.stockText:SetPoint("BOTTOMRIGHT", button, "BOTTOMRIGHT", -1, 1)
+    button.stockText:SetTextColor(1, 1, 1, 1)
+    button.stockText:SetFont(button.stockText:GetFont(), 8)
+    button.stockText:Hide()
+
     -- Search dim overlay
     button.dimOverlay = button:CreateTexture(nil, "OVERLAY", nil, 7)
     button.dimOverlay:SetAllPoints(button.icon)
@@ -248,7 +260,12 @@ function ItemButton:SetItem(button, itemInfo)
     -- Configure secure action attributes for item usage
     -- This allows WoW's protected action system to handle item use directly
     -- We disable secure action click actions if we are offline or viewing another character
-    local isOffline = (itemInfo.bagID == -1 or (Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player")))
+    local isOffline = false
+    if Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player") then
+        isOffline = true
+    elseif itemInfo.bagID == -1 or (itemInfo.bagID >= 5 and itemInfo.bagID <= 11) then
+        isOffline = not (Omni.Frame and Omni.Frame:IsBankOpen())
+    end
     if isOffline then
         button:SetAttribute("type", nil)
         button:SetAttribute("item", nil)
@@ -288,8 +305,11 @@ function ItemButton:SetItem(button, itemInfo)
     -- 2. Quest Item Indicator
     button.questText:Hide()
     if itemInfo.bagID and itemInfo.bagID >= 0 and itemInfo.slotID and itemInfo.slotID > 0 then
-        -- Online Quest Check
-        local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+        -- Online Quest Check (GetContainerItemQuestInfo only exists in 3.3.3+)
+        local isQuestItem, questId, isActive = false, nil, nil
+        if GetContainerItemQuestInfo then
+            isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+        end
         if isQuestItem or questId then
             button.questText:Show()
             -- Set quest gold border if not high quality
@@ -339,6 +359,26 @@ function ItemButton:SetItem(button, itemInfo)
         button.pinIcon:Show()
     else
         button.pinIcon:Hide()
+    end
+
+    -- 4. Stock change badge (cross-session tracking)
+    button.stockBadge:Hide()
+    button.stockText:Hide()
+    if itemInfo.itemID and Omni.Data and not isOffline then
+        local stockChange = Omni.Data:GetStockChange(itemInfo.itemID)
+        if stockChange == "new" then
+            button.stockBadge:SetTexture("Interface\\Minimap\\MinimapIcon\\Tracking")
+            button.stockBadge:SetVertexColor(0.0, 1.0, 0.5, 1)  -- Green tint
+            button.stockBadge:Show()
+        elseif stockChange == "up" then
+            button.stockText:SetText("+")
+            button.stockText:SetTextColor(0.0, 1.0, 0.5, 1)
+            button.stockText:Show()
+        elseif stockChange == "down" then
+            button.stockText:SetText("-")
+            button.stockText:SetTextColor(1.0, 0.3, 0.3, 1)
+            button.stockText:Show()
+        end
     end
 end
 
@@ -418,8 +458,12 @@ function ItemButton:OnClick(button, mouseButton)
         return
     end
 
-    -- Block all other clicks if offline or viewing another character
-    local isOffline = (bagID == -1 or (Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player")))
+    local isOffline = false
+    if Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player") then
+        isOffline = true
+    elseif bagID == -1 or (bagID >= 5 and bagID <= 11) then
+        isOffline = not (Omni.Frame and Omni.Frame:IsBankOpen())
+    end
     if isOffline then return end
 
     if not bagID or not slotID then return end
@@ -432,6 +476,15 @@ function ItemButton:OnClick(button, mouseButton)
         -- Also clear in Categorizer's tracking
         if Omni.Categorizer and button.itemInfo.itemID then
             Omni.Categorizer:ClearNewItem(button.itemInfo.itemID)
+        end
+    end
+
+    -- Clear stock change badge on click
+    if button.itemInfo and button.itemInfo.itemID and Omni.Data then
+        if Omni.Data.stockChanges and Omni.Data.stockChanges[button.itemInfo.itemID] then
+            Omni.Data.stockChanges[button.itemInfo.itemID] = nil
+            button.stockBadge:Hide()
+            button.stockText:Hide()
         end
     end
 
@@ -498,9 +551,18 @@ function ItemButton:OnEnter(button)
         GameTooltip:AddLine("Bank Item (Offline)", 0.5, 0.5, 0.5)
     end
 
-    -- Hook for Auctionator (if it doesn't hook automatically)
-    if Auctionator and Auctionator.ShowTooltip then
-         -- Auctionator usually hooks SetBagItem/SetHyperlink, but we can allow extra logic here if needed
+    -- Hook for Auctionator (show auction prices in tooltip)
+    if Auctionator then
+        -- Auctionator provides GetAuctionPrice(itemLink) function
+        if Auctionator.GetAuctionPrice and itemInfo.hyperlink then
+            local auctionPrice = Auctionator.GetAuctionPrice(itemInfo.hyperlink)
+            if auctionPrice and auctionPrice > 0 then
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Auction Price: |cFFFFFFFF" .. GetCoinTextureString(auctionPrice), 0.8, 0.8, 0.5)
+            end
+        end
+        -- Auctionator's built-in tooltip hook usually handles this,
+        -- but we add it explicitly for cases where it doesn't hook our frame
     end
 
     GameTooltip:Show()
@@ -521,6 +583,14 @@ function ItemButton:OnDragStart(button)
     local bagID = button.bagID
     local slotID = button.slotID
 
+    local isOffline = false
+    if Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player") then
+        isOffline = true
+    elseif bagID == -1 or (bagID >= 5 and bagID <= 11) then
+        isOffline = not (Omni.Frame and Omni.Frame:IsBankOpen())
+    end
+    if isOffline then return end
+
     if bagID and slotID then
         PickupContainerItem(bagID, slotID)
     end
@@ -531,6 +601,14 @@ function ItemButton:OnReceiveDrag(button)
 
     local bagID = button.bagID
     local slotID = button.slotID
+
+    local isOffline = false
+    if Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player") then
+        isOffline = true
+    elseif bagID == -1 or (bagID >= 5 and bagID <= 11) then
+        isOffline = not (Omni.Frame and Omni.Frame:IsBankOpen())
+    end
+    if isOffline then return end
 
     if bagID and slotID then
         PickupContainerItem(bagID, slotID)
@@ -564,6 +642,8 @@ function ItemButton:Reset(button)
     button.icon:SetAlpha(1)
     button.ilvlText:Hide()
     button.questText:Hide()
+    button.stockBadge:Hide()
+    button.stockText:Hide()
     button:Hide()
 end
 

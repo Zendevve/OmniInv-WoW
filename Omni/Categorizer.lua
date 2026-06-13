@@ -94,7 +94,10 @@ local function IsQuestItem(itemInfo)
     end
 
     -- GetContainerItemQuestInfo was added in 3.3.3
-    local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+    local isQuestItem, questId, isActive = false, nil, nil
+    if GetContainerItemQuestInfo then
+        isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+    end
     return isQuestItem or false
 end
 
@@ -200,6 +203,11 @@ end
 function Categorizer:GetCategory(itemInfo)
     if not itemInfo then
         return "Miscellaneous"
+    end
+
+    -- Special Priority: Keyring items go straight to "Keys"
+    if itemInfo.bagID == -2 then
+        return "Keys"
     end
 
     -- 1. Priority 1: Manual Override (highest priority, bypasses filter registry)

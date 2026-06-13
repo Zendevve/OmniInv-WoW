@@ -54,6 +54,24 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if Omni.Settings then Omni.Settings:Init() end
         if Omni.MinimapButton then Omni.MinimapButton:Init() end
 
+        -- Detect external addon integrations
+        Omni.integrations = {}
+        if Pawn then
+            table.insert(Omni.integrations, "Pawn")
+        end
+        if Auctionator then
+            table.insert(Omni.integrations, "Auctionator")
+        end
+        if LibStub then
+            local LDB = LibStub("LibDataBroker-1.1", true)
+            if LDB then
+                table.insert(Omni.integrations, "LibDataBroker")
+            end
+        end
+        if #Omni.integrations > 0 then
+            print("|cFF00FF00OmniInventory|r: Detected integrations: |cFF00FFFF" .. table.concat(Omni.integrations, ", ") .. "|r")
+        end
+
         -- Override default bag functions
         local function OverrideBags()
             -- Debounce mechanism to prevent double toggles
@@ -105,6 +123,17 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
 
             ToggleBag = function(id)
                 SafeToggle()
+            end
+
+            ToggleKeyRing = function()
+                if Omni.Frame then
+                    if Omni.Frame:IsShown() and Omni.Frame:GetMode() == "keys" then
+                        Omni.Frame:Hide()
+                    else
+                        Omni.Frame:SetMode("keys")
+                        Omni.Frame:Show()
+                    end
+                end
             end
 
             -- CRITICAL: Override OpenBag to prevent default frames from showing

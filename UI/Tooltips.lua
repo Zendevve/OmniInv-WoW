@@ -25,6 +25,7 @@ end
 local function GetCharacterItemCounts(charData, targetItemID)
     local bagsCount = 0
     local bankCount = 0
+    local keyringCount = 0
 
     -- 1. Scan bags
     if charData.bags then
@@ -50,7 +51,19 @@ local function GetCharacterItemCounts(charData, targetItemID)
         end
     end
 
-    return bagsCount, bankCount
+    -- 3. Scan keyring
+    if charData.keyring then
+        for _, item in ipairs(charData.keyring) do
+            if item.link then
+                local itemID = tonumber(string.match(item.link, "item:(%d+)"))
+                if itemID == targetItemID then
+                    keyringCount = keyringCount + (item.count or 1)
+                end
+            end
+        end
+    end
+
+    return bagsCount, bankCount, keyringCount
 end
 
 -- Appends owner counts to the tooltip
@@ -68,8 +81,8 @@ local function AddOwnerCounts(tooltip, itemLink)
 
     -- Iterate over all characters on this realm
     for charName, charData in pairs(realm) do
-        local bagsCount, bankCount = GetCharacterItemCounts(charData, targetItemID)
-        local total = bagsCount + bankCount
+        local bagsCount, bankCount, keyringCount = GetCharacterItemCounts(charData, targetItemID)
+        local total = bagsCount + bankCount + keyringCount
 
         if total > 0 then
             -- Add header line on the first match
@@ -79,13 +92,16 @@ local function AddOwnerCounts(tooltip, itemLink)
                 headerAdded = true
             end
 
-            -- Format details: e.g. "5 (Bags: 3, Bank: 2)"
+            -- Format details: e.g. "5 (Bags: 3, Bank: 2, Keyring: 1)"
             local details = {}
             if bagsCount > 0 then
                 table.insert(details, "Bags: " .. bagsCount)
             end
             if bankCount > 0 then
                 table.insert(details, "Bank: " .. bankCount)
+            end
+            if keyringCount > 0 then
+                table.insert(details, "Keyring: " .. keyringCount)
             end
 
             local detailsStr = ""
