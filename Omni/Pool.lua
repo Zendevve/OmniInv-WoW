@@ -78,6 +78,23 @@ function PoolMixin:IterateActive()
     return pairs(self.active)
 end
 
+--- Pre-spawn objects to populate the pool heap
+---@param count number Number of objects to pre-spawn
+function PoolMixin:PreSpawn(count)
+    if not count or count <= 0 then return end
+
+    -- Avoid secure frame creation errors in combat
+    if InCombatLockdown and InCombatLockdown() then
+        return
+    end
+
+    for i = 1, count do
+        local obj = self.createFunc()
+        table.insert(self.available, obj)
+        self.totalCreated = self.totalCreated + 1
+    end
+end
+
 -- =============================================================================
 -- Pool Factory
 -- =============================================================================
@@ -223,6 +240,17 @@ function Pool:Init()
             header.count:SetText("")
         end
     )
+
+    -- Pre-spawn items to avoid allocation stutters on first open
+    local itemButtonPool = self:Get("ItemButton")
+    if itemButtonPool then
+        itemButtonPool:PreSpawn(150)
+    end
+
+    local headerPool = self:Get("CategoryHeader")
+    if headerPool then
+        headerPool:PreSpawn(30)
+    end
 end
 
 print("|cFF00FF00OmniInventory|r: Object Pool system loaded")

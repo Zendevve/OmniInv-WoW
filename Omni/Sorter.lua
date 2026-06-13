@@ -286,11 +286,245 @@ function Sorter:SetDefaultMode(mode)
 end
 
 -- =============================================================================
+-- Physical Bag Sorting State Machine
+-- =============================================================================
+
+local isSorting = false
+local sortBank = false
+local timerFrame = CreateFrame("Frame")
+
+timerFrame:Hide()
+timerFrame.elapsed = 0
+timerFrame:SetScript("OnUpdate", function(self, elapsed)
+    self.elapsed = self.elapsed + elapsed
+    if self.elapsed >= 0.8 then
+        self:Hide()
+        if Sorter:IsPhysicalSorting() then
+            Sorter:ProcessNextPhysicalMove()
+        end
+    end
+end)
+
+function Sorter:IsPhysicalSorting()
+    return isSorting
+end
+
+function Sorter:PhysicalSort(isBank)
+    if isSorting then return end
+    if InCombatLockdown() then
+        print("|cFF00FF00OmniInventory|r: Cannot sort bags in combat.")
+        return
+    end
+
+    isSorting = true
+    sortBank = isBank or false
+    print("|cFF00FF00OmniInventory|r: Sorting bags...")
+
+    -- Perform the first move
+    self:ProcessNextPhysicalMove()
+end
+
+function Sorter:StopPhysicalSort()
+    isSorting = false
+    timerFrame:Hide()
+    if Omni.Frame then
+        Omni.Frame:UpdateLayout()
+    end
+end
+
+function Sorter:ProcessNextPhysicalMove()
+    if not isSorting then return end
+
+    if InCombatLockdown() then
+        self:StopPhysicalSort()
+        print("|cFF00FF00OmniInventory|r: Sorting paused due to combat.")
+        return
+    end
+
+    -- Clear cursor before picking up
+    ClearCursor()
+
+    local fromBag, fromSlot, toBag, toSlot = self:FindNextMove(sortBank)
+    if fromBag and fromSlot and toBag and toSlot then
+        -- Safety check: ensure slots are not locked
+        local _, _, lockedFrom = GetContainerItemInfo(fromBag, fromSlot)
+        local _, _, lockedTo = GetContainerItemInfo(toBag, toSlot)
+        if lockedFrom or lockedTo then
+            -- Slots are currently locked by the server; wait for BAG_UPDATE
+            return
+        end
+
+        -- Execute move: pickup from slot, drop in target slot
+        PickupContainerItem(fromBag, fromSlot)
+        PickupContainerItem(toBag, toSlot)
+        ClearCursor()
+
+        -- Set a safety timeout in case BAG_UPDATE is missed
+        timerFrame.elapsed = 0
+        timerFrame:Show()
+    else
+        -- No more moves! Sorting complete.
+        self:StopPhysicalSort()
+        print("|cFF00FF00OmniInventory|r: Sorting complete.")
+    end
+end
+
+local function GetBagsSlots(bagIds)
+    local slots = {}
+    for _, bag in ipairs(bagIds) do
+        local numSlots = GetContainerNumSlots(bag) or 0
+        for slot = 1, numSlots do
+            table.insert(slots, { bag = bag, slot = slot, slotId = bag * 100 + slot })
+        end
+    end
+    return slots
+end
+
+function Sorter:FindNextMove(isBank)
+    if InCombatLockdown() then return end
+
+    local bagIds = isBank and { -1, 5, 6, 7, 8, 9, 10, 11 } or { 0, 1, 2, 3, 4 }
+    local slots = GetBagsSlots(bagIds)
+
+    -- Step 1: Consolidate incomplete stacks
+    local incomplete = {}
+    for _, slotInfo in ipairs(slots) do
+        local bag, slot = slotInfo.bag, slotInfo.slot
+        local itemID = GetContainerItemID(bag, slot)
+        if itemID then
+            local _, count = GetContainerItemInfo(bag, slot)
+            local maxStack = select(8, GetItemInfo(itemID)) or 1
+            if maxStack > 1 and count < maxStack then
+                local prevSlotId = incomplete[itemID]
+                if prevSlotId then
+                    local prevBag, prevSlot = math.floor(prevSlotId / 100), prevSlotId % 100
+                    if prevSlotId < slotInfo.slotId then
+                        return bag, slot, prevBag, prevSlot
+                    else
+                        return prevBag, prevSlot, bag, slot
+                    end
+                else
+                    incomplete[itemID] = slotInfo.slotId
+                end
+            end
+        end
+    end
+
+    -- Step 2: Specialized bag sorting
+    local specBags = {}
+    local hasSpecBags = false
+    for _, bag in ipairs(bagIds) do
+        if bag > 0 then
+            local _, bagFamily = GetContainerNumFreeSlots(bag)
+            if bagFamily and bagFamily > 0 then
+                specBags[bagFamily] = specBags[bagFamily] or {}
+                table.insert(specBags[bagFamily], bag)
+                hasSpecBags = true
+            end
+        end
+    end
+
+    if hasSpecBags then
+        for _, slotInfo in ipairs(slots) do
+            local bag, slot = slotInfo.bag, slotInfo.slot
+            local isGeneralBag = (bag == 0 or bag == -1)
+            if not isGeneralBag then
+                local _, bagFamily = GetContainerNumFreeSlots(bag)
+                isGeneralBag = (not bagFamily or bagFamily == 0)
+            end
+
+            if isGeneralBag then
+                local itemLink = GetContainerItemLink(bag, slot)
+                if itemLink then
+                    local itemFamily = GetItemFamily(itemLink) or 0
+                    if itemFamily > 0 then
+                        for family, targetBags in pairs(specBags) do
+                            if bit.band(family, itemFamily) ~= 0 then
+                                for _, targetBag in ipairs(targetBags) do
+                                    local freeSlots = {}
+                                    GetContainerFreeSlots(targetBag, freeSlots)
+                                    if #freeSlots > 0 then
+                                        return bag, slot, targetBag, freeSlots[1]
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Step 3: General physical sorting
+    local generalSlots = {}
+    local generalItems = {}
+    for _, slotInfo in ipairs(slots) do
+        local bag = slotInfo.bag
+        local isGeneral = (bag == 0 or bag == -1)
+        if not isGeneral then
+            local _, bagFamily = GetContainerNumFreeSlots(bag)
+            isGeneral = (not bagFamily or bagFamily == 0)
+        end
+
+        if isGeneral then
+            table.insert(generalSlots, slotInfo)
+            local itemLink = GetContainerItemLink(bag, slotInfo.slot)
+            if itemLink then
+                local name, _, quality, iLvl = GetItemInfo(itemLink)
+                local _, count = GetContainerItemInfo(bag, slotInfo.slot)
+                local itemID = tonumber(string.match(itemLink, "item:(%d+)"))
+
+                table.insert(generalItems, {
+                    bag = bag,
+                    slot = slotInfo.slot,
+                    link = itemLink,
+                    quality = quality or 0,
+                    name = name or "",
+                    itemLevel = iLvl or 0,
+                    stackCount = count or 1,
+                    itemID = itemID,
+                    slotId = slotInfo.slotId,
+                })
+            end
+        end
+    end
+
+    local mode = Sorter:GetDefaultMode()
+    table.sort(generalItems, function(a, b)
+        local pinnedA = a.itemID and Omni.Data and Omni.Data:IsPinned(a.itemID)
+        local pinnedB = b.itemID and Omni.Data and Omni.Data:IsPinned(b.itemID)
+        if pinnedA and not pinnedB then return true end
+        if pinnedB and not pinnedA then return false end
+
+        if mode == "quality" then
+            if a.quality ~= b.quality then return a.quality > b.quality end
+        elseif mode == "name" then
+            if a.name ~= b.name then return a.name < b.name end
+        elseif mode == "ilvl" then
+            if a.itemLevel ~= b.itemLevel then return a.itemLevel > b.itemLevel end
+        end
+
+        if a.quality ~= b.quality then return a.quality > b.quality end
+        if a.name ~= b.name then return a.name < b.name end
+        return a.slotId < b.slotId
+    end)
+
+    for i, expectedItem in ipairs(generalItems) do
+        local targetSlot = generalSlots[i]
+        if expectedItem.slotId ~= targetSlot.slotId then
+            return expectedItem.bag, expectedItem.slot, targetSlot.bag, targetSlot.slot
+        end
+    end
+
+    return nil
+end
+
+-- =============================================================================
 -- Initialization
 -- =============================================================================
 
 function Sorter:Init()
-    -- Nothing to initialize, but maintain interface consistency
+    -- Maintain consistency
 end
 
 print("|cFF00FF00OmniInventory|r: Sorter loaded (stable merge-sort)")

@@ -147,6 +147,19 @@ function ItemButton:Create(parent)
     button.pinIcon:SetPoint("TOPRIGHT", button, "TOPRIGHT", -1, -1)
     button.pinIcon:Hide()
 
+    -- Item level text (top-left)
+    button.ilvlText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    button.ilvlText:SetPoint("TOPLEFT", button, "TOPLEFT", 2, -2)
+    button.ilvlText:SetTextColor(1, 1, 1, 1)
+    button.ilvlText:Hide()
+
+    -- Quest indicator exclamation mark (bottom-left)
+    button.questText = button:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    button.questText:SetPoint("BOTTOMLEFT", button, "BOTTOMLEFT", 2, 2)
+    button.questText:SetText("!")
+    button.questText:SetTextColor(1.0, 0.82, 0.0)
+    button.questText:Hide()
+
     -- Store item info reference
     button.itemInfo = nil
 
@@ -234,12 +247,18 @@ function ItemButton:SetItem(button, itemInfo)
 
     -- Configure secure action attributes for item usage
     -- This allows WoW's protected action system to handle item use directly
-    -- Format: "bag slot" where bag is container ID (0-4) and slot is slot number
-    button:SetAttribute("type", "item")
-    button:SetAttribute("item", itemInfo.bagID .. " " .. itemInfo.slotID)
+    -- We disable secure action click actions if we are offline or viewing another character
+    local isOffline = (itemInfo.bagID == -1 or (Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player")))
+    if isOffline then
+        button:SetAttribute("type", nil)
+        button:SetAttribute("item", nil)
+    else
+        button:SetAttribute("type", "item")
+        button:SetAttribute("item", itemInfo.bagID .. " " .. itemInfo.slotID)
+    end
 
     -- New item glow with animation
-    if itemInfo.isNew then
+    if itemInfo.isNew and not isOffline then
         button.glow:Show()
         button.glow.anim:Play()
     else
@@ -249,22 +268,70 @@ function ItemButton:SetItem(button, itemInfo)
 
     -- Pawn Upgrade Check (wrapped in pcall for safety)
     button.upgradeArrow:Hide()
-    if PawnIsContainerItemAnUpgrade and itemInfo.bagID and itemInfo.bagID >= 0 then
+    if PawnIsContainerItemAnUpgrade and itemInfo.bagID and itemInfo.bagID >= 0 and not isOffline then
         local ok, isUpgrade = pcall(PawnIsContainerItemAnUpgrade, itemInfo.bagID, itemInfo.slotID)
         if ok and isUpgrade then
             button.upgradeArrow:Show()
         end
     end
 
-    -- Apply quick filter dimming or clear search dim
-    if itemInfo.isQuickFiltered then
+    -- 1. Item Level Display
+    button.ilvlText:Hide()
+    if itemInfo.hyperlink then
+        local _, _, _, iLvl, _, itemType = GetItemInfo(itemInfo.hyperlink)
+        if iLvl and iLvl > 0 and (itemType == "Weapon" or itemType == "Armor") then
+            button.ilvlText:SetText(iLvl)
+            button.ilvlText:Show()
+        end
+    end
+
+    -- 2. Quest Item Indicator
+    button.questText:Hide()
+    if itemInfo.bagID and itemInfo.bagID >= 0 and itemInfo.slotID and itemInfo.slotID > 0 then
+        -- Online Quest Check
+        local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+        if isQuestItem or questId then
+            button.questText:Show()
+            -- Set quest gold border if not high quality
+            if not itemInfo.quality or itemInfo.quality <= 1 then
+                local gold = { r = 1.0, g = 0.82, b = 0.0 }
+                if button.borderTop then button.borderTop:SetVertexColor(gold.r, gold.g, gold.b, 1) end
+                if button.borderBottom then button.borderBottom:SetVertexColor(gold.r, gold.g, gold.b, 1) end
+                if button.borderLeft then button.borderLeft:SetVertexColor(gold.r, gold.g, gold.b, 1) end
+                if button.borderRight then button.borderRight:SetVertexColor(gold.r, gold.g, gold.b, 1) end
+            end
+        end
+    elseif itemInfo.category == "Quest Items" then
+        -- Offline Quest Check
+        button.questText:Show()
+    end
+
+    -- 3. Usability check & Search Dimming / Filtering
+    local isUnusable = false
+    if itemInfo.hyperlink then
+        if itemInfo.bagID and itemInfo.bagID >= 0 and itemInfo.slotID and itemInfo.slotID > 0 then
+            isUnusable = Omni.API:IsItemUnusable(itemInfo.bagID, itemInfo.slotID)
+        else
+            isUnusable = Omni.API:IsItemUnusableLink(itemInfo.hyperlink)
+        end
+    end
+
+    local isDimmed = itemInfo.isQuickFiltered or false
+    if isDimmed then
         button.dimOverlay:Show()
         button.icon:SetDesaturated(true)
         button.icon:SetAlpha(0.4)
+        button.icon:SetVertexColor(1, 1, 1)
+    elseif isUnusable then
+        button.dimOverlay:Hide()
+        button.icon:SetDesaturated(true)
+        button.icon:SetAlpha(1.0)
+        button.icon:SetVertexColor(1.0, 0.3, 0.3) -- Grayscale red tint
     else
         button.dimOverlay:Hide()
         button.icon:SetDesaturated(false)
-        button.icon:SetAlpha(1)
+        button.icon:SetAlpha(1.0)
+        button.icon:SetVertexColor(1, 1, 1)
     end
 
     -- Show pin icon if item is pinned
@@ -283,22 +350,56 @@ function ItemButton:SetSearchMatch(button, isMatch)
     if not button then return end
 
     if isMatch then
+        -- Check usability to restore correct tint on matching items
+        local isUnusable = false
+        if button.itemInfo and button.itemInfo.hyperlink then
+            if button.bagID and button.bagID >= 0 then
+                isUnusable = Omni.API:IsItemUnusable(button.bagID, button.slotID)
+            else
+                isUnusable = Omni.API:IsItemUnusableLink(button.itemInfo.hyperlink)
+            end
+        end
+
         button.dimOverlay:Hide()
-        button.icon:SetDesaturated(false)
-        button.icon:SetAlpha(1)
+        if isUnusable then
+            button.icon:SetDesaturated(true)
+            button.icon:SetAlpha(1.0)
+            button.icon:SetVertexColor(1.0, 0.3, 0.3)
+        else
+            button.icon:SetDesaturated(false)
+            button.icon:SetAlpha(1.0)
+            button.icon:SetVertexColor(1, 1, 1)
+        end
     else
         button.dimOverlay:Show()
         button.icon:SetDesaturated(true)
         button.icon:SetAlpha(0.5)
+        button.icon:SetVertexColor(1, 1, 1)
     end
 end
 
 function ItemButton:ClearSearch(button)
     if not button then return end
 
+    local isUnusable = false
+    if button.itemInfo and button.itemInfo.hyperlink then
+        if button.bagID and button.bagID >= 0 then
+            isUnusable = Omni.API:IsItemUnusable(button.bagID, button.slotID)
+        else
+            isUnusable = Omni.API:IsItemUnusableLink(button.itemInfo.hyperlink)
+        end
+    end
+
     button.dimOverlay:Hide()
-    button.icon:SetDesaturated(false)
-    button.icon:SetAlpha(1)
+    if isUnusable then
+        button.icon:SetDesaturated(true)
+        button.icon:SetAlpha(1.0)
+        button.icon:SetVertexColor(1.0, 0.3, 0.3)
+    else
+        button.icon:SetDesaturated(false)
+        button.icon:SetAlpha(1.0)
+        button.icon:SetVertexColor(1, 1, 1)
+    end
 end
 
 -- =============================================================================
@@ -310,6 +411,16 @@ function ItemButton:OnClick(button, mouseButton)
 
     local bagID = button.bagID
     local slotID = button.slotID
+
+    -- Allow shift-click chat linking for all items (even offline ones)
+    if mouseButton == "LeftButton" and IsModifiedClick("CHATLINK") and button.itemInfo.hyperlink then
+        ChatEdit_InsertLink(button.itemInfo.hyperlink)
+        return
+    end
+
+    -- Block all other clicks if offline or viewing another character
+    local isOffline = (bagID == -1 or (Omni.Frame and Omni.Frame:GetViewedCharacter() ~= UnitName("player")))
+    if isOffline then return end
 
     if not bagID or not slotID then return end
 
@@ -451,6 +562,8 @@ function ItemButton:Reset(button)
     button.dimOverlay:Hide()
     button.icon:SetDesaturated(false)
     button.icon:SetAlpha(1)
+    button.ilvlText:Hide()
+    button.questText:Hide()
     button:Hide()
 end
 

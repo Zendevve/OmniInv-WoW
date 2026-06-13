@@ -28,6 +28,7 @@ Omni\Rules.lua
 # UI Components
 # =============================================================================
 UI\ItemButton.lua
+UI\Tooltips.lua
 UI\GridView.lua
 UI\FlowView.lua
 UI\ListView.lua

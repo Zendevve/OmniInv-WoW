@@ -123,6 +123,12 @@ function Events:Init()
     -- The callback receives a table of modified bagIDs
 
     self:RegisterBucketEvent("BAG_UPDATE", function(modifiedBags)
+        -- If physical sorting is active, advance the sorting process
+        if Omni.Sorter and Omni.Sorter:IsPhysicalSorting() then
+            Omni.Sorter:ProcessNextPhysicalMove()
+            return
+        end
+
         -- Detect new items in modified bags
         if Omni.Categorizer then
             for bagID in pairs(modifiedBags) do
@@ -142,6 +148,11 @@ function Events:Init()
             end
         end
 
+        -- Save character inventory state for offline use
+        if Omni.Data then
+            Omni.Data:SaveCharacterInventory()
+        end
+
         -- Update the frame
         if Omni.Frame then
             Omni.Frame:UpdateLayout(modifiedBags)
@@ -158,14 +169,14 @@ function Events:Init()
         end
     end)
 
-    self:RegisterEvent("PLAYERBANKSLOTS_CHANGED", function()
+    self:RegisterBucketEvent("PLAYERBANKSLOTS_CHANGED", function()
         if Omni.Data then Omni.Data:SaveBankItems() end
         if Omni.Frame then Omni.Frame:UpdateLayout() end
     end)
 
-    self:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
+    self:RegisterBucketEvent("PLAYERBANKBAGSLOTS_CHANGED", function()
         if Omni.Data then Omni.Data:SaveBankItems() end
-         if Omni.Frame then Omni.Frame:UpdateLayout() end
+        if Omni.Frame then Omni.Frame:UpdateLayout() end
     end)
 
     self:RegisterEvent("BANKFRAME_CLOSED", function()

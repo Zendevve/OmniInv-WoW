@@ -199,15 +199,22 @@ function Frame:CreateHeader()
     header.sortBtn.text:SetPoint("CENTER")
     header.sortBtn.text:SetText("Sort")
 
-    header.sortBtn:SetScript("OnClick", function()
-        Frame:CycleSort()
+    header.sortBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    header.sortBtn:SetScript("OnClick", function(self, button)
+        if button == "RightButton" then
+            Frame:CycleSort()
+        else
+            Frame:PhysicalSortBags()
+        end
     end)
 
     header.sortBtn:SetScript("OnEnter", function(self)
         self:SetBackdropColor(0.3, 0.3, 0.3, 1)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         local mode = Omni.Sorter and Omni.Sorter:GetDefaultMode() or "category"
-        GameTooltip:SetText("Sort Mode: " .. mode)
+        GameTooltip:AddLine("Sort Bags", 1, 1, 1)
+        GameTooltip:AddLine("Left-Click: Trigger physical tidy/sort", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Right-Click: Cycle mode (Current: " .. mode .. ")", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     header.sortBtn:SetScript("OnLeave", function(self)
@@ -235,10 +242,37 @@ function Frame:CreateHeader()
     optBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     header.optBtn = optBtn
 
+    -- Character Selector Dropdown Button
+    local charBtn = CreateFrame("Button", "OmniInventoryCharBtn", header)
+    charBtn:SetSize(90, 18)
+    charBtn:SetPoint("LEFT", header.title, "RIGHT", 12, 0)
+    charBtn:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Buttons\\WHITE8X8",
+        edgeSize = 1,
+    })
+    charBtn:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    charBtn:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    charBtn.text = charBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    charBtn.text:SetPoint("CENTER")
+    charBtn.text:SetText(UnitName("player"))
+
+    charBtn:SetScript("OnClick", function(self)
+        Frame:ToggleCharacterDropdown(self)
+    end)
+    charBtn:SetScript("OnEnter", function(self)
+        self:SetBackdropColor(0.3, 0.3, 0.3, 1)
+    end)
+    charBtn:SetScript("OnLeave", function(self)
+        self:SetBackdropColor(0.2, 0.2, 0.2, 1)
+    end)
+    header.charBtn = charBtn
+
     -- Bags/Bank toggle tabs
     header.bagsTab = CreateFrame("Button", nil, header)
     header.bagsTab:SetSize(40, 18)
-    header.bagsTab:SetPoint("LEFT", header.title, "RIGHT", 12, 0)
+    header.bagsTab:SetPoint("LEFT", header.charBtn, "RIGHT", 8, 0)
     header.bagsTab:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8X8",
         edgeFile = "Interface\\Buttons\\WHITE8X8",
@@ -662,6 +696,62 @@ function Frame:CycleSort()
 end
 
 -- =============================================================================
+-- Character Selection (Offline View)
+-- =============================================================================
+
+local viewedChar = UnitName("player")
+local charMenuFrame = CreateFrame("Frame", "OmniInventoryCharMenu", UIParent, "UIDropDownMenuTemplate")
+
+function Frame:GetViewedCharacter()
+    return viewedChar or UnitName("player")
+end
+
+function Frame:SetViewedCharacter(name)
+    viewedChar = name or UnitName("player")
+
+    if mainFrame and mainFrame.header and mainFrame.header.charBtn then
+        mainFrame.header.charBtn.text:SetText(viewedChar)
+        if viewedChar == UnitName("player") then
+            mainFrame.header.charBtn.text:SetTextColor(1, 0.82, 0) -- Gold
+            mainFrame.header.title:SetText("|cFF00FF00Omni|r Inventory")
+        else
+            mainFrame.header.charBtn.text:SetTextColor(0.5, 0.82, 1) -- Light Blue
+            mainFrame.header.title:SetText("|cFF00FF00Omni|r (" .. viewedChar .. ")")
+        end
+    end
+
+    self:UpdateLayout()
+end
+
+function Frame:ToggleCharacterDropdown(anchorBtn)
+    local realmName = GetRealmName()
+    local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+    if not realm then return end
+
+    local menuList = {
+        { text = "Select Character", isTitle = true },
+    }
+
+    for name, data in pairs(realm) do
+        local classColor = "|cff00ff9a"
+        if RAID_CLASS_COLORS and data.class and RAID_CLASS_COLORS[data.class] then
+            local c = RAID_CLASS_COLORS[data.class]
+            classColor = string.format("|cff%02x%02x%02x", c.r*255, c.g*255, c.b*255)
+        end
+
+        table.insert(menuList, {
+            text = classColor .. name .. "|r",
+            func = function()
+                self:SetViewedCharacter(name)
+            end,
+            checked = (viewedChar == name),
+        })
+    end
+
+    EasyMenu(menuList, charMenuFrame, anchorBtn, 0, 0, "MENU")
+end
+
+-- =============================================================================
 -- Bags/Bank Mode
 -- =============================================================================
 
@@ -713,54 +803,95 @@ function Frame:UpdateLayout(changedBags)
 
     -- Get items based on current mode
     local items = {}
-    if OmniC_Container then
-        if currentMode == "bank" then
-            if isBankOpen then
-                items = OmniC_Container.GetAllBankItems()
-            else
-                -- Offline Bank Access
-                items = {}
-                if OmniInventoryDB and OmniInventoryDB.realm then
-                    local realm = OmniInventoryDB.realm[Omni.Data.realmName]
-                    local char = realm and realm[Omni.Data.playerName]
+    local activePlayer = UnitName("player")
+    local realmName = GetRealmName()
 
-                    if char and char.bank then
-                        for _, savedItem in ipairs(char.bank) do
-                            -- Use API to get cached info
-                            if Omni.API and savedItem.link then
-                                local info = Omni.API:GetExtendedItemInfo(savedItem.link)
-                                if info then
-                                    -- Construct compatible item table
-                                    local item = {
-                                        iconFileID = info.iconFileID,
-                                        itemID = tonumber(string.match(savedItem.link, "item:(%d+)")),
-                                        hyperlink = savedItem.link,
-                                        stackCount = savedItem.count or 1,
-                                        quality = info.quality,
-                                        isLocked = false,
-                                        isReadable = false,
-                                        hasLoot = false,
-                                        isBound = true, -- Assume bound if in bank
-                                        bindType = nil,
-                                        isFiltered = false,
-                                        bagID = -1, -- Dummy ID indicating bank
-                                        slotID = 0,
-                                        -- Extended fields for safe keeping
-                                        itemType = info.itemType,
-                                        itemSubType = info.itemSubType,
-                                        itemLevel = info.itemLevel,
-                                        equipSlot = info.equipSlot,
-                                        vendorPrice = info.vendorPrice,
-                                    }
-                                    table.insert(items, item)
+    if viewedChar == activePlayer then
+        if OmniC_Container then
+            if currentMode == "bank" then
+                if isBankOpen then
+                    items = OmniC_Container.GetAllBankItems()
+                else
+                    -- Offline Bank Access
+                    items = {}
+                    if OmniInventoryDB and OmniInventoryDB.realm then
+                        local realm = OmniInventoryDB.realm[realmName]
+                        local char = realm and realm[activePlayer]
+
+                        if char and char.bank then
+                            for _, savedItem in ipairs(char.bank) do
+                                if Omni.API and savedItem.link then
+                                    local info = Omni.API:GetExtendedItemInfo(savedItem.link)
+                                    if info then
+                                        local item = {
+                                            iconFileID = info.iconFileID,
+                                            itemID = tonumber(string.match(savedItem.link, "item:(%d+)")),
+                                            hyperlink = savedItem.link,
+                                            stackCount = savedItem.count or 1,
+                                            quality = info.quality,
+                                            isLocked = false,
+                                            isReadable = false,
+                                            hasLoot = false,
+                                            isBound = true,
+                                            bindType = nil,
+                                            isFiltered = false,
+                                            bagID = -1,
+                                            slotID = 0,
+                                            itemType = info.itemType,
+                                            itemSubType = info.itemSubType,
+                                            itemLevel = info.itemLevel,
+                                            equipSlot = info.equipSlot,
+                                            vendorPrice = info.vendorPrice,
+                                        }
+                                        table.insert(items, item)
+                                    end
                                 end
                             end
                         end
                     end
                 end
+            else
+                items = OmniC_Container.GetAllBagItems()
             end
-        else
-            items = OmniC_Container.GetAllBagItems()
+        end
+    else
+        -- OTHER CHARACTER (ALL OFFLINE)
+        items = {}
+        if OmniInventoryDB and OmniInventoryDB.realm then
+            local realm = OmniInventoryDB.realm[realmName]
+            local char = realm and realm[viewedChar]
+            local savedSource = (currentMode == "bank") and char.bank or char.bags
+
+            if savedSource then
+                for _, savedItem in ipairs(savedSource) do
+                    if Omni.API and savedItem.link then
+                        local info = Omni.API:GetExtendedItemInfo(savedItem.link)
+                        if info then
+                            local item = {
+                                iconFileID = info.iconFileID,
+                                itemID = tonumber(string.match(savedItem.link, "item:(%d+)")),
+                                hyperlink = savedItem.link,
+                                stackCount = savedItem.count or 1,
+                                quality = info.quality,
+                                isLocked = false,
+                                isReadable = false,
+                                hasLoot = false,
+                                isBound = true,
+                                bindType = nil,
+                                isFiltered = false,
+                                bagID = -1,
+                                slotID = 0,
+                                itemType = info.itemType,
+                                itemSubType = info.itemSubType,
+                                itemLevel = info.itemLevel,
+                                equipSlot = info.equipSlot,
+                                vendorPrice = info.vendorPrice,
+                            }
+                            table.insert(items, item)
+                        end
+                    end
+                end
+            end
         end
     end
 
@@ -844,15 +975,6 @@ function Frame:RenderFlowView(items)
     for _, header in ipairs(categoryHeaders) do header:Hide() end
     for _, row in ipairs(listRows) do row:Hide() end
 
-    -- Layout Constants
-    local contentWidth = mainFrame.content:GetWidth() - 20
-    local columns = math.floor(contentWidth / (ITEM_SIZE + ITEM_SPACING))
-    columns = math.max(columns, 1)
-
-    local yOffset = -ITEM_SPACING
-    local sectionHeaderHeight = (currentView == "grid") and 0 or 20 -- No headers in grid mode
-    local sectionSpacing = (currentView == "grid") and ITEM_SPACING or 8
-
     -- Group items
     local categories = {}
     local categoryOrder = {}
@@ -882,38 +1004,88 @@ function Frame:RenderFlowView(items)
         end
     end
 
-    -- Render Sections
-    local headerIndex = 0
+    local totalWidth, totalHeight
 
-    for _, catName in ipairs(categoryOrder) do
-        local catItems = categories[catName]
-        if catItems and #catItems > 0 then
+    if currentView == "grid" then
+        -- Layout Constants for Grid View
+        local contentWidth = mainFrame.content:GetWidth() - 20
+        local columns = math.floor(contentWidth / (ITEM_SIZE + ITEM_SPACING))
+        columns = math.max(columns, 1)
 
-            -- Render Header (only if not Grid)
-            if currentView ~= "grid" then
-                headerIndex = headerIndex + 1
-                local header = categoryHeaders[headerIndex]
-                if not header then
-                    header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    categoryHeaders[headerIndex] = header
-                end
+        local yOffset = -ITEM_SPACING
+        local catItems = categories["All"] or {}
 
-                header:ClearAllPoints()
-                header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", ITEM_SPACING, yOffset)
-
-                local r, g, b = 1, 1, 1
-                if Omni.Categorizer then
-                    r, g, b = Omni.Categorizer:GetCategoryColor(catName)
-                end
-                header:SetTextColor(r, g, b)
-                header:SetText(catName .. " (" .. #catItems .. ")")
-                header:Show()
-
-                yOffset = yOffset - sectionHeaderHeight
+        for i, itemInfo in ipairs(catItems) do
+            local btn
+            if Omni.Pool then
+                btn = Omni.Pool:Acquire("ItemButton")
+            else
+                btn = Omni.ItemButton:Create(scrollChild)
             end
 
-            -- Render Items in this section
-            for i, itemInfo in ipairs(catItems) do
+            if btn then
+                btn:SetParent(scrollChild)
+
+                local col = ((i - 1) % columns)
+                local row = math.floor((i - 1) / columns)
+                local x = ITEM_SPACING + col * (ITEM_SIZE + ITEM_SPACING)
+                local y = yOffset - row * (ITEM_SIZE + ITEM_SPACING)
+
+                btn:ClearAllPoints()
+                btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+
+                -- Error boundary: Protect against rendering bad items
+                local success, err = pcall(function()
+                     Omni.ItemButton:SetItem(btn, itemInfo)
+                     btn:Show()
+                end)
+
+                if not success then
+                     Omni.ItemButton:SetItem(btn, nil)
+                     if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
+                     btn:Show()
+                end
+
+                table.insert(itemButtons, btn)
+            end
+        end
+
+        local catRows = math.ceil(#catItems / columns)
+        totalHeight = catRows * (ITEM_SIZE + ITEM_SPACING) + ITEM_SPACING
+        totalWidth = contentWidth
+    else
+        -- FLOW MODE: Pack layout via FlowView packing algorithm
+        local maxColumns = OmniInventoryDB and OmniInventoryDB.global and OmniInventoryDB.global.columns or 10
+        local maxHeight = UIParent:GetHeight() * 0.65 -- 65% of screen height
+
+        local sectionsData, packedWidth, packedHeight = Omni.FlowView:PackLayout(categories, categoryOrder, maxColumns, maxHeight)
+
+        totalWidth = packedWidth
+        totalHeight = packedHeight
+
+        local headerIndex = 0
+        for _, sec in ipairs(sectionsData) do
+            -- Render Header
+            headerIndex = headerIndex + 1
+            local header = categoryHeaders[headerIndex]
+            if not header then
+                header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                categoryHeaders[headerIndex] = header
+            end
+
+            header:ClearAllPoints()
+            header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", sec.x, sec.y)
+
+            local r, g, b = 1, 1, 1
+            if Omni.Categorizer then
+                r, g, b = Omni.Categorizer:GetCategoryColor(sec.name)
+            end
+            header:SetTextColor(r, g, b)
+            header:SetText(sec.name .. " (" .. #sec.items .. ")")
+            header:Show()
+
+            -- Render item buttons for this section
+            for i, itemInfo in ipairs(sec.items) do
                 local btn
                 if Omni.Pool then
                     btn = Omni.Pool:Acquire("ItemButton")
@@ -924,15 +1096,10 @@ function Frame:RenderFlowView(items)
                 if btn then
                     btn:SetParent(scrollChild)
 
-                    local col = ((i - 1) % columns)
-                    local row = math.floor((i - 1) / columns)
-                    local x = ITEM_SPACING + col * (ITEM_SIZE + ITEM_SPACING)
-                    local y = yOffset - row * (ITEM_SIZE + ITEM_SPACING)
-
+                    local pos = sec.itemPositions[i]
                     btn:ClearAllPoints()
-                    btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+                    btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", pos.x, pos.y)
 
-                    -- Error boundary: Protect against rendering bad items
                     local success, err = pcall(function()
                          Omni.ItemButton:SetItem(btn, itemInfo)
                          btn:Show()
@@ -947,14 +1114,15 @@ function Frame:RenderFlowView(items)
                     table.insert(itemButtons, btn)
                 end
             end
-
-            -- Update yOffset for next section
-            local catRows = math.ceil(#catItems / columns)
-            yOffset = yOffset - (catRows * (ITEM_SIZE + ITEM_SPACING)) - sectionSpacing
         end
+
+        -- Dynamically adjust main frame width to fit packed columns
+        local desiredWidth = totalWidth + PADDING * 2 + 20
+        desiredWidth = math.max(desiredWidth, FRAME_MIN_WIDTH)
+        mainFrame:SetWidth(desiredWidth)
     end
 
-    scrollChild:SetHeight(math.abs(yOffset) + ITEM_SPACING)
+    scrollChild:SetHeight(totalHeight)
 end
 
 -- =============================================================================
@@ -1197,6 +1365,19 @@ end
 function Frame:UpdateSlotCount()
     if not mainFrame or not mainFrame.footer then return end
 
+    if viewedChar ~= UnitName("player") then
+        local realmName = GetRealmName()
+        local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+        local char = realm and realm[viewedChar]
+        local count = 0
+        if char then
+            local savedSource = (currentMode == "bank") and char.bank or char.bags
+            count = savedSource and #savedSource or 0
+        end
+        mainFrame.footer.slots:SetText(string.format("%d Items", count))
+        return
+    end
+
     local free, total = 0, 0
 
     if currentMode == "bank" then
@@ -1230,7 +1411,16 @@ end
 function Frame:UpdateMoney()
     if not mainFrame or not mainFrame.footer then return end
 
-    local money = GetMoney() or 0
+    local money = 0
+    if viewedChar == UnitName("player") then
+        money = GetMoney() or 0
+    else
+        local realmName = GetRealmName()
+        local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+        local char = realm and realm[viewedChar]
+        money = char and char.gold or 0
+    end
+
     local gold = math.floor(money / 10000)
     local silver = math.floor((money % 10000) / 100)
     local copper = money % 100
@@ -1316,9 +1506,9 @@ end
 -- =============================================================================
 
 function Frame:PhysicalSortBags()
-    -- Use Blizzard's native SortBags function (WoTLK 3.3.5a compatible)
-    if SortBags then
-        SortBags()
+    if Omni.Sorter then
+        local isBank = (currentMode == "bank")
+        Omni.Sorter:PhysicalSort(isBank)
     end
 end
 

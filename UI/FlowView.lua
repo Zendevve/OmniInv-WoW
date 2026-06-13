@@ -1,8 +1,8 @@
 -- =============================================================================
--- OmniInventory Flow View
+-- OmniInventory Flow View Layout Engine
 -- =============================================================================
 -- Purpose: Category-sectioned view (AdiBags-style).
--- Items grouped by category with headers.
+-- Items grouped by category with headers packed in multiple columns.
 -- =============================================================================
 
 local addonName, Omni = ...
@@ -20,21 +20,86 @@ local HEADER_HEIGHT = 20
 local SECTION_SPACING = 8
 
 -- =============================================================================
--- Layout Calculation
+-- Layout Calculation & Packing (AdiBags-style)
 -- =============================================================================
 
-function FlowView:CalculateSectionLayout(containerWidth, itemCount)
-    local columns = math.floor(containerWidth / (ITEM_SIZE + ITEM_SPACING))
-    columns = math.max(columns, 1)
+function FlowView:PackLayout(categorizedItems, categoryOrder, maxColumns, maxHeight)
+    local columns = {}
+    local currentColumn = { sections = {}, width = 0, height = 0 }
+    table.insert(columns, currentColumn)
 
-    local rows = math.ceil(itemCount / columns)
-    local height = rows * (ITEM_SIZE + ITEM_SPACING)
+    -- 1. Calculate dimensions for each section
+    local sectionsData = {}
+    for _, catName in ipairs(categoryOrder) do
+        local items = categorizedItems[catName]
+        if items and #items > 0 then
+            local secCols = math.min(#items, maxColumns)
+            local secRows = math.ceil(#items / secCols)
+            local secWidth = secCols * (ITEM_SIZE + ITEM_SPACING) - ITEM_SPACING
+            local secHeight = HEADER_HEIGHT + secRows * (ITEM_SIZE + ITEM_SPACING)
 
-    return {
-        columns = columns,
-        rows = rows,
-        height = height + HEADER_HEIGHT + SECTION_SPACING,
-    }
+            table.insert(sectionsData, {
+                name = catName,
+                items = items,
+                cols = secCols,
+                rows = secRows,
+                width = secWidth,
+                height = secHeight,
+            })
+        end
+    end
+
+    -- 2. Pack sections into columns (greedy column-packing)
+    for _, sec in ipairs(sectionsData) do
+        local spacing = #currentColumn.sections > 0 and SECTION_SPACING or 0
+        local expectedHeight = currentColumn.height + spacing + sec.height
+
+        -- If it fits, or if the current column is empty (must put at least one section)
+        if expectedHeight <= maxHeight or #currentColumn.sections == 0 then
+            currentColumn.height = currentColumn.height + spacing + sec.height
+            currentColumn.width = math.max(currentColumn.width, sec.width)
+            table.insert(currentColumn.sections, sec)
+        else
+            -- Start a new column
+            currentColumn = { sections = { sec }, width = sec.width, height = sec.height }
+            table.insert(columns, currentColumn)
+        end
+    end
+
+    -- 3. Compute coordinates relative to scrollChild
+    local totalWidth = 0
+    local totalHeight = 0
+    local currentX = ITEM_SPACING
+
+    for _, col in ipairs(columns) do
+        local currentY = -ITEM_SPACING
+        for _, sec in ipairs(col.sections) do
+            sec.x = currentX
+            sec.y = currentY
+
+            sec.itemPositions = {}
+            local startItemY = currentY - HEADER_HEIGHT
+            for i = 1, #sec.items do
+                local c = (i - 1) % sec.cols
+                local r = math.floor((i - 1) / sec.cols)
+                local ix = currentX + c * (ITEM_SIZE + ITEM_SPACING)
+                local iy = startItemY - r * (ITEM_SIZE + ITEM_SPACING)
+                table.insert(sec.itemPositions, { x = ix, y = iy })
+            end
+
+            -- Update vertical offset for the next section in this column
+            currentY = currentY - sec.height - SECTION_SPACING
+        end
+
+        -- Content height is determined by the tallest column
+        totalHeight = math.max(totalHeight, math.abs(currentY) + ITEM_SPACING)
+        currentX = currentX + col.width + SECTION_SPACING
+    end
+
+    -- Content width is determined by the total width of all columns
+    totalWidth = currentX - SECTION_SPACING + ITEM_SPACING
+
+    return sectionsData, totalWidth, totalHeight
 end
 
 function FlowView:GetCategoryOrder(categorizedItems)
@@ -58,4 +123,4 @@ function FlowView:GetCategoryOrder(categorizedItems)
     return order
 end
 
-print("|cFF00FF00OmniInventory|r: FlowView loaded")
+print("|cFF00FF00OmniInventory|r: FlowView layout engine loaded")

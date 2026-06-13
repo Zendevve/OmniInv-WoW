@@ -236,6 +236,54 @@ function API:GetExtendedItemInfo(itemLink)
 end
 
 -- =============================================================================
+-- Usability Scanner
+-- =============================================================================
+
+--- Scan tooltip for unusable requirements (red text)
+---@param bag number
+---@param slot number
+---@return boolean isUnusable
+function API:IsItemUnusable(bag, slot)
+    if not bag or not slot then return false end
+    scanningTooltip:ClearLines()
+    scanningTooltip:SetBagItem(bag, slot)
+
+    for i = 1, scanningTooltip:NumLines() do
+        local textFrame = _G["OmniScanningTooltipTextLeft" .. i]
+        if textFrame then
+            local r, g, b = textFrame:GetTextColor()
+            -- Red warning text in tooltips represents unmet requirements
+            if r > 0.9 and g < 0.2 and b < 0.2 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+--- Scan tooltip for unusable requirements using hyperlink
+---@param link string
+---@return boolean isUnusable
+function API:IsItemUnusableLink(link)
+    if not link then return false end
+    scanningTooltip:ClearLines()
+    scanningTooltip:SetHyperlink(link)
+
+    for i = 1, scanningTooltip:NumLines() do
+        local textFrame = _G["OmniScanningTooltipTextLeft" .. i]
+        if textFrame then
+            local r, g, b = textFrame:GetTextColor()
+            if r > 0.9 and g < 0.2 and b < 0.2 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+-- =============================================================================
 -- Initialization
 -- =============================================================================
 

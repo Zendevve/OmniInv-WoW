@@ -202,7 +202,7 @@ function Categorizer:GetCategory(itemInfo)
         return "Miscellaneous"
     end
 
-    -- Priority 1: Manual Override
+    -- 1. Priority 1: Manual Override (highest priority, bypasses filter registry)
     if itemInfo.itemID and OmniInventoryDB and OmniInventoryDB.categoryOverrides then
         local override = OmniInventoryDB.categoryOverrides[itemInfo.itemID]
         if override then
@@ -210,37 +210,19 @@ function Categorizer:GetCategory(itemInfo)
         end
     end
 
-    -- Priority 1.5: Custom Rules Engine
-    if Omni.Rules then
-        local matchedRule = Omni.Rules:FindMatchingRule(itemInfo)
-        if matchedRule and matchedRule.category then
-            return matchedRule.category
+    -- 2. Run Priority Filter Chain
+    for _, catDef in ipairs(categoryOrder) do
+        if catDef.filter then
+            local result = catDef.filter(itemInfo)
+            if type(result) == "string" then
+                return result
+            elseif result == true then
+                return catDef.name
+            end
         end
     end
 
-    -- Priority 2: Quest Items
-    if IsQuestItem(itemInfo) then
-        return "Quest Items"
-    end
-
-    -- Priority 3: Equipment Sets
-    if IsEquipmentSetItem(itemInfo) then
-        return "Equipment Sets"
-    end
-
-    -- Priority 4: New Items (session-based)
-    if self:IsNewItem(itemInfo.itemID) then
-        -- Don't return here, just mark - new items also belong to a real category
-        -- We'll handle "New" as a special overlay, not a category
-    end
-
-    -- Priority 5: Check quality for junk
-    if itemInfo.quality == 0 then
-        return "Junk"
-    end
-
-    -- Priority 10+: Heuristic classification
-    return ClassifyByItemType(itemInfo)
+    return "Miscellaneous"
 end
 
 -- =============================================================================
@@ -328,10 +310,41 @@ end
 -- =============================================================================
 
 function Categorizer:Init()
-    -- Register default categories
-    self:RegisterCategory("Quest Items", 2, nil, CATEGORY_COLORS["Quest Items"])
-    self:RegisterCategory("Equipment Sets", 3, nil, CATEGORY_COLORS["Equipment Sets"])
+    -- Initialize manual overrides
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.categoryOverrides = OmniInventoryDB.categoryOverrides or {}
+
+    -- Register default categories and their filters (ordered by priority)
+    
+    -- Priority 1.5: Custom Rules Engine
+    self:RegisterCategory("Custom Rules", 1.5, nil, nil, function(itemInfo)
+        if Omni.Rules then
+            local matchedRule = Omni.Rules:FindMatchingRule(itemInfo)
+            if matchedRule and matchedRule.category then
+                return matchedRule.category
+            end
+        end
+    end)
+
+    -- Priority 2: Quest Items
+    self:RegisterCategory("Quest Items", 2, nil, CATEGORY_COLORS["Quest Items"], function(itemInfo)
+        return IsQuestItem(itemInfo)
+    end)
+
+    -- Priority 3: Equipment Sets
+    self:RegisterCategory("Equipment Sets", 3, nil, CATEGORY_COLORS["Equipment Sets"], function(itemInfo)
+        return IsEquipmentSetItem(itemInfo)
+    end)
+
+    -- Priority 4: New Items (visual only, registered here for styling info)
     self:RegisterCategory("New Items", 4, nil, CATEGORY_COLORS["New Items"])
+
+    -- Priority 5: Junk (Poor/Grey quality)
+    self:RegisterCategory("Junk", 5, nil, CATEGORY_COLORS["Junk"], function(itemInfo)
+        return itemInfo.quality == 0
+    end)
+
+    -- Fallback category registration for visual styling/ordering
     self:RegisterCategory("Equipment", 10, nil, CATEGORY_COLORS["Equipment"])
     self:RegisterCategory("Consumables", 11, nil, CATEGORY_COLORS["Consumables"])
     self:RegisterCategory("Trade Goods", 12, nil, CATEGORY_COLORS["Trade Goods"])
@@ -340,12 +353,12 @@ function Categorizer:Init()
     self:RegisterCategory("Bags", 16, nil, CATEGORY_COLORS["Bags"])
     self:RegisterCategory("Ammo", 17, nil, CATEGORY_COLORS["Ammo"])
     self:RegisterCategory("Glyphs", 18, nil, CATEGORY_COLORS["Glyphs"])
-    self:RegisterCategory("Junk", 90, nil, CATEGORY_COLORS["Junk"])
-    self:RegisterCategory("Miscellaneous", 99, nil, CATEGORY_COLORS["Miscellaneous"])
+    self:RegisterCategory("Miscellaneous", 98, nil, CATEGORY_COLORS["Miscellaneous"])
 
-    -- Initialize manual overrides
-    OmniInventoryDB = OmniInventoryDB or {}
-    OmniInventoryDB.categoryOverrides = OmniInventoryDB.categoryOverrides or {}
+    -- Priority 99: Default/Heuristics Fallback Filter
+    self:RegisterCategory("Heuristics Fallback", 99, nil, nil, function(itemInfo)
+        return ClassifyByItemType(itemInfo)
+    end)
 
     -- Snapshot current inventory for "new items" tracking
     SnapshotInventory()
