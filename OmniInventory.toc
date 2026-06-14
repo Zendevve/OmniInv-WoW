@@ -1,43 +1,56 @@
 ## Interface: 30300
-## Title: |cFF00FF00Omni|r Inventory
-## Notes: The definitive inventory management addon for WoW 3.3.5a
+## Title: OmniInventory
+## Notes: Modular bag addon combining Bagnon multi-frame with AdiBags sections
 ## Author: Zendevve
 ## Version: 2.0-alpha
 ## SavedVariables: OmniInventoryDB
+## SavedVariablesPerCharacter: OmniInventoryCharDB
+## OptionalDeps: Ace3, LibSharedMedia-3.0, LibDataBroker-1.1, Masque, Pawn, AdiBags, Bagnon, TooltipScanner
 
-## X-Website: https://github.com/Zendevve/OmniInventory
-## X-Category: Inventory
-## X-License: MIT
-## X-Curse-Project-ID: 123456
-## X-WoWI-ID: 12345
-## Tags: Inventory, Bags, Bank, Sorting, Categorization
+# Core libraries (Ace3)
+libs\LibStub\LibStub.lua
+libs\CallbackHandler-1.0\CallbackHandler-1.0.lua
+libs\AceAddon-3.0\AceAddon-3.0.lua
+libs\AceEvent-3.0\AceEvent-3.0.lua
+libs\AceDB-3.0\AceDB-3.0.lua
+libs\AceDBOptions-3.0\AceDBOptions-3.0.lua
+libs\AceConsole-3.0\AceConsole-3.0.lua
+libs\AceGUI-3.0\AceGUI-3.0.lua
+libs\AceConfig-3.0\AceConfig-3.0.lua
+libs\AceConfig-3.0\AceConfigCmd-3.0\AceConfigCmd-3.0.lua
+libs\AceConfig-3.0\AceConfigDialog-3.0\AceConfigDialog-3.0.lua
+libs\AceConfig-3.0\AceConfigRegistry-3.0\AceConfigRegistry-3.0.lua
+libs\AceTimer-3.0\AceTimer-3.0.lua
+libs\AceHook-3.0\AceHook-3.0.lua
+libs\LibSharedMedia-3.0\lib.xml
 
-# =============================================================================
-# Core Architecture (Load Order Critical)
-# =============================================================================
-Omni\API.lua
-Omni\Events.lua
+# Core modules (before UI)
+OI_Core.lua
+Core\OI_Utils.lua
+Core\OI_API.lua
+Core\OI_Filter.lua
+Core\OI_Categorizer.lua
+Core\OI_Sorter.lua
+Core\OI_Rules.lua
+Core\OI_Saved.lua
+
+# Widgets
+Widgets\OI_ItemButton.lua
+Widgets\OI_BagSlot.lua
+Widgets\OI_FlowView.lua
+Widgets\OI_Section.lua
+Widgets\OI_ListRow.lua
+Widgets\OI_Container.lua
+
+# Legacy modules (ported)
 Omni\Pool.lua
-Omni\Utils.lua
-Omni\Data.lua
-Omni\Categorizer.lua
-Omni\Sorter.lua
-Omni\Rules.lua
 
-# =============================================================================
-# UI Components
-# =============================================================================
-UI\ItemButton.lua
-UI\Tooltips.lua
-UI\GridView.lua
-UI\FlowView.lua
-UI\ListView.lua
-UI\Frame.lua
-UI\Options.lua
-UI\CategoryEditor.lua
-UI\MinimapButton.lua
-
-# =============================================================================
-# Main Entry Point
-# =============================================================================
-Core.lua
+# Bag modules
+Modules\OI_Bags.lua
+Modules\OI_Bank.lua
+Modules\OI_Keys.lua
+Modules\OI_Tooltips.lua
+Modules\OI_ItemLevel.lua
+Modules\OI_Junk.lua
+Modules\OI_MinimapButton.lua
+Modules\OI_Config.lua
