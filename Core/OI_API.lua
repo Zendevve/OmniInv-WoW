@@ -13,6 +13,8 @@ local clientVersion = select(4, GetBuildInfo()) or 30300
 API.isWotLK = clientVersion < 40000
 API.isRetail = clientVersion >= 100000
 
+function API:Init() end
+
 -- =============================================================================
 -- Tooltip Scanner
 -- =============================================================================

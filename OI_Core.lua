@@ -7,6 +7,40 @@
 local addonName, ns = ...
 
 -- =============================================================================
+-- C_Container / Legacy Compatibility Shim
+-- =============================================================================
+if C_Container then
+    if not GetContainerNumSlots then _G.GetContainerNumSlots = C_Container.GetContainerNumSlots end
+    if not GetContainerItemLink then _G.GetContainerItemLink = C_Container.GetContainerItemLink end
+    if not GetContainerNumFreeSlots then _G.GetContainerNumFreeSlots = C_Container.GetContainerNumFreeSlots end
+    if not GetContainerItemID then _G.GetContainerItemID = C_Container.GetContainerItemID end
+    if not UseContainerItem then _G.UseContainerItem = C_Container.UseContainerItem end
+    if not PickupContainerItem then _G.PickupContainerItem = C_Container.PickupContainerItem end
+    if not SplitContainerItem then _G.SplitContainerItem = C_Container.SplitContainerItem end
+    if not GetContainerFreeSlots then _G.GetContainerFreeSlots = C_Container.GetContainerFreeSlots end
+    
+    if not GetContainerItemQuestInfo then
+        _G.GetContainerItemQuestInfo = function(bagID, slotID)
+            local info = C_Container.GetContainerItemQuestInfo(bagID, slotID)
+            if info then
+                return info.isQuestItem, info.questID, info.isActive
+            end
+            return nil
+        end
+    end
+    
+    if not GetContainerItemInfo then
+        _G.GetContainerItemInfo = function(bagID, slotID)
+            local info = C_Container.GetContainerItemInfo(bagID, slotID)
+            if info then
+                return info.iconFileID, info.stackCount, info.isLocked, info.quality, info.isReadable, info.hasLoot, info.hyperlink, info.isFiltered, info.hasNoValue, info.itemID
+            end
+            return nil
+        end
+    end
+end
+
+-- =============================================================================
 -- Ace3 Bootstrap
 -- =============================================================================
 
@@ -20,6 +54,17 @@ local OI = LibStub("AceAddon-3.0"):NewAddon(
 
 ns[1] = OI
 _G.OmniInventory = OI
+
+setmetatable(ns, { __index = OI })
+setmetatable(OI, {
+    __index = function(tbl, key)
+        local val = rawget(ns, key)
+        if val ~= nil then
+            return val
+        end
+        return nil
+    end
+})
 
 OI.version = "2.0-alpha"
 OI.author = "Zendevve"
@@ -143,14 +188,14 @@ local function SafeToggle()
 end
 
 function OI:HookBlizzardBags()
-    self:RawHook("ToggleAllBags", function() SafeToggle() end, true)
-    self:RawHook("OpenAllBags", function() if OI.Frame then OI.Frame:Show() end end, true)
-    self:RawHook("CloseAllBags", function() if OI.Frame then OI.Frame:Hide() end end, true)
-    self:RawHook("ToggleBackpack", function() SafeToggle() end, true)
-    self:RawHook("OpenBackpack", function() if OI.Frame then OI.Frame:Show() end end, true)
-    self:RawHook("CloseBackpack", function() if OI.Frame then OI.Frame:Hide() end end, true)
-    self:RawHook("ToggleBag", function() SafeToggle() end, true)
-    self:RawHook("OpenBag", function() if OI.Frame then OI.Frame:Show() end end, true)
+    self:RawHook("ToggleAllBags", function() SafeToggle() end)
+    self:RawHook("OpenAllBags", function() if OI.Frame then OI.Frame:Show() end end)
+    self:RawHook("CloseAllBags", function() if OI.Frame then OI.Frame:Hide() end end)
+    self:RawHook("ToggleBackpack", function() SafeToggle() end)
+    self:RawHook("OpenBackpack", function() if OI.Frame then OI.Frame:Show() end end)
+    self:RawHook("CloseBackpack", function() if OI.Frame then OI.Frame:Hide() end end)
+    self:RawHook("ToggleBag", function() SafeToggle() end)
+    self:RawHook("OpenBag", function() if OI.Frame then OI.Frame:Show() end end)
 
     self:Hook("ToggleKeyRing", function()
         if OI.Frame then
@@ -170,6 +215,12 @@ function OI:HookBlizzardBags()
             f:UnregisterAllEvents()
             f:SetScript("OnShow", function(self) self:Hide() end)
         end
+    end
+
+    if ContainerFrameCombinedBags then
+        ContainerFrameCombinedBags:Hide()
+        ContainerFrameCombinedBags:UnregisterAllEvents()
+        ContainerFrameCombinedBags:SetScript("OnShow", function(self) self:Hide() end)
     end
 
     for i = 0, 4 do

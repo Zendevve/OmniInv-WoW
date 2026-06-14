@@ -17,6 +17,9 @@ local SECTION_SPACING = 8
 local SLOT_SIZE = 28
 local SLOT_SPACING = 6
 
+local BACKDROP_TEMPLATE = BackdropTemplateMixin and "BackdropTemplate" or nil
+local SECURE_BUTTON_TEMPLATE = BackdropTemplateMixin and "SecureActionButtonTemplate,BackdropTemplate" or "SecureActionButtonTemplate"
+
 local mainFrame = nil
 local itemButtons = {}
 local categoryHeaders = {}
@@ -79,7 +82,7 @@ function Frame:ForceRender()
 end
 
 local function CreateMainFrame()
-    mainFrame = CreateFrame("Frame", "OmniInventoryContainer", UIParent, "BackdropTemplate")
+    mainFrame = CreateFrame("Frame", "OmniInventoryContainer", UIParent, BACKDROP_TEMPLATE)
     mainFrame:SetSize(FRAME_DEFAULT_WIDTH, FRAME_DEFAULT_HEIGHT)
     mainFrame:SetPoint("CENTER")
     mainFrame:SetClampedToScreen(true)
@@ -135,7 +138,7 @@ local function CreateMainFrame()
 end
 
 local function CreateHeader()
-    local header = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
+    local header = CreateFrame("Frame", nil, mainFrame, BACKDROP_TEMPLATE)
     header:SetHeight(HEADER_HEIGHT)
     header:SetPoint("TOPLEFT", 0, 0)
     header:SetPoint("TOPRIGHT", 0, 0)
@@ -201,7 +204,7 @@ local function CreateHeader()
         Frame:ToggleEditMode()
     end)
     header.editBtn = editBtn
-    local hearthBtn = CreateFrame("Button", nil, header, "SecureActionButtonTemplate,BackdropTemplate")
+    local hearthBtn = CreateFrame("Button", nil, header, SECURE_BUTTON_TEMPLATE)
     hearthBtn:SetSize(HEADER_HEIGHT - 4, HEADER_HEIGHT - 4)
     hearthBtn:SetPoint("RIGHT", editBtn, "LEFT", -4, 0)
     hearthBtn:SetNormalTexture("Interface\Icons\INV_Misc_Rune_01")
@@ -257,7 +260,7 @@ local function CreateHeader()
 end
 
 local function CreateSearchBar()
-    local searchFrame = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
+    local searchFrame = CreateFrame("Frame", nil, mainFrame, BACKDROP_TEMPLATE)
     searchFrame:SetHeight(SEARCH_HEIGHT)
     searchFrame:SetPoint("TOPLEFT", Frame.header, "BOTTOMLEFT", PADDING, -2)
     searchFrame:SetPoint("TOPRIGHT", Frame.header, "BOTTOMRIGHT", -PADDING, -2)
@@ -312,7 +315,7 @@ local function CreateSearchBar()
 end
 
 local function CreateFilterBar()
-    local filterBar = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
+    local filterBar = CreateFrame("Frame", nil, mainFrame, BACKDROP_TEMPLATE)
     filterBar:SetHeight(FILTER_HEIGHT)
     filterBar:SetPoint("TOPLEFT", Frame.searchFrame, "BOTTOMLEFT", 0, -2)
     filterBar:SetPoint("TOPRIGHT", Frame.searchFrame, "BOTTOMRIGHT", 0, -2)
@@ -332,7 +335,7 @@ local function CreateFilterBar()
                 activeFilter = self.filter
             end
             Frame:UpdateLayout()
-        end
+        end)
         table.insert(filterButtons, btn)
         xOffset = xOffset + 62
     end
@@ -341,7 +344,7 @@ local function CreateFilterBar()
 end
 
 local function CreateBagPanel()
-    local bagPanel = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
+    local bagPanel = CreateFrame("Frame", nil, mainFrame, BACKDROP_TEMPLATE)
     bagPanel:SetHeight(SLOT_SIZE + 8)
     bagPanel:SetPoint("TOPLEFT", Frame.filterBar, "BOTTOMLEFT", 0, -2)
     bagPanel:SetPoint("TOPRIGHT", Frame.filterBar, "BOTTOMRIGHT", 0, -2)
@@ -395,7 +398,7 @@ function Frame:UpdateBagPanel()
             if OI.BagSlot and OI.BagSlot.Create then
                 slot = OI.BagSlot:Create(self.bagPanel, bag)
             else
-                slot = CreateFrame("Button", nil, self.bagPanel, "BackdropTemplate")
+                slot = CreateFrame("Button", nil, self.bagPanel, BACKDROP_TEMPLATE)
                 slot:SetSize(SLOT_SIZE, SLOT_SIZE)
                 slot:SetBackdrop({
                     bgFile = "Interface\Buttons\WHITE8X8",
@@ -466,7 +469,7 @@ local function CreateContentArea()
 end
 
 local function CreateFooter()
-    local footer = CreateFrame("Frame", nil, mainFrame, "BackdropTemplate")
+    local footer = CreateFrame("Frame", nil, mainFrame, BACKDROP_TEMPLATE)
     footer:SetHeight(FOOTER_HEIGHT)
     footer:SetPoint("BOTTOMLEFT", PADDING, PADDING)
     footer:SetPoint("BOTTOMRIGHT", -PADDING, PADDING)
@@ -894,7 +897,7 @@ function Frame:RenderFlowView(items)
     local yOffset = 0
     for _, catData in ipairs(categories) do
         local isCollapsed = editMode and collapsedCategories[catData.name]
-        local headerBtn = CreateFrame("Button", nil, self.scrollChild, "BackdropTemplate")
+        local headerBtn = CreateFrame("Button", nil, self.scrollChild, BACKDROP_TEMPLATE)
         headerBtn:SetWidth(usableWidth)
         headerBtn:SetHeight(20)
         headerBtn:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 4, -yOffset)
@@ -940,7 +943,7 @@ function Frame:RenderFlowView(items)
                         OI.ItemButton:SetItem(btn, item)
                     end
                 else
-                    btn = CreateFrame("Button", nil, self.scrollChild, "BackdropTemplate")
+                    btn = CreateFrame("Button", nil, self.scrollChild, BACKDROP_TEMPLATE)
                     btn:SetSize(ITEM_SIZE, ITEM_SIZE)
                     btn:SetBackdrop({
                         bgFile = "Interface\\Buttons\\WHITE8X8",
@@ -1023,7 +1026,7 @@ function Frame:RenderListView(items)
     local usableWidth = contentWidth - (PADDING * 2)
     local yOffset = 0
     local rowHeight = 20
-    local headerRow = CreateFrame("Frame", nil, self.scrollChild, "BackdropTemplate")
+    local headerRow = CreateFrame("Frame", nil, self.scrollChild, BACKDROP_TEMPLATE)
     headerRow:SetWidth(usableWidth)
     headerRow:SetHeight(rowHeight)
     headerRow:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 4, -yOffset)
@@ -1051,7 +1054,7 @@ function Frame:RenderListView(items)
     table.insert(listRows, headerRow)
     yOffset = yOffset + rowHeight + 2
     for _, item in ipairs(items) do
-        local row = CreateFrame("Frame", nil, self.scrollChild, "BackdropTemplate")
+        local row = CreateFrame("Frame", nil, self.scrollChild, BACKDROP_TEMPLATE)
         row:SetWidth(usableWidth)
         row:SetHeight(rowHeight)
         row:SetPoint("TOPLEFT", self.scrollChild, "TOPLEFT", 4, -yOffset)
@@ -1293,12 +1296,20 @@ function Frame:Init()
     self:RegisterEvents()
 end
 
+local bagUpdateTimer = nil
+
+local function OnBagUpdateBucket()
+    bagUpdateTimer = nil
+    Frame:UpdateLayout()
+    if OI.SendMessage then
+        OI:SendMessage("TooltipUpdated")
+    end
+end
+
 function Frame:RegisterEvents()
-    OI:RegisterBucketEvent("BAG_UPDATE", 0.5, function(changedBags)
-        Frame:UpdateLayout(changedBags)
-        -- Notify tooltip cache to refresh after bag changes
-        if OI.SendMessage then
-            OI:SendMessage("TooltipUpdated")
+    OI:RegisterEvent("BAG_UPDATE", function(event, bagID)
+        if not bagUpdateTimer then
+            bagUpdateTimer = OI:ScheduleTimer(OnBagUpdateBucket, 0.5)
         end
     end)
     OI:RegisterEvent("MERCHANT_SHOW", function()
