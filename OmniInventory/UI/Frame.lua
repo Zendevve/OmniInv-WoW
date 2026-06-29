@@ -406,6 +406,13 @@ local function BuildScopedSlotOccupancySignature(bagPreviewScopeSet)
     return table.concat(parts, "")
 end
 
+local function IsCategoryCollapsed(catName)
+    if not OmniInventoryDB or not OmniInventoryDB.char or not OmniInventoryDB.char.collapsedCategories then
+        return false
+    end
+    return OmniInventoryDB.char.collapsedCategories[catName] == true
+end
+
 local function BuildFlowCompositionSignature(categories, categoryOrder, usableWidth, itemStep, filterName)
     local parts = {
         tostring(math.floor((usableWidth or 0) + 0.5)),
@@ -414,7 +421,8 @@ local function BuildFlowCompositionSignature(categories, categoryOrder, usableWi
     }
     for _, catName in ipairs(categoryOrder or {}) do
         local count = categories and categories[catName] and #categories[catName] or 0
-        parts[#parts + 1] = tostring(catName) .. ":" .. tostring(count)
+        local collapsed = IsCategoryCollapsed(catName)
+        parts[#parts + 1] = tostring(catName) .. ":" .. tostring(count) .. ":" .. (collapsed and "c" or "e")
     end
     return table.concat(parts, "|")
 end
@@ -426,7 +434,8 @@ function Frame:BuildFlowLaneSignature(categoryOrder, usableWidth, itemStep, filt
         tostring(filterName or "none"),
     }
     for _, catName in ipairs(categoryOrder or {}) do
-        parts[#parts + 1] = tostring(catName)
+        local collapsed = IsCategoryCollapsed(catName)
+        parts[#parts + 1] = tostring(catName) .. ":" .. (collapsed and "c" or "e")
     end
     return table.concat(parts, "|")
 end
@@ -3954,6 +3963,9 @@ function Frame:RenderFlowView(items, layoutOpts)
         end
         local laneColumns = columnsForLaneWidth((usableWidth - laneGap) * 0.5)
         local function sectionHeight(catName)
+            if IsCategoryCollapsed(catName) then
+                return sectionHeaderHeight + sectionSpacing
+            end
             local n = categories[catName] and #categories[catName] or 0
             if n <= 0 then
                 return sectionHeaderHeight + sectionSpacing
@@ -4138,13 +4150,57 @@ function Frame:RenderFlowView(items, layoutOpts)
                     headerIndex = headerIndex + 1
                     header = categoryHeaders[headerIndex]
                     if not header then
-                        header = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                        -- Create category header as clickable Button
+                        header = CreateFrame("Button", nil, scrollChild)
+                        header:SetHeight(16)
+                        header.textLabel = header:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                        header.textLabel:SetPoint("LEFT", header, "LEFT", 0, 0)
+
+                        header.SetText = function(self, val)
+                            self.textLabel:SetText(val)
+                            self:SetWidth(math.max(self.textLabel:GetStringWidth() or 0, 40))
+                        end
+                        header.SetTextColor = function(self, r, g, b)
+                            self.textLabel:SetTextColor(r, g, b)
+                        end
+
+                        header:RegisterForClicks("LeftButtonUp")
+                        header:SetScript("OnClick", function(self)
+                            local cat = self.catName
+                            if cat and OmniInventoryDB and OmniInventoryDB.char then
+                                OmniInventoryDB.char.collapsedCategories = OmniInventoryDB.char.collapsedCategories or {}
+                                local current = OmniInventoryDB.char.collapsedCategories[cat]
+                                OmniInventoryDB.char.collapsedCategories[cat] = not current
+                                if Frame.UpdateLayout then
+                                    Frame:InvalidateRenderCaches()
+                                    Frame:UpdateLayout(nil, { reason = "category_collapse" })
+                                end
+                            end
+                        end)
+                        header:SetScript("OnEnter", function(self)
+                            self.textLabel:SetTextColor(1, 1, 1)
+                        end)
+                        header:SetScript("OnLeave", function(self)
+                            local r, g, b = 1, 1, 1
+                            if currentView == "bag" then
+                                r, g, b = 0.9, 0.8, 0.4
+                            elseif Omni.Categorizer then
+                                r, g, b = Omni.Categorizer:GetCategoryColor(self.catName)
+                            end
+                            self.textLabel:SetTextColor(r, g, b)
+                        end)
+
                         categoryHeaders[headerIndex] = header
                     end
                     headerSlotIndex = headerIndex
                 end
 
+                header.catName = catName
                 headerByCategory[catName] = headerSlotIndex
+
+                local collapsed = IsCategoryCollapsed(catName)
+                local prefix = collapsed and "► " or "▼ "
+
                 if not reusedHeader then
                     header:ClearAllPoints()
                     header:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", laneX, laneY)
@@ -4159,71 +4215,102 @@ function Frame:RenderFlowView(items, layoutOpts)
                     if currentView == "bag" then
                         local usedSlots = bagItemCounts and bagItemCounts[catName] or #catItems
                         local totalSlots = bagSlotCounts and bagSlotCounts[catName] or #catItems
-                        header:SetText(GetBagDisplayName(catName) .. " (" .. usedSlots .. "/" .. totalSlots .. ")")
+                        header:SetText(prefix .. GetBagDisplayName(catName) .. " (" .. usedSlots .. "/" .. totalSlots .. ")")
                     else
-                        header:SetText(catName .. " (" .. #catItems .. ")")
+                        header:SetText(prefix .. catName .. " (" .. #catItems .. ")")
                     end
                 elseif flowContentOnly and header then
                     if currentView == "bag" then
                         local usedSlots = bagItemCounts and bagItemCounts[catName] or #catItems
                         local totalSlots = bagSlotCounts and bagSlotCounts[catName] or #catItems
-                        header:SetText(GetBagDisplayName(catName) .. " (" .. usedSlots .. "/" .. totalSlots .. ")")
+                        header:SetText(prefix .. GetBagDisplayName(catName) .. " (" .. usedSlots .. "/" .. totalSlots .. ")")
                     else
-                        header:SetText(catName .. " (" .. #catItems .. ")")
+                        header:SetText(prefix .. catName .. " (" .. #catItems .. ")")
                     end
                 end
                 header:Show()
 
-
-
                 laneY = laneY - sectionHeaderHeight
             end
 
-            for i, itemInfo in ipairs(catItems) do
-                -- ʕ •ᴥ•ʔ✿ Look up the persistent slot button for this item's
-                -- (bag, slot). It was created, parented to the bag's
-                -- ItemContainer, and SetID'd by EnsureSlotButtons above, so
-                -- we only need to reposition and SetItem here -- all of
-                -- which is still OOC because UpdateLayout is combat-gated. ✿ ʕ •ᴥ•ʔ
-                local bagID = itemInfo.bagID
-                local slotID = itemInfo.slotID
-                local btn = (bagID and slotID) and GetSlotButton(bagID, slotID) or nil
+            local collapsed = IsCategoryCollapsed(catName)
+            if not collapsed then
+                for i, itemInfo in ipairs(catItems) do
+                    -- ʕ •ᴥ•ʔ✿ Look up the persistent slot button for this item's
+                    -- (bag, slot). It was created, parented to the bag's
+                    -- ItemContainer, and SetID'd by EnsureSlotButtons above, so
+                    -- we only need to reposition and SetItem here -- all of
+                    -- which is still OOC because UpdateLayout is combat-gated. ✿ ʕ •ᴥ•ʔ
+                    local bagID = itemInfo.bagID
+                    local slotID = itemInfo.slotID
+                    local btn = (bagID and slotID) and GetSlotButton(bagID, slotID) or nil
 
-                if btn then
-                    flowSlotPaintIndex = flowSlotPaintIndex + 1
-                    local col = ((i - 1) % columns)
-                    local row = math.floor((i - 1) / columns)
-                    local x = laneX + col * itemStep
-                    local y = laneY - row * itemStep
+                    if btn then
+                        flowSlotPaintIndex = flowSlotPaintIndex + 1
+                        local col = ((i - 1) % columns)
+                        local row = math.floor((i - 1) / columns)
+                        local x = laneX + col * itemStep
+                        local y = laneY - row * itemStep
 
-                    local needsReposition = (btn._oiLayoutX ~= x) or (btn._oiLayoutY ~= y)
-                    local needsMetrics = (btn._oiLayoutScale ~= itemScale)
-                    local slotItem = itemInfo
-                    local nextRenderKey = ItemRenderKey(slotItem)
-                    local skipItemPaint = flowContentOnly and (btn._oiRenderKey == nextRenderKey)
-                    local deferItemPaint = (not skipItemPaint)
-                        and layoutOpts and layoutOpts.reason == "show_open"
-                        and flowSlotPaintIndex > FLOW_SHOW_OPEN_DEFER_AFTER
+                        local needsReposition = (btn._oiLayoutX ~= x) or (btn._oiLayoutY ~= y)
+                        local needsMetrics = (btn._oiLayoutScale ~= itemScale)
+                        local slotItem = itemInfo
+                        local nextRenderKey = ItemRenderKey(slotItem)
+                        local skipItemPaint = flowContentOnly and (btn._oiRenderKey == nextRenderKey)
+                        local deferItemPaint = (not skipItemPaint)
+                            and layoutOpts and layoutOpts.reason == "show_open"
+                            and flowSlotPaintIndex > FLOW_SHOW_OPEN_DEFER_AFTER
 
-                    if deferItemPaint then
-                        if needsReposition then
-                            btn:ClearAllPoints()
-                            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
-                            btn._oiLayoutX = x
-                            btn._oiLayoutY = y
-                        end
-                        if needsMetrics then
-                            ApplyItemButtonMetrics(btn, itemScale)
-                            btn._oiLayoutScale = itemScale
-                        end
-                        pcall(btn.Show, btn)
-                        btn:SetAlpha(0)
-                        deferredFlowPaintQueue[#deferredFlowPaintQueue + 1] = { btn, slotItem }
-                    elseif skipItemPaint then
-                        if flowContentOnly and not needsReposition and not needsMetrics then
-                            local targetA = (slotItem and slotItem.__empty) and EMPTY_SLOT_ALPHA or 1
-                            if not btn:IsShown() then btn:Show() end
-                            btn:SetAlpha(targetA)
+                        if deferItemPaint then
+                            if needsReposition then
+                                btn:ClearAllPoints()
+                                btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+                                btn._oiLayoutX = x
+                                btn._oiLayoutY = y
+                            end
+                            if needsMetrics then
+                                ApplyItemButtonMetrics(btn, itemScale)
+                                btn._oiLayoutScale = itemScale
+                            end
+                            pcall(btn.Show, btn)
+                            btn:SetAlpha(0)
+                            deferredFlowPaintQueue[#deferredFlowPaintQueue + 1] = { btn, slotItem }
+                        elseif skipItemPaint then
+                            if flowContentOnly and not needsReposition and not needsMetrics then
+                                local targetA = (slotItem and slotItem.__empty) and EMPTY_SLOT_ALPHA or 1
+                                if not btn:IsShown() then btn:Show() end
+                                btn:SetAlpha(targetA)
+                            else
+                                if needsReposition then
+                                    btn:ClearAllPoints()
+                                    btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
+                                    btn._oiLayoutX = x
+                                    btn._oiLayoutY = y
+                                end
+                                if needsMetrics then
+                                    ApplyItemButtonMetrics(btn, itemScale)
+                                    btn._oiLayoutScale = itemScale
+                                end
+                                local targetA = (slotItem and slotItem.__empty) and EMPTY_SLOT_ALPHA or 1
+                                if not btn:IsShown() then btn:Show() end
+                                btn:SetAlpha(targetA)
+                            end
+                        elseif flowContentOnly and not needsReposition and not needsMetrics then
+                            btn:SetAlpha(1)
+                            local success = pcall(function()
+                                SetButtonItem(btn, slotItem)
+                                btn._oiRenderKey = nextRenderKey
+                                btn:Show()
+                            end)
+                            if not success then
+                                pcall(SetButtonItem, btn, nil)
+                                if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
+                                pcall(btn.Show, btn)
+                                btn._oiRenderKey = "error"
+                            end
+                            if slotItem and slotItem.__empty then
+                                btn:SetAlpha(EMPTY_SLOT_ALPHA)
+                            end
                         else
                             if needsReposition then
                                 btn:ClearAllPoints()
@@ -4235,67 +4322,39 @@ function Frame:RenderFlowView(items, layoutOpts)
                                 ApplyItemButtonMetrics(btn, itemScale)
                                 btn._oiLayoutScale = itemScale
                             end
-                            local targetA = (slotItem and slotItem.__empty) and EMPTY_SLOT_ALPHA or 1
-                            if not btn:IsShown() then btn:Show() end
-                            btn:SetAlpha(targetA)
+                            btn:SetAlpha(1)
+                            local success = pcall(function()
+                                SetButtonItem(btn, slotItem)
+                                btn._oiRenderKey = nextRenderKey
+                                btn:Show()
+                            end)
+                            if not success then
+                                pcall(SetButtonItem, btn, nil)
+                                if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
+                                pcall(btn.Show, btn)
+                                btn._oiRenderKey = "error"
+                            end
+                            if slotItem and slotItem.__empty then
+                                btn:SetAlpha(EMPTY_SLOT_ALPHA)
+                            end
                         end
-                    elseif flowContentOnly and not needsReposition and not needsMetrics then
-                        btn:SetAlpha(1)
-                        local success = pcall(function()
-                            SetButtonItem(btn, slotItem)
-                            btn._oiRenderKey = nextRenderKey
-                            btn:Show()
-                        end)
-                        if not success then
-                            pcall(SetButtonItem, btn, nil)
-                            if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
-                            pcall(btn.Show, btn)
-                            btn._oiRenderKey = "error"
-                        end
-                        if slotItem and slotItem.__empty then
-                            btn:SetAlpha(EMPTY_SLOT_ALPHA)
-                        end
-                    else
-                        if needsReposition then
-                            btn:ClearAllPoints()
-                            btn:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", x, y)
-                            btn._oiLayoutX = x
-                            btn._oiLayoutY = y
-                        end
-                        if needsMetrics then
-                            ApplyItemButtonMetrics(btn, itemScale)
-                            btn._oiLayoutScale = itemScale
-                        end
-                        btn:SetAlpha(1)
-                        local success = pcall(function()
-                            SetButtonItem(btn, slotItem)
-                            btn._oiRenderKey = nextRenderKey
-                            btn:Show()
-                        end)
-                        if not success then
-                            pcall(SetButtonItem, btn, nil)
-                            if btn.icon then btn.icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark") end
-                            pcall(btn.Show, btn)
-                            btn._oiRenderKey = "error"
-                        end
-                        if slotItem and slotItem.__empty then
-                            btn:SetAlpha(EMPTY_SLOT_ALPHA)
-                        end
-                    end
 
-                    touched[bagID] = touched[bagID] or {}
-                    if not seenTouchedBagsThisPass[bagID] then
-                        seenTouchedBagsThisPass[bagID] = true
-                        usedTouchedBags[#usedTouchedBags + 1] = bagID
+                        touched[bagID] = touched[bagID] or {}
+                        if not seenTouchedBagsThisPass[bagID] then
+                            seenTouchedBagsThisPass[bagID] = true
+                            usedTouchedBags[#usedTouchedBags + 1] = bagID
+                        end
+                        touched[bagID][slotID] = true
+                        table.insert(itemButtons, btn)
                     end
-                    touched[bagID][slotID] = true
-                    table.insert(itemButtons, btn)
                 end
-            end
 
-            local catRows = math.ceil(#catItems / columns)
-            local itemsBottomY = laneY - (catRows * itemStep)
-            laneY = itemsBottomY - sectionSpacing
+                local catRows = math.ceil(#catItems / columns)
+                local itemsBottomY = laneY - (catRows * itemStep)
+                laneY = itemsBottomY - sectionSpacing
+            else
+                laneY = laneY - sectionSpacing
+            end
 
             if isBoeAnchor then
                 -- ʕ •ᴥ•ʔ✿ Remember BoE's lane geometry. The overflow
