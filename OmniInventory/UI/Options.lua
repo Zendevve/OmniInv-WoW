@@ -477,6 +477,83 @@ function Settings:CreateControls(parent)
     end)
     self.enableUnusableOverlayCb = unusableCb
 
+    yOffset = yOffset - 22
+
+    local autoSellCb = CreateFrame("CheckButton", "OmniAutoSellJunk", parent, "UICheckButtonTemplate")
+    autoSellCb:SetSize(24, 24)
+    autoSellCb:SetPoint("TOPLEFT", 14, yOffset)
+    local autoSellLabel = autoSellCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    autoSellLabel:SetPoint("LEFT", autoSellCb, "RIGHT", 2, 1)
+    autoSellLabel:SetText("Auto-sell junk")
+    autoSellCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Auto-sell junk", 1, 0.82, 0)
+        GameTooltip:AddLine("Automatically sells all grey quality items in your bags when visiting a merchant NPC.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    autoSellCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    autoSellCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            Omni.Data:Set("autoSellJunk", self:GetChecked() and true or false)
+        end
+    end)
+    self.autoSellJunkCb = autoSellCb
+
+    local autoRepairCb = CreateFrame("CheckButton", "OmniAutoRepair", parent, "UICheckButtonTemplate")
+    autoRepairCb:SetSize(24, 24)
+    autoRepairCb:SetPoint("TOPLEFT", 160, yOffset)
+    local autoRepairLabel = autoRepairCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    autoRepairLabel:SetPoint("LEFT", autoRepairCb, "RIGHT", 2, 1)
+    autoRepairLabel:SetText("Auto-repair")
+    autoRepairCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Auto-repair gear", 1, 0.82, 0)
+        GameTooltip:AddLine("Automatically repairs all equipped and inventory gear when visiting a repair merchant.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    autoRepairCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    autoRepairCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            local checked = self:GetChecked() and true or false
+            Omni.Data:Set("autoRepair", checked)
+            if self.guildFundsCb then
+                if checked then
+                    self.guildFundsCb:Enable()
+                    self.guildFundsCb:SetAlpha(1.0)
+                else
+                    self.guildFundsCb:Disable()
+                    self.guildFundsCb:SetAlpha(0.5)
+                end
+            end
+        end
+    end)
+    self.autoRepairCb = autoRepairCb
+
+    yOffset = yOffset - 22
+
+    local guildFundsCb = CreateFrame("CheckButton", "OmniAutoRepairGuild", parent, "UICheckButtonTemplate")
+    guildFundsCb:SetSize(24, 24)
+    guildFundsCb:SetPoint("TOPLEFT", 160, yOffset)
+    local guildFundsLabel = guildFundsCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    guildFundsLabel:SetPoint("LEFT", guildFundsCb, "RIGHT", 2, 1)
+    guildFundsLabel:SetText("Use Guild funds")
+    guildFundsCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Use Guild Funds", 1, 0.82, 0)
+        GameTooltip:AddLine("Attempts to use guild bank funds for auto-repairs before using your own gold.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    guildFundsCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    guildFundsCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            Omni.Data:Set("autoRepairGuild", self:GetChecked() and true or false)
+        end
+    end)
+    self.autoRepairGuildCb = guildFundsCb
+
+    -- Link them
+    autoRepairCb.guildFundsCb = guildFundsCb
+
     yOffset = yOffset - SPACING - 4
 
     local tipPlacementHeader = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -717,6 +794,25 @@ function Settings:UpdateValues()
     end
     if self.enableUnusableOverlayCb and Omni.Data then
         self.enableUnusableOverlayCb:SetChecked(Omni.Data:Get("enableUnusableOverlay") ~= false)
+    end
+    if self.autoSellJunkCb and Omni.Data then
+        self.autoSellJunkCb:SetChecked(Omni.Data:Get("autoSellJunk") ~= false)
+    end
+    if self.autoRepairCb and Omni.Data then
+        local repairActive = Omni.Data:Get("autoRepair") == true
+        self.autoRepairCb:SetChecked(repairActive)
+        if self.autoRepairGuildCb then
+            if repairActive then
+                self.autoRepairGuildCb:Enable()
+                self.autoRepairGuildCb:SetAlpha(1.0)
+            else
+                self.autoRepairGuildCb:Disable()
+                self.autoRepairGuildCb:SetAlpha(0.5)
+            end
+        end
+    end
+    if self.autoRepairGuildCb and Omni.Data then
+        self.autoRepairGuildCb:SetChecked(Omni.Data:Get("autoRepairGuild") == true)
     end
     self._syncingTooltipFixedSliders = true
     if Omni.Data and self.tooltipFixedXSlider and self.tooltipFixedYSlider then

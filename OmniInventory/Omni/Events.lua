@@ -333,6 +333,66 @@ function Events:Init()
                 Omni.Frame:UpdateLayout(nil, { forceFull = true, reason = "vendor_transition" })
             end
         end
+
+        -- Auto Sell Junk & Auto Repair
+        local db = OmniInventoryDB and OmniInventoryDB.global
+        if db then
+            -- 1. Auto Sell Junk
+            if db.autoSellJunk ~= false then
+                local soldCount = 0
+                local earnedMoney = 0
+                for bagID = 0, 4 do
+                    local numSlots = GetContainerNumSlots(bagID) or 0
+                    for slotID = 1, numSlots do
+                        local link = GetContainerItemLink(bagID, slotID)
+                        if link then
+                            local _, _, quality, _, _, _, _, _, _, _, price = GetItemInfo(link)
+                            if quality == 0 and price and price > 0 then
+                                local _, count = GetContainerItemInfo(bagID, slotID)
+                                earnedMoney = earnedMoney + (price * (count or 1))
+                                UseContainerItem(bagID, slotID)
+                                soldCount = soldCount + 1
+                            end
+                        end
+                    end
+                end
+                if soldCount > 0 and Omni.Utils and Omni.Utils.FormatMoney then
+                    local formatted = Omni.Utils:FormatMoney(earnedMoney)
+                    print("|cFF00FF00OmniInventory|r: Automatically sold " .. soldCount .. " junk items for " .. formatted .. ".")
+                end
+            end
+
+            -- 2. Auto Repair
+            if db.autoRepair == true and CanMerchantRepair() then
+                local repairCost, canRepair = GetRepairAllCost()
+                if canRepair and repairCost > 0 then
+                    local useGuild = false
+                    if db.autoRepairGuild == true and CanGuildBankRepair() then
+                        local amount = GetGuildBankWithdrawMoney()
+                        local guildMoney = GetGuildBankMoney()
+                        if amount == -1 or amount >= repairCost then
+                            if guildMoney >= repairCost then
+                                useGuild = true
+                            end
+                        end
+                    end
+
+                    if useGuild then
+                        RepairAllItems(true)
+                        if Omni.Utils and Omni.Utils.FormatMoney then
+                            print("|cFF00FF00OmniInventory|r: Automatically repaired items using Guild Funds for " .. Omni.Utils:FormatMoney(repairCost) .. ".")
+                        end
+                    elseif GetMoney() >= repairCost then
+                        RepairAllItems(false)
+                        if Omni.Utils and Omni.Utils.FormatMoney then
+                            print("|cFF00FF00OmniInventory|r: Automatically repaired items for " .. Omni.Utils:FormatMoney(repairCost) .. ".")
+                        end
+                    else
+                        print("|cFFFF4040OmniInventory|r: Insufficient funds for auto-repair.")
+                    end
+                end
+            end
+        end
     end)
 
     self:RegisterEvent("MERCHANT_CLOSED", function()

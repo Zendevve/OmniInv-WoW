@@ -31,6 +31,9 @@ local defaults = {
         },
         enableBoundCategories = true,
         enableUnusableOverlay = true,
+        autoSellJunk = true,
+        autoRepair = false,
+        autoRepairGuild = false,
         -- ʕ •ᴥ•ʔ✿ Footer: larger outlined gold + slot count; slots tint blue→red by fill ✿ ʕ •ᴥ•ʔ
         footerMoneyEmphasis = true,
         -- ʕ •ᴥ•ʔ✿ Custom footer launcher buttons (mini-mode themed) ✿ ʕ •ᴥ•ʔ
