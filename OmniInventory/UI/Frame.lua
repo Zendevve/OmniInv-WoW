@@ -4214,7 +4214,7 @@ function Frame:RenderFlowView(items, layoutOpts)
                 headerByCategory[catName] = headerSlotIndex
 
                 local collapsed = IsCategoryCollapsed(catName)
-                local prefix = collapsed and "► " or "▼ "
+                local prefix = collapsed and "+ " or "- "
 
                 if not reusedHeader then
                     header:ClearAllPoints()
