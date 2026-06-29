@@ -4728,6 +4728,98 @@ end
 -- Search
 -- =============================================================================
 
+local function MatchItemQuery(itemInfo, query)
+    if not itemInfo or not itemInfo.hyperlink then
+        return false
+    end
+
+    query = string.lower(query or "")
+    if query == "" then
+        return true
+    end
+
+    -- 1. Get cached name
+    local name = itemInfo.__cachedName
+    if not name then
+        name = GetItemInfo(itemInfo.hyperlink)
+        itemInfo.__cachedName = name
+    end
+    local lowerName = itemInfo.__cachedLowerName
+    if name and not lowerName then
+        lowerName = string.lower(name)
+        itemInfo.__cachedLowerName = lowerName
+    end
+
+    -- Prefix check:
+    -- A) Tooltip search: ~t:text or tooltip:text
+    local tooltipQuery = string.match(query, "^~t:(.+)$") or string.match(query, "^tooltip:(.+)$")
+    if tooltipQuery then
+        local scanningTooltip = _G["OmniScanningTooltip"]
+        if not scanningTooltip then
+            return false
+        end
+        scanningTooltip:ClearLines()
+        if itemInfo.bagID and itemInfo.slotID then
+            scanningTooltip:SetBagItem(itemInfo.bagID, itemInfo.slotID)
+        elseif itemInfo.hyperlink then
+            scanningTooltip:SetHyperlink(itemInfo.hyperlink)
+        else
+            return false
+        end
+        for i = 1, scanningTooltip:NumLines() do
+            local leftFrame = _G["OmniScanningTooltipTextLeft" .. i]
+            local leftText = leftFrame and leftFrame:GetText()
+            if leftText and string.find(string.lower(leftText), tooltipQuery, 1, true) then
+                return true
+            end
+            local rightFrame = _G["OmniScanningTooltipTextRight" .. i]
+            local rightText = rightFrame and rightFrame:GetText()
+            if rightText and string.find(string.lower(rightText), tooltipQuery, 1, true) then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- B) Quality search: ~q:text or quality:text
+    local qualityQuery = string.match(query, "^~q:(.+)$") or string.match(query, "^quality:(.+)$")
+    if qualityQuery then
+        local quality = itemInfo.quality
+        if not quality then
+            _, _, quality = GetItemInfo(itemInfo.hyperlink)
+            itemInfo.quality = quality
+        end
+        if quality then
+            local qStr = tostring(quality)
+            local qualityNames = {
+                [0] = "poor", [1] = "common", [2] = "uncommon", [3] = "rare",
+                [4] = "epic", [5] = "legendary", [6] = "artifact", [7] = "heirloom"
+            }
+            local qName = qualityNames[quality] or ""
+            if string.find(qStr, qualityQuery, 1, true) or string.find(qName, qualityQuery, 1, true) then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- C) Equipment search: ~e or ~equip
+    if query == "~e" or query == "~equip" or query == "equipment" then
+        local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(itemInfo.hyperlink)
+        if equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_TEXT" then
+            return true
+        end
+        return false
+    end
+
+    -- Default fallback: substring match on item name
+    if lowerName and string.find(lowerName, query, 1, true) then
+        return true
+    end
+
+    return false
+end
+
 function Frame:ApplySearch(text)
     local perfToken = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("frame.ApplySearch")
     searchText = text or ""
@@ -4750,29 +4842,12 @@ function Frame:ApplySearch(text)
         return
     end
 
-    local lowerSearch = string.lower(searchText)
     local matchedButtons = 0
 
     -- Filter Grid/Flow view buttons
     for _, btn in ipairs(itemButtons) do
         local itemInfo = btn.itemInfo
-        local isMatch = false
-
-        if itemInfo and itemInfo.hyperlink then
-            local name = itemInfo.__cachedName
-            local lowerName = itemInfo.__cachedLowerName
-            if not name then
-                name = GetItemInfo(itemInfo.hyperlink)
-                itemInfo.__cachedName = name
-            end
-            if name and not lowerName then
-                lowerName = string.lower(name)
-                itemInfo.__cachedLowerName = lowerName
-            end
-            if lowerName and string.find(lowerName, lowerSearch, 1, true) then
-                isMatch = true
-            end
-        end
+        local isMatch = MatchItemQuery(itemInfo, searchText)
 
         if Omni.ItemButton then
             Omni.ItemButton:SetSearchMatch(btn, isMatch)
@@ -4787,23 +4862,7 @@ function Frame:ApplySearch(text)
     for _, row in ipairs(listRows) do
         if row:IsShown() and row.itemInfo then
             local itemInfo = row.itemInfo
-            local isMatch = false
-
-            if itemInfo.hyperlink then
-                local name = itemInfo.__cachedName
-                local lowerName = itemInfo.__cachedLowerName
-                if not name then
-                    name = GetItemInfo(itemInfo.hyperlink)
-                    itemInfo.__cachedName = name
-                end
-                if name and not lowerName then
-                    lowerName = string.lower(name)
-                    itemInfo.__cachedLowerName = lowerName
-                end
-                if lowerName and string.find(lowerName, lowerSearch, 1, true) then
-                    isMatch = true
-                end
-            end
+            local isMatch = MatchItemQuery(itemInfo, searchText)
 
             if isMatch then
                 row:SetAlpha(1)
