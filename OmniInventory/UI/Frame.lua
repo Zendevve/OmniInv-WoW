@@ -3400,6 +3400,21 @@ function Frame:UpdateLayout(changedBags, opts)
     local perfTotal = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("frame.UpdateLayout.total")
     local forceFull = opts and opts.forceFull == true
     local updateReason = (opts and opts.reason) or "layout"
+
+    self._bagSlotCache = self._bagSlotCache or {}
+    local sizeChanged = false
+    for _, bagID in ipairs(DIM.BAG_IDS) do
+        local currentSlots = GetContainerNumSlots(bagID) or 0
+        if currentSlots ~= (self._bagSlotCache[bagID] or 0) then
+            sizeChanged = true
+            self._bagSlotCache[bagID] = currentSlots
+        end
+    end
+    if sizeChanged then
+        forceFull = true
+        updateReason = updateReason .. "_size_change"
+    end
+
     if not InCombat() and self:_RestoreCombatGridFallback() then
         forceFull = true
         updateReason = "restore_" .. updateReason
