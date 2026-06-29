@@ -1051,7 +1051,7 @@ function Frame:CreateHeader()
     header.title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     header.title:SetPoint("LEFT", 6, 0)
     header.title:SetJustifyH("LEFT")
-    header.title:SetText("|cFF00FF00Omni|r Inventory")
+    header.title:SetText("|cFF00FF00Omni|rInventory")
 
     header.closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
     header.closeBtn:SetSize(20, 20)
