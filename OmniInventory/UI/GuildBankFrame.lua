@@ -105,6 +105,9 @@ local function GetDB()
     OmniInventoryDB.char = OmniInventoryDB.char or {}
     OmniInventoryDB.char.guildBank = OmniInventoryDB.char.guildBank or {}
     OmniInventoryDB.char.guildBank.tabMappings = OmniInventoryDB.char.guildBank.tabMappings or {}
+    if OmniInventoryDB.char.guildBank.darkmoonTab == nil then
+        OmniInventoryDB.char.guildBank.darkmoonTab = false
+    end
     if not tabMappingStringsCoerced then
         tabMappingStringsCoerced = true
         for tab, val in pairs(OmniInventoryDB.char.guildBank.tabMappings) do
@@ -127,6 +130,72 @@ end
 
 local function SetViewMode(mode)
     GetDB().viewMode = (mode == VIEW_GRID) and VIEW_GRID or VIEW_FLOW
+end
+
+local function GetDarkmoonTab()
+    return GetDB().darkmoonTab or false
+end
+
+local function SetDarkmoonTab(tab)
+    GetDB().darkmoonTab = tab or false
+end
+
+local DARKMOON_RANK_ORDER = {
+    ["Ace"] = 1,
+    ["Two"] = 2,
+    ["Three"] = 3,
+    ["Four"] = 4,
+    ["Five"] = 5,
+    ["Six"] = 6,
+    ["Seven"] = 7,
+    ["Eight"] = 8,
+}
+
+local function GetDarkmoonSetAndRank(item)
+    if not item or not item.hyperlink then return nil, nil end
+    local name = GetItemInfo(item.hyperlink)
+    if not name then return nil, nil end
+
+    local rankStr, setName = string.match(name, "^(%a+) of (.+)$")
+    if rankStr and setName then
+        local rank = DARKMOON_RANK_ORDER[rankStr]
+        if rank then
+            return setName, rank
+        end
+    end
+    return nil, nil
+end
+
+local function ApplyDarkmoonGrouping(items)
+    local darkmoonItems = {}
+    local otherItems = {}
+
+    for _, item in ipairs(items) do
+        local setName, rank = GetDarkmoonSetAndRank(item)
+        if setName and rank then
+            item.category = "Darkmoon: " .. setName
+            item.darkmoonRank = rank
+            table.insert(darkmoonItems, item)
+        else
+            table.insert(otherItems, item)
+        end
+    end
+
+    table.sort(darkmoonItems, function(a, b)
+        if a.category ~= b.category then
+            return a.category < b.category
+        end
+        return (a.darkmoonRank or 0) < (b.darkmoonRank or 0)
+    end)
+
+    local result = {}
+    for _, item in ipairs(darkmoonItems) do
+        table.insert(result, item)
+    end
+    for _, item in ipairs(otherItems) do
+        table.insert(result, item)
+    end
+    return result
 end
 
 local function GetTabMappings()
@@ -1411,6 +1480,9 @@ function GuildBankFrame:RefreshItemArea()
         if frame.flowScroll then frame.flowScroll:Show() end
         local perfFlowCollect = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("guildbank.RefreshItemArea.flowCollect")
         local items = CollectGuildBankTabItems(currentTab)
+        if currentTab == GetDarkmoonTab() then
+            items = ApplyDarkmoonGrouping(items)
+        end
         if Omni._perfEnabled and Omni.Perf then
             Omni.Perf:End("guildbank.RefreshItemArea.flowCollect", perfFlowCollect, { itemCount = #items })
         end
@@ -1624,18 +1696,42 @@ function GuildBankFrame:UpdateSlots()
     end
 end
 
+-- ʕ •ᴥ•ʔ✿ GetCoinTextureString takes a 32-bit int internally, so feeding it a
+-- corrected (un-overflowed) value above 2^31-1 just overflows it again.
+-- Format large amounts ourselves instead. ✿ ʕ •ᴥ•ʔ
+local function FormatGuildBankMoney(copper)
+    if copper <= 2147483647 then
+        return GetCoinTextureString(copper)
+    end
+    local gold = math.floor(copper / 10000)
+    local silver = math.floor((copper % 10000) / 100)
+    local cop = copper % 100
+    local formattedGold = tostring(gold):reverse():gsub("(%d%d%d)", "%1,"):reverse():gsub("^,", "")
+    return string.format(
+        "%s|TInterface\\MoneyFrame\\UI-GoldIcon:0|t %d|TInterface\\MoneyFrame\\UI-SilverIcon:0|t %d|TInterface\\MoneyFrame\\UI-CopperIcon:0|t",
+        formattedGold, silver, cop
+    )
+end
+
 function GuildBankFrame:UpdateMoney()
     if not frame or not frame.footer then return end
     local money = GetGuildBankMoney and GetGuildBankMoney() or 0
+    if money < 0 then
+        money = money + 4294967296
+    end
     local withdraw = GetGuildBankWithdrawMoney and GetGuildBankWithdrawMoney() or 0
-    local moneyText = GetCoinTextureString(money)
+    if withdraw < 0 then
+        withdraw = withdraw + 4294967296
+    end
+
+    local moneyText = FormatGuildBankMoney(money)
     frame.footer.money:SetText(moneyText)
     frame.footer.moneyBtn._moneyText = moneyText
     if withdraw == -1 then
         frame.footer.withdrawLimit:SetText("Withdraw: |cFFFFD700Unlimited|r")
         frame.footer.moneyBtn._withdrawText = "Withdraw: Unlimited"
     else
-        local withdrawText = GetCoinTextureString(withdraw)
+        local withdrawText = FormatGuildBankMoney(withdraw)
         frame.footer.withdrawLimit:SetText("Withdraw: " .. withdrawText)
         frame.footer.moneyBtn._withdrawText = "Withdraw: " .. withdrawText
     end
@@ -1885,6 +1981,20 @@ function GuildBankFrame:ShowTabContextMenu(tabIndex)
             func = function()
                 local dialog = StaticPopup_Show("OMNI_GUILDBANK_EDIT_INFO", tabIndex)
                 if dialog then dialog.tabIndex = tabIndex end
+            end,
+        },
+        {
+            text = "  Darkmoon view: group cards by set (Ace-8)",
+            checkable = true,
+            keepShownOnClick = 1,
+            checked = (GetDarkmoonTab() == tabIndex),
+            func = function()
+                if GetDarkmoonTab() == tabIndex then
+                    SetDarkmoonTab(false)
+                else
+                    SetDarkmoonTab(tabIndex)
+                end
+                GuildBankFrame:UpdateLayout()
             end,
         },
         {
