@@ -623,6 +623,14 @@ function ItemButton:Create(parent)
     button.count = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
     button.count:SetPoint("BOTTOMRIGHT", -2, 2)
     button.count:SetJustifyH("RIGHT")
+
+    -- Item level overlay font string
+    button.iLevelText = button:CreateFontString(nil, "OVERLAY", "NumberFontNormal")
+    button.iLevelText:SetPoint("TOPLEFT", 3, -3)
+    button.iLevelText:SetTextColor(1, 0.82, 0) -- Gold color
+    local fontName, _, fontFlags = button.iLevelText:GetFont()
+    button.iLevelText:SetFont(fontName or "Fonts\\FRIZQT__.TTF", 10, fontFlags or "OUTLINE")
+    button.iLevelText:Hide()
     pcall(button.count.SetDrawLayer, button.count, "OVERLAY", 127)
 
     button.itemInfo = nil
@@ -742,6 +750,9 @@ function ItemButton:SetItem(button, itemInfo)
                 button.newGlow.pulse:Stop()
             end
             button.newGlow:Hide()
+        end
+        if button.iLevelText then
+            button.iLevelText:Hide()
         end
         HideItemCooldown(button)
         if button.questStarterIcon then button.questStarterIcon:Hide() end
@@ -911,6 +922,24 @@ function ItemButton:SetItem(button, itemInfo)
             button.newGlow.pulse:Stop()
         end
         button.newGlow:Hide()
+    end
+
+    -- Update item level overlay
+    local shownILevel = false
+    if not itemInfo.__empty and itemInfo.hyperlink
+            and OmniInventoryDB and OmniInventoryDB.global.showItemLevel ~= false then
+        local _, _, _, itemLevel, _, class, _, _, equipSlot = GetItemInfo(itemInfo.hyperlink)
+        if itemLevel and itemLevel > 1 then
+            if (class == "Weapon" or class == "Armor") and equipSlot and equipSlot ~= "" and equipSlot ~= "INVTYPE_BAG" and equipSlot ~= "INVTYPE_NON_EQUIP" then
+                button.iLevelText:SetText(tostring(itemLevel))
+                button.iLevelText:Show()
+                shownILevel = true
+            end
+        end
+    end
+
+    if not shownILevel then
+        button.iLevelText:Hide()
     end
 
     button.__lastRenderKey = {

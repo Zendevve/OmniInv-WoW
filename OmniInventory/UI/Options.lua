@@ -554,6 +554,27 @@ function Settings:CreateControls(parent)
     -- Link them
     autoRepairCb.guildFundsCb = guildFundsCb
 
+    local showItemLevelCb = CreateFrame("CheckButton", "OmniShowItemLevel", parent, "UICheckButtonTemplate")
+    showItemLevelCb:SetSize(24, 24)
+    showItemLevelCb:SetPoint("TOPLEFT", 14, yOffset)
+    local showItemLevelLabel = showItemLevelCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    showItemLevelLabel:SetPoint("LEFT", showItemLevelCb, "RIGHT", 2, 1)
+    showItemLevelLabel:SetText("Item levels")
+    showItemLevelCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Show Item Levels", 1, 0.82, 0)
+        GameTooltip:AddLine("Displays the item level (iLevel) directly on weapons and armor in your bags and bank.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    showItemLevelCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    showItemLevelCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            Omni.Data:Set("showItemLevel", self:GetChecked() and true or false)
+            RefreshAllInventory()
+        end
+    end)
+    self.showItemLevelCb = showItemLevelCb
+
     yOffset = yOffset - SPACING - 4
 
     local tipPlacementHeader = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -813,6 +834,9 @@ function Settings:UpdateValues()
     end
     if self.autoRepairGuildCb and Omni.Data then
         self.autoRepairGuildCb:SetChecked(Omni.Data:Get("autoRepairGuild") == true)
+    end
+    if self.showItemLevelCb and Omni.Data then
+        self.showItemLevelCb:SetChecked(Omni.Data:Get("showItemLevel") ~= false)
     end
     self._syncingTooltipFixedSliders = true
     if Omni.Data and self.tooltipFixedXSlider and self.tooltipFixedYSlider then
