@@ -103,6 +103,26 @@ local function GetBankContentWidth()
     return math.max(width, 1)
 end
 
+local function GetFreeSpaceCategoryName(bagID)
+    if bagID == 0 or bagID == -1 then
+        return "Free Space"
+    end
+    local invID = ContainerIDToInventoryID(bagID)
+    if invID then
+        local link = GetInventoryItemLink("player", invID)
+        if link then
+            local _, _, _, _, _, _, _, _, _, _, _, itemClassID, itemSubClassID = GetItemInfo(link)
+            if itemSubClassID and itemSubClassID > 0 then
+                local bagName = GetItemInfo(link)
+                if bagName then
+                    return "Free Space (" .. bagName .. ")"
+                end
+            end
+        end
+    end
+    return "Free Space"
+end
+
 local function IsValidBankBagID(bagID)
     if bagID == nil then return false end
     if bagID == -1 then return true end
@@ -1039,13 +1059,64 @@ function BankFrame:RenderFlowView(items)
         table.insert(categories[cat], item)
     end
 
+    -- Collect all empty slots in the bank
+    local activeBags = {}
+    if selectedBankBagID ~= nil then
+        activeBags[1] = selectedBankBagID
+    else
+        table.insert(activeBags, -1)
+        for _, bagID in ipairs(BANK_BAG_IDS or {5,6,7,8,9,10,11}) do
+            table.insert(activeBags, bagID)
+        end
+    end
+
+    for _, bagID in ipairs(activeBags) do
+        local numSlots = GetContainerNumSlots(bagID) or 0
+        for slotID = 1, numSlots do
+            local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+            if not info then
+                local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
+                local emptyItem = {
+                    bagID = bagID,
+                    slotID = slotID,
+                    __empty = true,
+                    category = freeSpaceCat,
+                }
+                if not categories[freeSpaceCat] then
+                    categories[freeSpaceCat] = {}
+                    table.insert(categoryOrder, freeSpaceCat)
+                end
+                table.insert(categories[freeSpaceCat], emptyItem)
+            end
+        end
+    end
+
     if Omni.Categorizer then
         table.sort(categoryOrder, function(a, b)
             local infoA = Omni.Categorizer:GetCategoryInfo(a)
             local infoB = Omni.Categorizer:GetCategoryInfo(b)
-            return (infoA.priority or 99) < (infoB.priority or 99)
+            local prioA = infoA and infoA.priority or 99
+            local prioB = infoB and infoB.priority or 99
+            if prioA ~= prioB then
+                return prioA < prioB
+            end
+            return a < b
         end)
     end
+
+    -- Bubble all categories starting with "Free Space" to the absolute end
+    local reordered = {}
+    for _, catName in ipairs(categoryOrder) do
+        if not string.match(catName, "^Free Space") then
+            table.insert(reordered, catName)
+        end
+    end
+    for _, catName in ipairs(categoryOrder) do
+        if string.match(catName, "^Free Space") then
+            table.insert(reordered, catName)
+        end
+    end
+    categoryOrder = reordered
 
     local dualCategoryLanes = #categoryOrder > 1
 
@@ -1123,6 +1194,11 @@ function BankFrame:RenderFlowView(items)
                         end
                         if itemInfo.slotID and btn.SetID then
                             pcall(btn.SetID, btn, itemInfo.slotID)
+                        end
+                        if itemInfo.__empty then
+                            pcall(btn.SetAlpha, btn, 1)
+                        else
+                            pcall(btn.SetAlpha, btn, 1)
                         end
                     end
                     if not ok then

@@ -148,6 +148,26 @@ local mainFrame = nil
 -- combat we only mutate insecure state (alpha, icon, count), which keeps
 -- every physical bag slot interactable even for items that appear while
 -- PLAYER_REGEN_ENABLED is still pending. ✿ ʕ •ᴥ•ʔ
+local function GetFreeSpaceCategoryName(bagID)
+    if bagID == 0 or bagID == -1 then
+        return "Free Space"
+    end
+    local invID = ContainerIDToInventoryID(bagID)
+    if invID then
+        local link = GetInventoryItemLink("player", invID)
+        if link then
+            local _, _, _, _, _, _, _, _, _, _, _, itemClassID, itemSubClassID = GetItemInfo(link)
+            if itemSubClassID and itemSubClassID > 0 then
+                local bagName = GetItemInfo(link)
+                if bagName then
+                    return "Free Space (" .. bagName .. ")"
+                end
+            end
+        end
+    end
+    return "Free Space"
+end
+
 local slotButtons = {}
 local itemButtons = {}  -- Flat list of populated slot buttons (search / cooldown)
 local categoryHeaders = {}  -- Active category header FontStrings
@@ -3817,30 +3837,68 @@ function Frame:RenderFlowView(items, layoutOpts)
             table.insert(categories[cat], item)
         end
 
+        -- Collect all empty slots in the active bags
+        local activeBags = {}
+        if IsValidBagID(selectedBagID) then
+            activeBags[1] = selectedBagID
+        else
+            for _, bagID in ipairs(DIM.BAG_IDS) do
+                table.insert(activeBags, bagID)
+            end
+        end
+
+        for _, bagID in ipairs(activeBags) do
+            local numSlots = GetContainerNumSlots(bagID) or 0
+            for slotID = 1, numSlots do
+                local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+                if not info then
+                    local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
+                    local emptyItem = {
+                        bagID = bagID,
+                        slotID = slotID,
+                        __empty = true,
+                        category = freeSpaceCat,
+                    }
+                    if not seenCategoryThisPass[freeSpaceCat] then
+                        categories[freeSpaceCat] = categories[freeSpaceCat] or {}
+                        seenCategoryThisPass[freeSpaceCat] = true
+                        usedCategoryKeys[#usedCategoryKeys + 1] = freeSpaceCat
+                        table.insert(categoryOrder, freeSpaceCat)
+                    end
+                    table.insert(categories[freeSpaceCat], emptyItem)
+                end
+            end
+        end
+
         -- Sort categories
         if Omni.Categorizer then
             table.sort(categoryOrder, function(a, b)
                 local infoA = Omni.Categorizer:GetCategoryInfo(a)
                 local infoB = Omni.Categorizer:GetCategoryInfo(b)
-                return (infoA.priority or 99) < (infoB.priority or 99)
+                local prioA = infoA and infoA.priority or 99
+                local prioB = infoB and infoB.priority or 99
+                if prioA ~= prioB then
+                    return prioA < prioB
+                end
+                return a < b
             end)
         end
 
-        -- ʕ •ᴥ•ʔ✿ Keep BoE inside the dual-lane flow, but pin it to the
-        -- tail of the priority order so it's the final section rendered.
-        -- We still render the BoE header even when the player holds zero
-        -- BoE equipment -- the overflow strip (where every pre-parked
-        -- empty slot button lives) anchors to BoE's lane, so any item
-        -- that lands in a previously empty slot during combat visually
-        -- appears under "BoE" inside its half-width lane. ✿ ʕ •ᴥ•ʔ
+        -- ʕ •ᴥ•ʔ✿ BoE & Free Space bubble: bubble the BoE category followed
+        -- by all Free Space categories to the absolute tail of the priority order. ✿ ʕ •ᴥ•ʔ
         local reordered = {}
         for _, catName in ipairs(categoryOrder) do
-            if catName ~= "BoE" then
+            if catName ~= "BoE" and not string.match(catName, "^Free Space") then
                 table.insert(reordered, catName)
             end
         end
         categories["BoE"] = categories["BoE"] or {}
         table.insert(reordered, "BoE")
+        for _, catName in ipairs(categoryOrder) do
+            if string.match(catName, "^Free Space") then
+                table.insert(reordered, catName)
+            end
+        end
         categoryOrder = reordered
 
         if IsMerchantOpen() then

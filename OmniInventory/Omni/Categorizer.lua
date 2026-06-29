@@ -537,6 +537,13 @@ function Categorizer:RegisterCategory(name, priority, icon, color, filterFunc)
 end
 
 function Categorizer:GetCategoryInfo(name)
+    if name and (name == "Free Space" or string.match(name, "^Free Space")) then
+        return {
+            name = name,
+            priority = 150,
+            color = { r = 0.5, g = 0.5, b = 0.5 },
+        }
+    end
     return categories[name] or {
         name = name,
         priority = 99,
@@ -601,6 +608,7 @@ function Categorizer:Init()
     self:RegisterCategory("Glyphs", 18, nil, CATEGORY_COLORS["Glyphs"])
     self:RegisterCategory("Junk", 90, nil, CATEGORY_COLORS["Junk"])
     self:RegisterCategory("Miscellaneous", 99, nil, CATEGORY_COLORS["Miscellaneous"])
+    self:RegisterCategory("Free Space", 150, nil, CATEGORY_COLORS["Free Space"] or { r = 0.5, g = 0.5, b = 0.5 })
 
     -- Initialize manual overrides
     OmniInventoryDB = OmniInventoryDB or {}
