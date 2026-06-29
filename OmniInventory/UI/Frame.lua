@@ -2584,6 +2584,45 @@ local function ShowFooterMoneyTooltip(owner)
         1, 1, 1
     )
 
+    -- Alt Gold Breakdown
+    local realmName = GetRealmName()
+    local realmData = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+    if realmData then
+        local alts = {}
+        local totalGold = 0
+        local currentPlayer = UnitName("player")
+        for charName, charData in pairs(realmData) do
+            local gold = charData.gold or 0
+            totalGold = totalGold + gold
+            table.insert(alts, { name = charName, gold = gold, isCurrent = (charName == currentPlayer) })
+        end
+
+        if #alts > 1 then
+            table.sort(alts, function(a, b)
+                if a.isCurrent ~= b.isCurrent then
+                    return a.isCurrent
+                end
+                return a.name < b.name
+            end)
+
+            GameTooltip:AddLine(" ")
+            GameTooltip:AddLine("Characters", 0.6, 0.85, 1)
+            for _, alt in ipairs(alts) do
+                local nameStr = alt.name
+                if alt.isCurrent then
+                    nameStr = "|cfffffffff" .. nameStr .. " (You)|r"
+                else
+                    nameStr = "|cff00ff9a" .. nameStr .. "|r"
+                end
+                local formatted = Omni.Utils and Omni.Utils.FormatMoney and Omni.Utils:FormatMoney(alt.gold) or (math.floor(alt.gold / 10000) .. "g")
+                GameTooltip:AddDoubleLine(nameStr, formatted, 1, 1, 1, 1, 1, 1)
+            end
+            GameTooltip:AddLine(" ")
+            local totalFormatted = Omni.Utils and Omni.Utils.FormatMoney and Omni.Utils:FormatMoney(totalGold) or (math.floor(totalGold / 10000) .. "g")
+            GameTooltip:AddDoubleLine("|cffc7c7cfTotal Gold|r", totalFormatted, 1, 0.85, 0.25, 1, 1, 1)
+        end
+    end
+
     local currencies = CollectTooltipCurrencies()
     if #currencies > 0 then
         GameTooltip:AddLine(" ")
