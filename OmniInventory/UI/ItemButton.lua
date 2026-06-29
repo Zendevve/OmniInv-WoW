@@ -598,14 +598,12 @@ function ItemButton:Create(parent)
     local ag = button.newGlow:CreateAnimationGroup()
     
     local anim1 = ag:CreateAnimation("Alpha")
-    anim1:SetFromAlpha(1.0)
-    anim1:SetToAlpha(0.2)
+    anim1:SetChange(-0.8)
     anim1:SetDuration(0.8)
     anim1:SetOrder(1)
     
     local anim2 = ag:CreateAnimation("Alpha")
-    anim2:SetFromAlpha(0.2)
-    anim2:SetToAlpha(1.0)
+    anim2:SetChange(0.8)
     anim2:SetDuration(0.8)
     anim2:SetOrder(2)
     
