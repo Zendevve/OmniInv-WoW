@@ -1,0 +1,554 @@
+-- =============================================================================
+-- OmniInventory Smart Categorization Engine
+-- =============================================================================
+-- Purpose: Automatically assign items to logical categories using a
+-- priority-based pipeline (Quest > Equipment > Consumables > etc.)
+-- =============================================================================
+
+local addonName, Omni = ...
+
+Omni.Categorizer = {}
+local Categorizer = Omni.Categorizer
+
+-- =============================================================================
+-- Category Registry
+-- =============================================================================
+
+local categories = {}  -- { name = { priority, icon, color, filter } }
+local categoryOrder = {}  -- Sorted by priority
+
+local TOOLS_ITEMS = {
+    [7453] = true,
+    [45120] = true,
+    [6256] = true,
+    [6366] = true,
+    [6367] = true,
+    [6365] = true,
+    [25978] = true,
+    [44050] = true,
+    [45991] = true,
+    [45858] = true,
+    [15846] = true,
+    [45992] = true,
+    [19970] = true,
+    [7005] = true,
+    [2901] = true,
+    [5956] = true,
+    [6219] = true,
+    [10498] = true,
+    [20815] = true,
+    [20824] = true,
+    [39505] = true,
+    [6218] = true,
+    [6339] = true,
+    [11130] = true,
+    [11145] = true,
+    [16207] = true,
+    [22461] = true,
+    [22462] = true,
+    [22463] = true,
+    [44452] = true,
+    [40772] = true,
+    [23821] = true,
+    [9149] = true,
+    [13503] = true,
+    [35751] = true,
+    [35748] = true,
+    [35750] = true,
+    [35749] = true,
+    [44322] = true,
+    [44323] = true,
+    [44324] = true,
+    [49040] = true,
+    [6948] = true,
+    [40768] = true,
+    [6265] = true,
+    [22057] = true,
+    [12534] = true,
+    [10818] = true,
+    [19931] = true,
+    [21986] = true,
+    [49633] = true,
+    [49634] = true,
+    [60274] = true,
+}
+
+-- =============================================================================
+-- New Items Tracking (Session-based)
+-- =============================================================================
+
+local sessionItems = {}  -- Items present at login
+local newItems = {}      -- Items acquired this session
+
+local function SnapshotInventory()
+    sessionItems = {}
+    local API = Omni.API
+    for bagID = 0, 4 do
+        local numSlots = GetContainerNumSlots(bagID) or 0
+        for slot = 1, numSlots do
+            local link = API and API:GetItemLinkBySlot(bagID, slot) or GetContainerItemLink(bagID, slot)
+            if link then
+                local itemID = API and API:GetIdFromLink(link) or tonumber(string.match(link, "item:(%d+)"))
+                if itemID then
+                    sessionItems[itemID] = true
+                end
+            end
+        end
+    end
+end
+
+-- Public API for new item tracking
+function Categorizer:IsNewItem(itemID)
+    if not itemID then return false end
+    return newItems[itemID] == true
+end
+
+function Categorizer:MarkAsNew(itemID)
+    if itemID and not sessionItems[itemID] then
+        newItems[itemID] = true
+    end
+end
+
+function Categorizer:ClearNewItem(itemID)
+    if itemID then
+        newItems[itemID] = nil
+    end
+end
+
+function Categorizer:ClearAllNewItems()
+    newItems = {}
+end
+
+function Categorizer:SnapshotInventory()
+    SnapshotInventory()
+end
+
+-- =============================================================================
+-- Perishable Items Registry
+-- =============================================================================
+-- ʕ •ᴥ•ʔ✿ Time-limited items that must be turned in before they expire ✿ ʕ •ᴥ•ʔ
+
+local PERISHABLE_ITEMS = {
+    [50289] = true,  -- Blacktip Shark (1 hour turn-in)
+}
+
+function Categorizer:IsPerishableItem(itemID)
+    if not itemID then return false end
+    if PERISHABLE_ITEMS[itemID] then return true end
+    if OmniInventoryDB and OmniInventoryDB.perishableItems
+        and OmniInventoryDB.perishableItems[itemID] then
+        return true
+    end
+    return false
+end
+
+function Categorizer:AddPerishableItem(itemID)
+    if not itemID then return end
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.perishableItems = OmniInventoryDB.perishableItems or {}
+    OmniInventoryDB.perishableItems[itemID] = true
+end
+
+function Categorizer:RemovePerishableItem(itemID)
+    if not itemID then return end
+    if OmniInventoryDB and OmniInventoryDB.perishableItems then
+        OmniInventoryDB.perishableItems[itemID] = nil
+    end
+end
+
+-- =============================================================================
+-- Category Filters
+-- =============================================================================
+
+-- Check if item is a quest item
+local function IsQuestItem(itemInfo)
+    if not itemInfo or not itemInfo.bagID or not itemInfo.slotID then
+        return false
+    end
+
+    -- GetContainerItemQuestInfo was added in 3.3.3
+    local isQuestItem, questId, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+    return isQuestItem or false
+end
+
+-- ʕ •ᴥ•ʔ✿ Native-first equipment manager membership check ✿ ʕ •ᴥ•ʔ
+local function IsEquipmentSetItem(itemInfo)
+    if not itemInfo then return false end
+
+    -- Preferred path: ask the C extension about this exact slot instance.
+    local API = Omni.API
+    if API and itemInfo.bagID and itemInfo.slotID then
+        local inSet = API:IsItemInEquipmentSet(itemInfo.bagID, itemInfo.slotID)
+        if inSet ~= nil then
+            return inSet
+        end
+    end
+
+    -- Fallback: iterate saved sets by itemID (slower, misses specific instances).
+    if not itemInfo.hyperlink then return false end
+
+    local numSets = GetNumEquipmentSets and GetNumEquipmentSets() or 0
+    for i = 1, numSets do
+        local name = GetEquipmentSetInfo(i)
+        if name then
+            local itemIDs = GetEquipmentSetItemIDs(name)
+            if itemIDs then
+                for _, itemID in pairs(itemIDs) do
+                    if itemID == itemInfo.itemID then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+local function GetItemID(itemInfo)
+    if not itemInfo then
+        return nil
+    end
+    if itemInfo.itemID then
+        return itemInfo.itemID
+    end
+    if itemInfo.hyperlink then
+        if Omni.API then
+            return Omni.API:GetIdFromLink(itemInfo.hyperlink)
+        end
+        return tonumber(string.match(itemInfo.hyperlink, "item:(%d+)"))
+    end
+    return nil
+end
+
+
+-- Get item type fields from itemInfo or GetItemInfo fallback
+local function GetItemTypeInfo(itemInfo)
+    if not itemInfo then
+        return nil, nil, nil
+    end
+
+    local itemType = itemInfo.itemType
+    local itemSubType = itemInfo.itemSubType
+    local equipSlot = itemInfo.equipSlot
+
+    if itemType then
+        return itemType, itemSubType, equipSlot
+    end
+
+    if not itemInfo.hyperlink then
+        return nil, nil, nil
+    end
+
+    local _, _, _, _, _, resolvedType, resolvedSubType, _, resolvedEquipSlot = GetItemInfo(itemInfo.hyperlink)
+    return resolvedType, resolvedSubType, resolvedEquipSlot
+end
+
+local function IsEquipmentItem(itemInfo)
+    local itemType, _, equipSlot = GetItemTypeInfo(itemInfo)
+    if equipSlot and equipSlot ~= "" and equipSlot ~= "INVTYPE_BAG" and equipSlot ~= "INVTYPE_QUIVER" then
+        return true
+    end
+
+    -- Fallback for uncached equip slots
+    return itemType == "Armor" or itemType == "Weapon"
+end
+
+local function IsBoEItem(itemInfo)
+    if not itemInfo then
+        return false
+    end
+    if itemInfo.bindType ~= "BoE" then
+        return false
+    end
+    return IsEquipmentItem(itemInfo)
+end
+
+
+local function IsToolsItem(itemInfo)
+    local itemID = GetItemID(itemInfo)
+    if not itemID then
+        return false
+    end
+    return TOOLS_ITEMS[itemID] == true
+end
+
+
+-- =============================================================================
+-- Heuristic Classification
+-- =============================================================================
+
+local TYPE_TO_CATEGORY = {
+    -- Main types
+    ["Armor"]         = "Equipment",
+    ["Weapon"]        = "Equipment",
+    ["Consumable"]    = "Consumables",
+    ["Trade Goods"]   = "Trade Goods",
+    ["Reagent"]       = "Reagents",
+    ["Recipe"]        = "Trade Goods",
+    ["Gem"]           = "Trade Goods",
+    ["Quest"]         = "Quest Items",
+    ["Key"]           = "Keys",
+    ["Miscellaneous"] = "Miscellaneous",
+    ["Container"]     = "Bags",
+    ["Projectile"]    = "Ammo",
+    ["Quiver"]        = "Bags",
+    ["Glyph"]         = "Glyphs",
+
+    -- Subtypes (for more specific matching)
+    ["Potion"]        = "Consumables",
+    ["Elixir"]        = "Consumables",
+    ["Flask"]         = "Consumables",
+    ["Food & Drink"]  = "Consumables",
+    ["Bandage"]       = "Consumables",
+    ["Scroll"]        = "Consumables",
+    ["Other"]         = "Consumables",  -- Consumable subtype
+    ["Leather"]       = "Trade Goods",
+    ["Metal & Stone"] = "Trade Goods",
+    ["Cloth"]         = "Trade Goods",
+    ["Herb"]          = "Trade Goods",
+    ["Enchanting"]    = "Trade Goods",
+    ["Jewelcrafting"] = "Trade Goods",
+    ["Parts"]         = "Trade Goods",
+    ["Devices"]       = "Trade Goods",
+    ["Explosives"]    = "Trade Goods",
+    ["Mount"]         = "Miscellaneous",
+    ["Companion Pets"] = "Miscellaneous",
+    ["Holiday"]       = "Miscellaneous",
+}
+
+local function ClassifyByItemType(itemInfo)
+    local itemType, itemSubType = GetItemTypeInfo(itemInfo)
+
+    if not itemType then
+        return "Miscellaneous"
+    end
+
+    -- Equipment must win over subtype names like "Cloth"/"Leather".
+    if IsEquipmentItem(itemInfo) then
+        return "Equipment"
+    end
+
+    -- These top-level types are unambiguous.
+    if itemType == "Trade Goods" then return "Trade Goods" end
+    if itemType == "Reagent" then return "Reagents" end
+    if itemType == "Container" then return "Bags" end
+    if itemType == "Projectile" then return "Ammo" end
+    if itemType == "Glyph" then return "Glyphs" end
+    if itemType == "Quest" then return "Quest Items" end
+    if itemType == "Key" then return "Keys" end
+
+    -- Check subtype first for more specific classification
+    if itemSubType then
+        local subCategory = TYPE_TO_CATEGORY[itemSubType]
+        if subCategory then
+            return subCategory
+        end
+    end
+
+    -- Fallback to main type
+    return TYPE_TO_CATEGORY[itemType] or "Miscellaneous"
+end
+
+-- =============================================================================
+-- Priority Pipeline
+-- =============================================================================
+
+function Categorizer:GetCategory(itemInfo)
+    local perfToken = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("categorizer.GetCategory")
+    if not itemInfo then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Miscellaneous"
+    end
+
+    -- Priority 1: Manual Override
+    if itemInfo.itemID and OmniInventoryDB and OmniInventoryDB.categoryOverrides then
+        local override = OmniInventoryDB.categoryOverrides[itemInfo.itemID]
+        if override then
+            if Omni._perfEnabled and Omni.Perf then
+                Omni.Perf:End("categorizer.GetCategory", perfToken)
+            end
+            return override
+        end
+    end
+
+    -- ʕ ● ᴥ ●ʔ Custom Rules Engine disabled — module is no longer loaded (see OmniInventory.toc)
+
+    -- Priority 1.75: Perishable / time-limited turn-in items
+    if self:IsPerishableItem(GetItemID(itemInfo)) then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Perishable"
+    end
+
+
+
+    -- Priority 2: Quest Items
+    if IsQuestItem(itemInfo) then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Quest Items"
+    end
+
+
+    -- Priority 4: Equipment Sets
+    if IsEquipmentSetItem(itemInfo) then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Equipment Sets"
+    end
+
+
+    -- Prio 5 : Tools
+    if IsToolsItem(itemInfo) then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Tools"
+    end
+
+    -- Priority 6: BoE equipment
+    if IsBoEItem(itemInfo) then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "BoE"
+    end
+
+
+    -- Priority 88: Check quality for junk
+    if itemInfo.quality == 0 then
+        if Omni._perfEnabled and Omni.Perf then
+            Omni.Perf:End("categorizer.GetCategory", perfToken)
+        end
+        return "Junk"
+    end
+
+    
+
+    -- Priority 10+: Heuristic classification
+    local out = ClassifyByItemType(itemInfo)
+    if Omni._perfEnabled and Omni.Perf then
+        Omni.Perf:End("categorizer.GetCategory", perfToken, { result = out })
+    end
+    return out
+end
+
+-- =============================================================================
+-- Manual Override Management
+-- =============================================================================
+
+function Categorizer:SetManualOverride(itemID, categoryName)
+    if not itemID or not categoryName then return end
+
+    OmniInventoryDB.categoryOverrides = OmniInventoryDB.categoryOverrides or {}
+    OmniInventoryDB.categoryOverrides[itemID] = categoryName
+end
+
+function Categorizer:ClearManualOverride(itemID)
+    if not itemID then return end
+
+    if OmniInventoryDB and OmniInventoryDB.categoryOverrides then
+        OmniInventoryDB.categoryOverrides[itemID] = nil
+    end
+end
+
+-- =============================================================================
+-- Category Registry
+-- =============================================================================
+
+function Categorizer:RegisterCategory(name, priority, icon, color, filterFunc)
+    categories[name] = {
+        name = name,
+        priority = priority,
+        icon = icon,
+        color = color or CATEGORY_COLORS[name] or { r = 0.5, g = 0.5, b = 0.5 },
+        filter = filterFunc,
+    }
+
+    -- Rebuild sorted order
+    categoryOrder = {}
+    for catName, catDef in pairs(categories) do
+        table.insert(categoryOrder, catDef)
+    end
+    table.sort(categoryOrder, function(a, b)
+        return a.priority < b.priority
+    end)
+end
+
+function Categorizer:GetCategoryInfo(name)
+    return categories[name] or {
+        name = name,
+        priority = 99,
+        color = CATEGORY_COLORS[name] or { r = 0.5, g = 0.5, b = 0.5 },
+    }
+end
+
+function Categorizer:GetAllCategories()
+    return categoryOrder
+end
+
+function Categorizer:GetCategoryColor(name)
+    local info = self:GetCategoryInfo(name)
+    return info.color.r, info.color.g, info.color.b
+end
+
+-- =============================================================================
+-- Categorize All Items
+-- =============================================================================
+
+function Categorizer:CategorizeItems(items)
+    local perfToken = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("categorizer.CategorizeItems")
+    local categorized = {}  -- { categoryName = { items } }
+
+    for _, itemInfo in ipairs(items) do
+        local category = self:GetCategory(itemInfo)
+
+        if not categorized[category] then
+            categorized[category] = {}
+        end
+
+        itemInfo.category = category
+        table.insert(categorized[category], itemInfo)
+    end
+
+    if Omni._perfEnabled and Omni.Perf then
+        Omni.Perf:End("categorizer.CategorizeItems", perfToken, { itemCount = items and #items or 0 })
+    end
+    return categorized
+end
+
+-- =============================================================================
+-- Initialization
+-- =============================================================================
+
+function Categorizer:Init()
+    self:RegisterCategory("Perishable", 1, nil, CATEGORY_COLORS["Perishable"])
+    self:RegisterCategory("Quest Items", 2, nil, CATEGORY_COLORS["Quest Items"])
+    self:RegisterCategory("Equipment Sets", 4, nil, CATEGORY_COLORS["Equipment Sets"])
+    self:RegisterCategory("BoE", 5, nil, CATEGORY_COLORS["BoE"])
+    self:RegisterCategory("New Items", 6, nil, CATEGORY_COLORS["New Items"])
+    self:RegisterCategory("Equipment", 10, nil, CATEGORY_COLORS["Equipment"])
+    self:RegisterCategory("Consumables", 11, nil, CATEGORY_COLORS["Consumables"])
+    self:RegisterCategory("Trade Goods", 12, nil, CATEGORY_COLORS["Trade Goods"])
+    self:RegisterCategory("Reagents", 13, nil, CATEGORY_COLORS["Reagents"])
+    self:RegisterCategory("Tools", 14, nil, CATEGORY_COLORS["Tools"])
+    self:RegisterCategory("Keys", 15, nil, CATEGORY_COLORS["Keys"])
+    self:RegisterCategory("Bags", 16, nil, CATEGORY_COLORS["Bags"])
+    self:RegisterCategory("Ammo", 17, nil, CATEGORY_COLORS["Ammo"])
+    self:RegisterCategory("Glyphs", 18, nil, CATEGORY_COLORS["Glyphs"])
+    self:RegisterCategory("Junk", 90, nil, CATEGORY_COLORS["Junk"])
+    self:RegisterCategory("Miscellaneous", 99, nil, CATEGORY_COLORS["Miscellaneous"])
+
+    -- Initialize manual overrides
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.categoryOverrides = OmniInventoryDB.categoryOverrides or {}
+    OmniInventoryDB.perishableItems = OmniInventoryDB.perishableItems or {}
+end
+
+print("|cFF00FF00OmniInventory|r: Categorizer loaded")

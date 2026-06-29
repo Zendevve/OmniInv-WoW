@@ -1,2 +1,7 @@
-.kilo/
-references/
+# Reference materials
+refs/
+
+# OS/System files
+.DS_Store
+Thumbs.db
+Desktop.ini
