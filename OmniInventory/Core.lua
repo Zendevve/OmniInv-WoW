@@ -528,6 +528,28 @@ local function HandleSlashCommand(msg)
     elseif msg == "openclams" or msg == "clams" then
         StartClamOpener()
 
+    elseif msg == "currency" or msg == "currencies" then
+        if Omni.Features and Omni.Features.ToggleCurrencyFrame then
+            Omni.Features:ToggleCurrencyFrame()
+        end
+
+    elseif msg == "bankswitch" or msg == "switchbank" then
+        if Omni.Features and Omni.Features.CycleBankBagView then
+            Omni.Features:CycleBankBagView()
+        end
+
+    elseif msg == "tidy" then
+        if Omni.Features and Omni.Features.RunTidy then
+            Omni.Features:RunTidy()
+        end
+
+    elseif msg == "lock" then
+        if Omni.Features and Omni.Features.SetGlobalLock then
+            local locked = not Omni.Features:IsGlobalLocked()
+            Omni.Features:SetGlobalLock(locked)
+            print("|cFF00FF00OmniInventory|r: Global lock " .. (locked and "enabled" or "disabled") .. ".")
+        end
+
     elseif msg == "help" then
         print("|cFF00FF00OmniInventory|r Commands:")
         print("  |cFFFFFF00/oi|r - Toggle bags")
@@ -543,6 +565,10 @@ local function HandleSlashCommand(msg)
         print("  |cFFFFFF00/oi perf report|r - Print timing summary")
         print("  |cFFFFFF00/oi perf dump|r - Print JSON snapshot markers")
         print("  |cFFFFFF00/oi reapply|r - Re-apply bag function overrides")
+        print("  |cFFFFFF00/oi currency|r - Toggle currency frame")
+        print("  |cFFFFFF00/oi bankswitch|r - Cycle bank bag view")
+        print("  |cFFFFFF00/oi tidy|r - Run auto-tidy (sort + compact)")
+        print("  |cFFFFFF00/oi lock|r - Toggle global lock (pause updates)")
 
     else
         SafeToggle("slash")

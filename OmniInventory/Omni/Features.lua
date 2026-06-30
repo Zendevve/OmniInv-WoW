@@ -423,6 +423,180 @@ function Features:ApplyItemFixes(itemInfo)
 end
 
 -- =============================================================================
+-- Currency Frame (A35)
+-- =============================================================================
+-- Dedicated currency display frame showing tracked currencies in the bag frame.
+-- Reuses the existing TRACKED_TOOLTIP_CURRENCIES from Frame.lua via a standalone
+-- popup so users can see their emblem/seal counts without hovering the footer.
+
+local currencyFrame
+
+function Features:GetCurrencyFrame()
+    return currencyFrame
+end
+
+function Features:CreateCurrencyFrame()
+    if currencyFrame then return currencyFrame end
+    if not Omni.Frame then return nil end
+
+    currencyFrame = CreateFrame("Frame", "OmniCurrencyFrame", UIParent)
+    currencyFrame:SetSize(220, 180)
+    currencyFrame:SetFrameStrata("DIALOG")
+    currencyFrame:SetClampedToScreen(true)
+    currencyFrame:EnableMouse(true)
+    currencyFrame:SetMovable(true)
+    currencyFrame:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8X8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    currencyFrame:SetBackdropColor(0.08, 0.08, 0.08, 0.95)
+    currencyFrame:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+
+    currencyFrame.title = currencyFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    currencyFrame.title:SetPoint("TOPLEFT", 8, -6)
+    currencyFrame.title:SetText("|cFFFFCC00Currencies|r")
+
+    currencyFrame.closeBtn = CreateFrame("Button", nil, currencyFrame, "UIPanelCloseButton")
+    currencyFrame.closeBtn:SetSize(18, 18)
+    currencyFrame.closeBtn:SetPoint("TOPRIGHT", -2, -2)
+    currencyFrame.closeBtn:SetScript("OnClick", function() currencyFrame:Hide() end)
+
+    currencyFrame.rows = {}
+    currencyFrame:Hide()
+
+    tinsert(UISpecialFrames, "OmniCurrencyFrame")
+
+    return currencyFrame
+end
+
+function Features:UpdateCurrencyFrame()
+    if not currencyFrame or not currencyFrame:IsShown() then return end
+
+    -- Reuse Frame.lua's currency collectors via the Omni namespace if available
+    local rows = {}
+    -- Honor + Arena
+    if GetHonorCurrency then
+        local honor = select(1, GetHonorCurrency())
+        if type(honor) == "number" and honor > 0 then
+            rows[#rows + 1] = { label = "Honor Points", value = honor, icon = "Interface\\Icons\\inv_bannerpvp_01" }
+        end
+    end
+    if GetArenaCurrency then
+        local a = GetArenaCurrency()
+        if type(a) == "number" and a > 0 then
+            rows[#rows + 1] = { label = "Arena Points", value = a, icon = "Interface\\Icons\\achievement_pvp_h_14" }
+        end
+    end
+    -- Tracked item currencies (mirror Frame.lua DIM.TRACKED_TOOLTIP_CURRENCIES)
+    local tracked = {
+        { label = "Emblem of Frost",           itemID = 49426 },
+        { label = "Emblem of Triumph",         itemID = 47241 },
+        { label = "Emblem of Conquest",        itemID = 45624 },
+        { label = "Emblem of Valor",           itemID = 40753 },
+        { label = "Emblem of Heroism",         itemID = 40752 },
+        { label = "Badge of Justice",          itemID = 29434 },
+        { label = "Champion's Seal",           itemID = 24131 },
+        { label = "Venture Coin",              itemID = 37836 },
+        { label = "Wintergrasp Mark of Honor", itemID = 43589 },
+        { label = "Stone Keeper's Shard",      itemID = 43228 },
+    }
+    for _, entry in ipairs(tracked) do
+        if GetItemCount then
+            local count = GetItemCount(entry.itemID, true) or 0
+            if count > 0 then
+                rows[#rows + 1] = { label = entry.label, value = count, itemID = entry.itemID }
+            end
+        end
+    end
+
+    -- Render rows
+    for i = 1, #rows do
+        local row = currencyFrame.rows[i]
+        if not row then
+            row = CreateFrame("Frame", nil, currencyFrame)
+            row:SetHeight(18)
+            row:SetPoint("LEFT", 8, 0)
+            row:SetPoint("RIGHT", -8, 0)
+            row.icon = row:CreateTexture(nil, "ARTWORK")
+            row.icon:SetSize(14, 14)
+            row.icon:SetPoint("LEFT", 0, 0)
+            row.label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.label:SetPoint("LEFT", row.icon, "RIGHT", 4, 0)
+            row.label:SetJustifyH("LEFT")
+            row.value = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+            row.value:SetPoint("RIGHT", 0, 0)
+            row.value:SetJustifyH("RIGHT")
+            row.value:SetTextColor(1, 0.85, 0.25)
+            currencyFrame.rows[i] = row
+        end
+        local yOffset = -24 - ((i - 1) * 20)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", currencyFrame, "TOPLEFT", 8, yOffset)
+        row:SetPoint("TOPRIGHT", currencyFrame, "TOPRIGHT", -8, yOffset)
+        local icon = rows[i].icon
+        if not icon and rows[i].itemID and GetItemIcon then
+            icon = GetItemIcon(rows[i].itemID)
+        end
+        if icon then
+            row.icon:SetTexture(icon)
+            row.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+            row.icon:Show()
+        else
+            row.icon:Hide()
+        end
+        row.label:SetText(rows[i].label)
+        row.value:SetText(tostring(rows[i].value))
+        row:Show()
+    end
+    for i = #rows + 1, #currencyFrame.rows do
+        currencyFrame.rows[i]:Hide()
+    end
+
+    local height = 24 + (#rows * 20) + 12
+    currencyFrame:SetHeight(math.max(height, 40))
+end
+
+function Features:ToggleCurrencyFrame()
+    if not currencyFrame then
+        self:CreateCurrencyFrame()
+    end
+    if not currencyFrame then return end
+    if currencyFrame:IsShown() then
+        currencyFrame:Hide()
+    else
+        self:UpdateCurrencyFrame()
+        currencyFrame:Show()
+    end
+end
+
+-- =============================================================================
+-- Bank Switcher (A39)
+-- =============================================================================
+-- Switches between bank bag views. Provides a dropdown/cycle to view
+-- individual bank bags (5-11) or the main bank (-1) or all.
+
+function Features:CycleBankBagView()
+    if not Omni.BankFrame then return end
+    -- Cycle: all -> -1 -> 5 -> 6 -> ... -> 11 -> all
+    local current = OmniInventoryDB and OmniInventoryDB.char
+        and OmniInventoryDB.char.settings and OmniInventoryDB.char.settings.selectedBankBagID
+    local sequence = { nil, -1, 5, 6, 7, 8, 9, 10, 11 }
+    local idx = 1
+    for i, v in ipairs(sequence) do
+        if v == current then
+            idx = i
+            break
+        end
+    end
+    local nextVal = sequence[(idx % #sequence) + 1]
+    if Omni.BankFrame.SetBankBagFilter then
+        Omni.BankFrame:SetBankBagFilter(nextVal)
+    end
+end
+
+-- =============================================================================
 -- LDB Data Source/Launcher (A10)
 -- =============================================================================
 -- Registers a LibDataBroker data object if LibDataBroker is available.
