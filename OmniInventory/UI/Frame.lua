@@ -2092,12 +2092,12 @@ local FOOTER_CUSTOM_BUTTONS = {
         icon    = "Interface\\Icons\\INV_Misc_Rune_01",
         title   = "Hearthstone",
         sub     = "Left-click to cast Hearthstone. Right-click to pick up.",
-        onClick = function()
-            local bagID, slotID = FindHearthstone()
-            if bagID and slotID then
-                UseContainerItem(bagID, slotID)
-            else
-                print("|cFF00FF00OmniInventory|r: Hearthstone not found in bags.")
+        onClick = function(self, button)
+            if button == "RightButton" then
+                local bagID, slotID = FindHearthstone()
+                if bagID and slotID then
+                    PickupContainerItem(bagID, slotID)
+                end
             end
         end,
         onDragStart = function(self)
@@ -2129,14 +2129,6 @@ local FOOTER_CUSTOM_BUTTONS = {
         icon    = "Interface\\Icons\\INV_Misc_Clam_01",
         title   = "Openable Opener",
         sub     = "Uses the first openable container found (clams, lockboxes, crates).",
-        onClick = function()
-            local bagID, slotID = FindFirstOpenableContainer()
-            if bagID and slotID then
-                UseContainerItem(bagID, slotID)
-            else
-                print("|cFF00FF00OmniInventory|r: No openable containers found in bags.")
-            end
-        end,
         onEnter = function(self)
             self:SetBackdropBorderColor(0.9, 0.8, 0.2, 1)
             local bagID, slotID = FindFirstOpenableContainer()
@@ -2162,9 +2154,6 @@ local FOOTER_CUSTOM_BUTTONS = {
         isAvailable = function()
             return HasSpell("Disenchant")
         end,
-        onClick = function()
-            CastSpellByName("Disenchant")
-        end,
     },
     {
         key     = "picklock",
@@ -2173,9 +2162,6 @@ local FOOTER_CUSTOM_BUTTONS = {
         sub     = "Changes cursor to pick a lockbox in your bags.",
         isAvailable = function()
             return HasSpell("Pick Lock")
-        end,
-        onClick = function()
-            CastSpellByName("Pick Lock")
         end,
     },
 }
@@ -2263,8 +2249,32 @@ local function StyleFooterMiniButton(btn)
 end
 
 local function CreateFooterMiniButton(parent, def)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(DIM.FOOTER_BTN_SIZE, DIM.FOOTER_BTN_SIZE)
+    local btn = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
+    btn:RegisterForClicks("AnyUp")
+
+    if def.key == "hearthstone" then
+        btn:SetAttribute("type1", "item")
+        btn:SetAttribute("item1", "item:6948")
+    elseif def.key == "disenchant" then
+        btn:SetAttribute("type1", "spell")
+        btn:SetAttribute("spell1", "Disenchant")
+    elseif def.key == "picklock" then
+        btn:SetAttribute("type1", "spell")
+        btn:SetAttribute("spell1", "Pick Lock")
+    elseif def.key == "openables" then
+        btn:SetScript("PreClick", function(self)
+            if not InCombatLockdown() then
+                local bagID, slotID = FindFirstOpenableContainer()
+                if bagID and slotID then
+                    self:SetAttribute("type1", "item")
+                    self:SetAttribute("item1", bagID .. " " .. slotID)
+                else
+                    self:SetAttribute("type1", nil)
+                    self:SetAttribute("item1", nil)
+                end
+            end
+        end)
+    end
 
     local trim = def.trimIcon ~= false
     btn:SetNormalTexture(def.icon)
@@ -2304,8 +2314,13 @@ local function CreateFooterMiniButton(parent, def)
     end)
 
     if type(def.onClick) == "function" then
-        btn:SetScript("OnClick", def.onClick)
-    else
+        btn:SetScript("OnClick", function(self, button, down)
+            if button == "LeftButton" and (def.key == "hearthstone" or def.key == "disenchant" or def.key == "picklock" or def.key == "openables") then
+                return
+            end
+            def.onClick(self, button, down)
+        end)
+    elseif type(def.fn) == "string" then
         btn.__openFn = def.fn
         btn.__closeFn = def.fn:gsub("^Open", "Close")
         btn.__toggleFrame = def.toggleFrame
