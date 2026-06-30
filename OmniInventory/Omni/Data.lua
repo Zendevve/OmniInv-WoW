@@ -215,16 +215,43 @@ function Data:SaveCharacterInventory()
 
     char.gold = GetMoney()
     char.lastSeen = time()
+    char.level = UnitLevel("player")
 
     char.bags = {}
+    char.bagSizes = char.bagSizes or {}
     for bagID = 0, 4 do
-        local numSlots = GetContainerNumSlots(bagID)
+        local numSlots = GetContainerNumSlots(bagID) or 0
+        char.bagSizes[tostring(bagID)] = numSlots
         for slot = 1, numSlots do
             local link = FetchLink(bagID, slot)
             if link then
                 local _, count = GetContainerItemInfo(bagID, slot)
-                table.insert(char.bags, { link = link, count = count or 1 })
+                local _, _, quality = GetItemInfo(link)
+                table.insert(char.bags, {
+                    bagID = bagID,
+                    slotID = slot,
+                    link = link,
+                    count = count or 1,
+                    quality = quality or 0
+                })
             end
+        end
+    end
+
+    -- Keyring
+    local keyringSlots = GetContainerNumSlots(-2) or 0
+    char.bagSizes["-2"] = keyringSlots
+    for slot = 1, keyringSlots do
+        local link = FetchLink(-2, slot)
+        if link then
+            local _, count = GetContainerItemInfo(-2, slot)
+            table.insert(char.bags, {
+                bagID = -2,
+                slotID = slot,
+                link = link,
+                count = count or 1,
+                quality = 0
+            })
         end
     end
 end
@@ -235,23 +262,40 @@ function Data:SaveBankItems()
     if not char then return end
 
     char.bank = {}
+    char.bagSizes = char.bagSizes or {}
 
-    local numSlots = GetContainerNumSlots(-1)
+    local numSlots = GetContainerNumSlots(-1) or 0
+    char.bagSizes["-1"] = numSlots
     for slot = 1, numSlots do
         local link = FetchLink(-1, slot)
         if link then
             local _, count = GetContainerItemInfo(-1, slot)
-            table.insert(char.bank, { link = link, count = count or 1 })
+            local _, _, quality = GetItemInfo(link)
+            table.insert(char.bank, {
+                bagID = -1,
+                slotID = slot,
+                link = link,
+                count = count or 1,
+                quality = quality or 0
+            })
         end
     end
 
     for bagID = 5, 11 do
-        local numSlots = GetContainerNumSlots(bagID)
+        local numSlots = GetContainerNumSlots(bagID) or 0
+        char.bagSizes[tostring(bagID)] = numSlots
         for slot = 1, numSlots do
             local link = FetchLink(bagID, slot)
             if link then
                 local _, count = GetContainerItemInfo(bagID, slot)
-                table.insert(char.bank, { link = link, count = count or 1 })
+                local _, _, quality = GetItemInfo(link)
+                table.insert(char.bank, {
+                    bagID = bagID,
+                    slotID = slot,
+                    link = link,
+                    count = count or 1,
+                    quality = quality or 0
+                })
             end
         end
     end

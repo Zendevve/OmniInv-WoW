@@ -180,6 +180,38 @@ OmniC_Container = {}
 ---@param slotID number
 ---@return table|nil info Item info structure or nil if slot is empty
 function OmniC_Container.GetContainerItemInfo(bagID, slotID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local realmName = GetRealmName()
+        local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+        local charData = realm and realm[viewedChar]
+        local items = (bagID == -1 or (bagID >= 5 and bagID <= 11)) and charData and charData.bank or charData and charData.bags
+        if items then
+            for _, item in ipairs(items) do
+                if item.bagID == bagID and item.slotID == slotID then
+                    local texture = GetItemIcon(item.link)
+                    local itemID = tonumber(string.match(item.link, "item:(%d+)"))
+                    return {
+                        iconFileID = texture or "Interface\\Icons\\INV_Misc_QuestionMark",
+                        itemID = itemID,
+                        hyperlink = item.link,
+                        stackCount = math.max(1, tonumber(item.count) or 1),
+                        isLocked = false,
+                        isReadable = false,
+                        hasLoot = false,
+                        isBound = (item.quality and item.quality >= 3),
+                        bindType = nil,
+                        quality = item.quality or 1,
+                        bagID = bagID,
+                        slotID = slotID,
+                        __offline = true,
+                    }
+                end
+            end
+        end
+        return nil
+    end
+
     local texture, itemCount, locked, quality, readable, lootable, itemLink = GetContainerItemInfo(bagID, slotID)
 
     if not texture then
@@ -233,6 +265,20 @@ end
 ---@param bagID number
 ---@return number numSlots
 function OmniC_Container.GetContainerNumSlots(bagID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local realmName = GetRealmName()
+        local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+        local charData = realm and realm[viewedChar]
+        if charData and charData.bagSizes then
+            local size = charData.bagSizes[tostring(bagID)]
+            if size then return size end
+        end
+        if bagID == 0 then return 16
+        elseif bagID == -1 then return 28
+        elseif bagID == -2 then return 32
+        else return 0 end
+    end
     return GetContainerNumSlots(bagID) or 0
 end
 
@@ -241,6 +287,23 @@ end
 ---@return number freeSlots
 ---@return number bagType
 function OmniC_Container.GetContainerFreeSlots(bagID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local totalSlots = OmniC_Container.GetContainerNumSlots(bagID)
+        local used = 0
+        local realmName = GetRealmName()
+        local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+        local charData = realm and realm[viewedChar]
+        local items = (bagID == -1 or (bagID >= 5 and bagID <= 11)) and charData and charData.bank or charData and charData.bags
+        if items then
+            for _, item in ipairs(items) do
+                if item.bagID == bagID then
+                    used = used + 1
+                end
+            end
+        end
+        return math.max(0, totalSlots - used), 0
+    end
     local numFreeSlots, bagType = GetContainerNumFreeSlots(bagID)
     return numFreeSlots or 0, bagType or 0
 end

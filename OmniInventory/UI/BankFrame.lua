@@ -7,6 +7,38 @@
 
 local addonName, Omni = ...
 
+-- ʕ •ᴥ•ʔ✿ Offline Character Wrapper Redirections ✿ ʕ •ᴥ•ʔ
+local GetContainerNumSlots = function(bagID)
+    return OmniC_Container.GetContainerNumSlots(bagID)
+end
+
+local GetContainerNumFreeSlots = function(bagID)
+    return OmniC_Container.GetContainerFreeSlots(bagID)
+end
+
+local orig_GetContainerItemInfo = GetContainerItemInfo
+local GetContainerItemInfo = function(bagID, slotID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+        if info then
+            return info.iconFileID, info.stackCount, false, info.quality, false, false, info.hyperlink
+        end
+        return nil
+    end
+    return orig_GetContainerItemInfo(bagID, slotID)
+end
+
+local orig_GetContainerItemLink = GetContainerItemLink
+local GetContainerItemLink = function(bagID, slotID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+        return info and info.hyperlink
+    end
+    return orig_GetContainerItemLink(bagID, slotID)
+end
+
 Omni.BankFrame = {}
 local BankFrame = Omni.BankFrame
 
@@ -65,6 +97,9 @@ local function SetButtonItem(btn, itemInfo)
 end
 
 local function GetSharedItemScale()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bank", "itemScale", 1.0)
+    end
     if Omni.Frame and Omni.Frame.GetItemScale then
         return Omni.Frame:GetItemScale()
     end
@@ -72,6 +107,9 @@ local function GetSharedItemScale()
 end
 
 local function GetSharedItemGap()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bank", "itemGap", ITEM_SPACING)
+    end
     if Omni.Frame and Omni.Frame.GetItemGap then
         return Omni.Frame:GetItemGap()
     end
@@ -329,9 +367,30 @@ local function CreateHeader(parent)
     header.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
     header.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
 
-    header.title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header.title:SetPoint("LEFT", 6, 0)
-    header.title:SetText("|cFF00FF00Omni|r Bank")
+    local titleBtn = CreateFrame("Button", nil, header)
+    titleBtn:SetHeight(16)
+    titleBtn:SetPoint("LEFT", 6, 0)
+    
+    local titleText = titleBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    titleText:SetPoint("LEFT", 0, 0)
+    titleText:SetText("|cFF00FF00Omni|r Bank")
+    titleBtn:SetFontString(titleText)
+    titleBtn.text = titleText
+
+    titleBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("OmniInventory Characters", 1, 0.82, 0)
+        GameTooltip:AddLine("Left-click to select another character's bank to view offline.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    titleBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    titleBtn:SetScript("OnClick", function(self)
+        if Omni.Frame and Omni.Frame.OpenCharacterSelectMenu then
+            Omni.Frame.OpenCharacterSelectMenu(self)
+        end
+    end)
+
+    header.title = titleBtn
 
     header.closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
     header.closeBtn:SetSize(20, 20)
@@ -630,8 +689,7 @@ function BankFrame:CreateMainFrame()
     bankFrame:SetBackdropColor(0.05, 0.09, 0.08, 0.95)
     bankFrame:SetBackdropBorderColor(0.3, 0.55, 0.45, 1)
 
-    local scale = OmniInventoryDB and OmniInventoryDB.char
-        and OmniInventoryDB.char.settings and OmniInventoryDB.char.settings.scale
+    local scale = BankFrame:GetScale()
     bankFrame:SetScale(scale or 1)
 
     tinsert(UISpecialFrames, "OmniInventoryBankFrame")
@@ -1763,6 +1821,7 @@ end
 function BankFrame:UpdateLayout()
     local perfTotal = Omni._perfEnabled and Omni.Perf and Omni.Perf:Begin("bank.UpdateLayout.total")
     if not bankFrame or not bankFrame:IsShown() then return end
+    self:UpdateTitle()
 
     self:UpdateBankBagButtonIcons()
     self:UpdateBankBagButtonVisuals()
@@ -1843,20 +1902,8 @@ function BankFrame:ApplySearch(text)
     for _, btn in ipairs(itemButtons) do
         local info = btn.itemInfo
         local isMatch = false
-        if info and info.hyperlink then
-            local name = info.__cachedName
-            local lowerName = info.__cachedLowerName
-            if not name then
-                name = GetItemInfo(info.hyperlink)
-                info.__cachedName = name
-            end
-            if name and not lowerName then
-                lowerName = string.lower(name)
-                info.__cachedLowerName = lowerName
-            end
-            if lowerName and string.find(lowerName, lowerSearch, 1, true) then
-                isMatch = true
-            end
+        if info and Omni.MatchItemQuery then
+            isMatch = Omni.MatchItemQuery(info, searchText)
         end
         if Omni.ItemButton then
             Omni.ItemButton:SetSearchMatch(btn, isMatch)
@@ -1911,6 +1958,101 @@ end
 
 function BankFrame:Init()
     -- Frame is created lazily on first show
+end
+
+function BankFrame:UpdateTitle()
+    if not bankFrame or not bankFrame.header or not bankFrame.header.title then return end
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local colorStr = "FFFFFFFF"
+        local realm = OmniInventoryDB.realm[Omni.Data.realmName]
+        local charData = realm and realm[viewedChar]
+        if charData and charData.class then
+            local colorTable = RAID_CLASS_COLORS[charData.class]
+            if colorTable then
+                colorStr = string.format("FF%02x%02x%02x", colorTable.r * 255, colorTable.g * 255, colorTable.b * 255)
+            end
+        end
+        bankFrame.header.title.text:SetText(string.format("|c%s%s|r's Bank", colorStr, viewedChar))
+    else
+        bankFrame.header.title.text:SetText("|cFF00FF00Omni|r Bank")
+    end
+end
+
+function BankFrame:SetScale(scale)
+    if not bankFrame then return end
+    scale = math.max(0.5, math.min(scale or 1, 2.0))
+    bankFrame:SetScale(scale)
+
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bank", "scale", scale)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.scale = scale
+    end
+end
+
+function BankFrame:GetScale()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bank", "scale", 1.0)
+    end
+    if bankFrame and bankFrame.GetScale then
+        return bankFrame:GetScale()
+    end
+    local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
+    return settings and settings.scale or 1
+end
+
+function BankFrame:GetItemScale()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bank", "itemScale", 1.0)
+    end
+    local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
+    return settings and settings.itemScale or 1.0
+end
+
+function BankFrame:SetItemScale(scale)
+    if InCombat() then return false end
+    scale = math.max(0.5, math.min(scale or 1, 2.0))
+
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bank", "itemScale", scale)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.itemScale = scale
+    end
+
+    self:UpdateLayout()
+    return true
+end
+
+function BankFrame:GetItemGap()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bank", "itemGap", ITEM_SPACING)
+    end
+    local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
+    return settings and settings.itemGap or ITEM_SPACING
+end
+
+function BankFrame:SetItemGap(gap)
+    if InCombat() then return false end
+    gap = math.max(0, math.min(gap or ITEM_SPACING, 20))
+
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bank", "itemGap", gap)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.itemGap = gap
+    end
+
+    self:UpdateLayout()
+    return true
 end
 
 print("|cFF00FF00OmniInventory|r: BankFrame loaded")

@@ -810,6 +810,11 @@ function ItemButton:SetItem(button, itemInfo)
         return
     end
 
+    if itemInfo.__offline then
+        button:RegisterForClicks()
+    else
+        button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    end
     pcall(button.EnableMouse, button, true)
 
     local isPinned = itemInfo.itemID and Omni.Data and Omni.Data:IsPinned(itemInfo.itemID) or false
@@ -908,7 +913,12 @@ function ItemButton:SetItem(button, itemInfo)
     end
 
     -- Apply quick filter dimming or clear search dim
-    if itemInfo.isQuickFiltered then
+    if itemInfo.__offline then
+        button.dimOverlay:Hide()
+        button.icon:SetDesaturated(true)
+        button.icon:SetAlpha(0.65)
+        button.icon:SetVertexColor(1, 1, 1)
+    elseif itemInfo.isQuickFiltered then
         button.dimOverlay:Show()
         button.icon:SetDesaturated(true)
         button.icon:SetAlpha(0.4)
@@ -1169,7 +1179,7 @@ function ItemButton:OnEnter(button)
     end
 
     local shown = false
-    if IsLiveContainerFrameSlot(bagID, slotID) and slotID then
+    if not info.__offline and IsLiveContainerFrameSlot(bagID, slotID) and slotID then
         GameTooltip:SetBagItem(bagID, slotID)
         if GameTooltip.NumLines then
             shown = GameTooltip:NumLines() > 0
@@ -1180,7 +1190,11 @@ function ItemButton:OnEnter(button)
 
     if not shown and info.hyperlink then
         GameTooltip:SetHyperlink(info.hyperlink)
-        if not IsLiveContainerFrameSlot(bagID, slotID) then
+        if info.__offline then
+            GameTooltip:AddLine(" ")
+            local charName = Omni.Data and Omni.Data.currentViewedChar or "Unknown Character"
+            GameTooltip:AddLine("Offline Item (" .. charName .. ")", 0.5, 0.5, 0.5)
+        elseif not IsLiveContainerFrameSlot(bagID, slotID) then
             GameTooltip:AddLine(" ")
             GameTooltip:AddLine("Bank Item (Offline)", 0.5, 0.5, 0.5)
         end
@@ -1231,6 +1245,7 @@ function ItemButton:OnReceiveDrag() end
 function ItemButton:Reset(button)
     if not button then return end
 
+    button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     button.itemInfo = nil
     button.__lastRenderKey = nil
     button.__omniActionStateKey = nil

@@ -7,6 +7,38 @@
 
 local Omni = select(2, ...)
 
+-- ʕ •ᴥ•ʔ✿ Offline Character Wrapper Redirections ✿ ʕ •ᴥ•ʔ
+local GetContainerNumSlots = function(bagID)
+    return OmniC_Container.GetContainerNumSlots(bagID)
+end
+
+local GetContainerNumFreeSlots = function(bagID)
+    return OmniC_Container.GetContainerFreeSlots(bagID)
+end
+
+local orig_GetContainerItemInfo = GetContainerItemInfo
+local GetContainerItemInfo = function(bagID, slotID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+        if info then
+            return info.iconFileID, info.stackCount, false, info.quality, false, false, info.hyperlink
+        end
+        return nil
+    end
+    return orig_GetContainerItemInfo(bagID, slotID)
+end
+
+local orig_GetContainerItemLink = GetContainerItemLink
+local GetContainerItemLink = function(bagID, slotID)
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+        return info and info.hyperlink
+    end
+    return orig_GetContainerItemLink(bagID, slotID)
+end
+
 Omni.Frame = {}
 local Frame = Omni.Frame
 
@@ -731,6 +763,9 @@ local function GetSavedViewMode()
 end
 
 local function GetSavedItemScale()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bag", "itemScale", 1.0)
+    end
     local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
     local scale = settings and settings.itemScale
     if type(scale) ~= "number" then
@@ -740,6 +775,9 @@ local function GetSavedItemScale()
 end
 
 local function GetSavedItemGap()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bag", "itemGap", DIM.ITEM_SPACING)
+    end
     local settings = OmniInventoryDB and OmniInventoryDB.char and OmniInventoryDB.char.settings
     local gap = settings and settings.itemGap
     if type(gap) ~= "number" then
@@ -1097,10 +1135,30 @@ function Frame:CreateHeader()
     header.bg:SetTexture("Interface\\Buttons\\WHITE8X8")
     header.bg:SetVertexColor(0.15, 0.15, 0.15, 1)
 
-    header.title = header:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    header.title:SetPoint("LEFT", 6, 0)
-    header.title:SetJustifyH("LEFT")
-    header.title:SetText("|cFF00FF00Omni|rInventory")
+    local titleBtn = CreateFrame("Button", nil, header)
+    titleBtn:SetHeight(16)
+    titleBtn:SetPoint("LEFT", 6, 0)
+    
+    local titleText = titleBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    titleText:SetPoint("LEFT", 0, 0)
+    titleText:SetText("|cFF00FF00Omni|rInventory")
+    titleBtn:SetFontString(titleText)
+    titleBtn.text = titleText
+
+    titleBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("OmniInventory Characters", 1, 0.82, 0)
+        GameTooltip:AddLine("Left-click to select another character's bags to view offline.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    titleBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    titleBtn:SetScript("OnClick", function(self)
+        if Omni.Frame and Omni.Frame.OpenCharacterSelectMenu then
+            Omni.Frame.OpenCharacterSelectMenu(self)
+        end
+    end)
+
+    header.title = titleBtn
 
     header.closeBtn = CreateFrame("Button", nil, header, "UIPanelCloseButton")
     header.closeBtn:SetSize(20, 20)
@@ -3327,14 +3385,20 @@ function Frame:SetScale(scale)
     scale = math.max(0.5, math.min(scale or 1, 2.0))
     mainFrame:SetScale(scale)
 
-    -- Save to DB
-    OmniInventoryDB = OmniInventoryDB or {}
-    OmniInventoryDB.char = OmniInventoryDB.char or {}
-    OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
-    OmniInventoryDB.char.settings.scale = scale
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bag", "scale", scale)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.scale = scale
+    end
 end
 
 function Frame:GetScale()
+    if Omni.Data and Omni.Data.GetFrameSetting then
+        return Omni.Data:GetFrameSetting("bag", "scale", 1.0)
+    end
     if mainFrame and mainFrame.GetScale then
         return mainFrame:GetScale()
     end
@@ -3350,10 +3414,14 @@ function Frame:SetItemScale(scale)
     if InCombat() then return false end
     scale = math.max(DIM.ITEM_SCALE_MIN, math.min(scale or 1, DIM.ITEM_SCALE_MAX))
 
-    OmniInventoryDB = OmniInventoryDB or {}
-    OmniInventoryDB.char = OmniInventoryDB.char or {}
-    OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
-    OmniInventoryDB.char.settings.itemScale = scale
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bag", "itemScale", scale)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.itemScale = scale
+    end
 
     self:InvalidateRenderCaches({ clearLayout = true })
 
@@ -3369,10 +3437,14 @@ function Frame:SetItemGap(gap)
     if InCombat() then return false end
     gap = math.max(DIM.ITEM_GAP_MIN, math.min(gap or DIM.ITEM_SPACING, DIM.ITEM_GAP_MAX))
 
-    OmniInventoryDB = OmniInventoryDB or {}
-    OmniInventoryDB.char = OmniInventoryDB.char or {}
-    OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
-    OmniInventoryDB.char.settings.itemGap = gap
+    if Omni.Data and Omni.Data.SetFrameSetting then
+        Omni.Data:SetFrameSetting("bag", "itemGap", gap)
+    else
+        OmniInventoryDB = OmniInventoryDB or {}
+        OmniInventoryDB.char = OmniInventoryDB.char or {}
+        OmniInventoryDB.char.settings = OmniInventoryDB.char.settings or {}
+        OmniInventoryDB.char.settings.itemGap = gap
+    end
 
     self:InvalidateRenderCaches({ clearLayout = true })
 
@@ -3615,6 +3687,7 @@ end
 
 function Frame:UpdateLayout(changedBags, opts)
     if not mainFrame then return end
+    self:UpdateTitle()
     -- ʕ •ᴥ•ʔ✿ Global lock: pause all layout updates while locked (e.g.
     -- during sort/swap operations). Combat gating still applies below. ✿ ʕ •ᴥ•ʔ
     if Omni.Features and Omni.Features.IsGlobalLocked and Omni.Features:IsGlobalLocked()
@@ -5145,96 +5218,368 @@ end
 -- Search
 -- =============================================================================
 
+local function GetItemSearchInfo(itemInfo)
+    if not itemInfo or not itemInfo.hyperlink then
+        return nil
+    end
+
+    local link = itemInfo.hyperlink
+    local name, _, quality, iLvl, reqLevel, classType, subClassType, _, equipLoc = GetItemInfo(link)
+
+    -- Retrieve quest and soulbound info
+    local isBOP = false
+    local isBOE = false
+    local isBOU = false
+    local isBOA = false
+    local isQuest = false
+
+    -- Check soulbound using API
+    if Omni.API and Omni.API.IsItemSoulbound and itemInfo.bagID and itemInfo.slotID then
+        isBOP = Omni.API:IsItemSoulbound(itemInfo.bagID, itemInfo.slotID)
+    end
+
+    -- Tooltip scanning for bind and quest info
+    local scanningTooltip = _G["OmniScanningTooltip"]
+    if scanningTooltip then
+        scanningTooltip:ClearLines()
+        if itemInfo.bagID and itemInfo.slotID then
+            scanningTooltip:SetBagItem(itemInfo.bagID, itemInfo.slotID)
+        else
+            scanningTooltip:SetHyperlink(link)
+        end
+
+        for i = 1, scanningTooltip:NumLines() do
+            local leftFrame = _G["OmniScanningTooltipTextLeft" .. i]
+            local leftText = leftFrame and leftFrame:GetText()
+            if leftText then
+                local lowerText = string.lower(leftText)
+                if string.find(lowerText, "bind on pickup") or string.find(lowerText, "binds on pickup") then
+                    isBOP = true
+                elseif string.find(lowerText, "bind on equip") or string.find(lowerText, "binds on equip") then
+                    isBOE = true
+                elseif string.find(lowerText, "bind on use") or string.find(lowerText, "binds on use") then
+                    isBOU = true
+                elseif string.find(lowerText, "binds to account") or string.find(lowerText, "binds to battle.net account") then
+                    isBOA = true
+                elseif string.find(lowerText, "quest item") then
+                    isQuest = true
+                end
+            end
+        end
+    end
+
+    -- Quest item from API if available
+    if GetContainerItemQuestInfo and itemInfo.bagID and itemInfo.slotID then
+        local isQuestItem, _, isActive = GetContainerItemQuestInfo(itemInfo.bagID, itemInfo.slotID)
+        if isQuestItem or isActive then
+            isQuest = true
+        end
+    end
+
+    return {
+        name = name or "",
+        quality = quality or 0,
+        iLvl = iLvl or 0,
+        reqLevel = reqLevel or 0,
+        classType = classType or "",
+        subClassType = subClassType or "",
+        equipLoc = equipLoc or "",
+        isBOP = isBOP,
+        isBOE = isBOE,
+        isBOU = isBOU,
+        isBOA = isBOA,
+        isQuest = isQuest,
+    }
+end
+
+local function GetCachedItemSearchInfo(itemInfo)
+    if not itemInfo then return nil end
+    if not itemInfo.__searchInfo then
+        itemInfo.__searchInfo = GetItemSearchInfo(itemInfo)
+    end
+    return itemInfo.__searchInfo
+end
+
+local function CompareValue(itemVal, operator, targetVal)
+    if not itemVal or not targetVal then return false end
+    if operator == ">=" then
+        return itemVal >= targetVal
+    elseif operator == "<=" then
+        return itemVal <= targetVal
+    elseif operator == ">" then
+        return itemVal > targetVal
+    elseif operator == "<" then
+        return itemVal < targetVal
+    elseif operator == "!=" or operator == "<>" then
+        return itemVal ~= targetVal
+    else
+        return itemVal == targetVal
+    end
+end
+
+local function ParseNumericComparison(valStr)
+    local operator, numStr = string.match(valStr, "^([><=!]+)%s*(%d+)$")
+    if not operator then
+        numStr = string.match(valStr, "^(%d+)$")
+        operator = "="
+    end
+    return operator, tonumber(numStr)
+end
+
+local qualityNames = {
+    [0] = "poor", [1] = "common", [2] = "uncommon", [3] = "rare",
+    [4] = "epic", [5] = "legendary", [6] = "artifact", [7] = "heirloom"
+}
+
+local function MatchQuality(info, queryVal)
+    local op, num = ParseNumericComparison(queryVal)
+    if num then
+        return CompareValue(info.quality, op, num)
+    else
+        local qName = qualityNames[info.quality]
+        if qName then
+            return string.find(qName, queryVal, 1, true) ~= nil
+        end
+    end
+    return false
+end
+
+local function MatchItemLevel(info, queryVal)
+    local op, num = ParseNumericComparison(queryVal)
+    if num then
+        return CompareValue(info.iLvl, op, num)
+    end
+    return false
+end
+
+local function MatchType(info, queryVal)
+    local lowerQuery = string.lower(queryVal)
+    return string.find(string.lower(info.classType), lowerQuery, 1, true) ~= nil
+        or string.find(string.lower(info.subClassType), lowerQuery, 1, true) ~= nil
+        or string.find(string.lower(info.equipLoc), lowerQuery, 1, true) ~= nil
+end
+
+local function IsItemInEquipmentSet(itemInfo, targetSetName)
+    if not GetNumEquipmentSets or not GetEquipmentSetInfo then return false end
+    local numSets = GetNumEquipmentSets()
+    local link = itemInfo.hyperlink
+    local targetItemID = tonumber(string.match(link, "item:(%d+)"))
+    if not targetItemID then return false end
+
+    for index = 1, numSets do
+        local setName = GetEquipmentSetInfo(index)
+        if setName and (targetSetName == "" or string.find(string.lower(setName), string.lower(targetSetName), 1, true)) then
+            local itemIDs = GetEquipmentSetItemIDs(setName)
+            if itemIDs then
+                for _, id in pairs(itemIDs) do
+                    if id == targetItemID then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
+local function MatchKeyword(info, keyword)
+    if keyword == "bop" or keyword == "soulbound" or keyword == "bound" then
+        return info.isBOP
+    elseif keyword == "boe" then
+        return info.isBOE
+    elseif keyword == "bou" then
+        return info.isBOU
+    elseif keyword == "boa" then
+        return info.isBOA
+    elseif keyword == "quest" then
+        return info.isQuest
+    end
+    return false
+end
+
+local function MatchTooltip(itemInfo, queryVal)
+    local scanningTooltip = _G["OmniScanningTooltip"]
+    if not scanningTooltip then return false end
+    scanningTooltip:ClearLines()
+    if itemInfo.bagID and itemInfo.slotID then
+        scanningTooltip:SetBagItem(itemInfo.bagID, itemInfo.slotID)
+    else
+        scanningTooltip:SetHyperlink(itemInfo.hyperlink)
+    end
+    local lowerQuery = string.lower(queryVal)
+    for i = 1, scanningTooltip:NumLines() do
+        local leftFrame = _G["OmniScanningTooltipTextLeft" .. i]
+        local leftText = leftFrame and leftFrame:GetText()
+        if leftText and string.find(string.lower(leftText), lowerQuery, 1, true) then
+            return true
+        end
+        local rightFrame = _G["OmniScanningTooltipTextRight" .. i]
+        local rightText = rightFrame and rightFrame:GetText()
+        if rightText and string.find(string.lower(rightText), lowerQuery, 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function MatchSingleAtom(itemInfo, info, atom)
+    atom = string.gsub(atom, "^%s*(.-)%s*$", "%1")
+    if atom == "" then return true end
+
+    local negate = false
+    if string.sub(atom, 1, 1) == "!" then
+        negate = true
+        atom = string.sub(atom, 2)
+        atom = string.gsub(atom, "^%s*(.-)%s*$", "%1")
+    end
+
+    local match = false
+    local prefix, val = string.match(atom, "^([^:]+):(.*)$")
+    if prefix then
+        prefix = string.lower(prefix)
+        if prefix == "q" or prefix == "quality" then
+            match = MatchQuality(info, val)
+        elseif prefix == "ilvl" or prefix == "lvl" or prefix == "level" then
+            match = MatchItemLevel(info, val)
+        elseif prefix == "t" or prefix == "type" or prefix == "slot" then
+            match = MatchType(info, val)
+        elseif prefix == "s" or prefix == "set" then
+            match = IsItemInEquipmentSet(itemInfo, val)
+        elseif prefix == "tooltip" or prefix == "t" or prefix == "~t" then
+            match = MatchTooltip(itemInfo, val)
+        elseif prefix == "bind" then
+            match = MatchKeyword(info, string.lower(val))
+        else
+            match = string.find(string.lower(info.name), string.lower(atom), 1, true) ~= nil
+        end
+    else
+        local lowerAtom = string.lower(atom)
+        if lowerAtom == "bop" or lowerAtom == "soulbound" or lowerAtom == "bound"
+            or lowerAtom == "boe" or lowerAtom == "bou" or lowerAtom == "boa" or lowerAtom == "quest" then
+            match = MatchKeyword(info, lowerAtom)
+        elseif lowerAtom == "equipment" or lowerAtom == "equip" then
+            match = (info.equipLoc ~= "" and info.equipLoc ~= "INVTYPE_NON_EQUIP_TEXT")
+        else
+            match = string.find(string.lower(info.name), lowerAtom, 1, true) ~= nil
+        end
+    end
+
+    if negate then
+        return not match
+    else
+        return match
+    end
+end
+
 local function MatchItemQuery(itemInfo, query)
     if not itemInfo or not itemInfo.hyperlink then
         return false
     end
 
-    query = string.lower(query or "")
+    query = string.gsub(query or "", "^%s*(.-)%s*$", "%1")
     if query == "" then
         return true
     end
 
-    -- 1. Get cached name
-    local name = itemInfo.__cachedName
-    if not name then
-        name = GetItemInfo(itemInfo.hyperlink)
-        itemInfo.__cachedName = name
-    end
-    local lowerName = itemInfo.__cachedLowerName
-    if name and not lowerName then
-        lowerName = string.lower(name)
-        itemInfo.__cachedLowerName = lowerName
-    end
-
-    -- Prefix check:
-    -- A) Tooltip search: ~t:text or tooltip:text
-    local tooltipQuery = string.match(query, "^~t:(.+)$") or string.match(query, "^tooltip:(.+)$")
-    if tooltipQuery then
-        local scanningTooltip = _G["OmniScanningTooltip"]
-        if not scanningTooltip then
-            return false
-        end
-        scanningTooltip:ClearLines()
-        if itemInfo.bagID and itemInfo.slotID then
-            scanningTooltip:SetBagItem(itemInfo.bagID, itemInfo.slotID)
-        elseif itemInfo.hyperlink then
-            scanningTooltip:SetHyperlink(itemInfo.hyperlink)
-        else
-            return false
-        end
-        for i = 1, scanningTooltip:NumLines() do
-            local leftFrame = _G["OmniScanningTooltipTextLeft" .. i]
-            local leftText = leftFrame and leftFrame:GetText()
-            if leftText and string.find(string.lower(leftText), tooltipQuery, 1, true) then
-                return true
-            end
-            local rightFrame = _G["OmniScanningTooltipTextRight" .. i]
-            local rightText = rightFrame and rightFrame:GetText()
-            if rightText and string.find(string.lower(rightText), tooltipQuery, 1, true) then
-                return true
-            end
-        end
+    local info = GetCachedItemSearchInfo(itemInfo)
+    if not info then
         return false
     end
 
-    -- B) Quality search: ~q:text or quality:text
-    local qualityQuery = string.match(query, "^~q:(.+)$") or string.match(query, "^quality:(.+)$")
-    if qualityQuery then
-        local quality = itemInfo.quality
-        if not quality then
-            _, _, quality = GetItemInfo(itemInfo.hyperlink)
-            itemInfo.quality = quality
-        end
-        if quality then
-            local qStr = tostring(quality)
-            local qualityNames = {
-                [0] = "poor", [1] = "common", [2] = "uncommon", [3] = "rare",
-                [4] = "epic", [5] = "legendary", [6] = "artifact", [7] = "heirloom"
-            }
-            local qName = qualityNames[quality] or ""
-            if string.find(qStr, qualityQuery, 1, true) or string.find(qName, qualityQuery, 1, true) then
+    for orPart in string.gmatch(query, "[^|]+") do
+        orPart = string.gsub(orPart, "^%s*(.-)%s*$", "%1")
+        if orPart ~= "" then
+            local andMatch = true
+            for andPart in string.gmatch(orPart, "[^%s]+") do
+                if not MatchSingleAtom(itemInfo, info, andPart) then
+                    andMatch = false
+                    break
+                end
+            end
+            if andMatch then
                 return true
             end
         end
-        return false
-    end
-
-    -- C) Equipment search: ~e or ~equip
-    if query == "~e" or query == "~equip" or query == "equipment" then
-        local _, _, _, _, _, _, _, _, equipLoc = GetItemInfo(itemInfo.hyperlink)
-        if equipLoc and equipLoc ~= "" and equipLoc ~= "INVTYPE_NON_EQUIP_TEXT" then
-            return true
-        end
-        return false
-    end
-
-    -- Default fallback: substring match on item name
-    if lowerName and string.find(lowerName, query, 1, true) then
-        return true
     end
 
     return false
+end
+
+Frame.MatchItemQuery = MatchItemQuery
+Omni.MatchItemQuery = MatchItemQuery
+
+local function OpenCharacterSelectMenu(anchorFrame)
+    local dropdown = _G["OmniCharacterDropdownMenu"]
+    if not dropdown then
+        dropdown = CreateFrame("Frame", "OmniCharacterDropdownMenu", UIParent, "UIDropDownMenuTemplate")
+    end
+
+    local realmName = GetRealmName()
+    local characters = {}
+    if OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName] then
+        for name, data in pairs(OmniInventoryDB.realm[realmName]) do
+            table.insert(characters, { name = name, class = data.class })
+        end
+    end
+    table.sort(characters, function(a, b) return a.name < b.name end)
+
+    local menuList = {
+        { text = "Select Character", isTitle = true, notCheckable = true }
+    }
+
+    for _, char in ipairs(characters) do
+        local colorStr = "FFFFFFFF"
+        if char.class then
+            local colorTable = RAID_CLASS_COLORS[char.class]
+            if colorTable then
+                colorStr = string.format("FF%02x%02x%02x", colorTable.r * 255, colorTable.g * 255, colorTable.b * 255)
+            end
+        end
+        local isCurrent = (Omni.Data.currentViewedChar == char.name) or (not Omni.Data.currentViewedChar and char.name == Omni.Data.playerName)
+        table.insert(menuList, {
+            text = string.format("|c%s%s|r", colorStr, char.name),
+            checked = isCurrent,
+            func = function()
+                if char.name == Omni.Data.playerName then
+                    Omni.Data.currentViewedChar = nil
+                else
+                    Omni.Data.currentViewedChar = char.name
+                end
+                
+                if Omni.Frame then
+                    Omni.Frame:UpdateTitle()
+                    Omni.Frame:UpdateLayout(nil, { forceFull = true, immediate = true })
+                end
+                if Omni.BankFrame then
+                    Omni.BankFrame:UpdateTitle()
+                    Omni.BankFrame:UpdateLayout()
+                end
+            end
+        })
+    end
+
+    EasyMenu(menuList, dropdown, anchorFrame, 0, 0, "MENU")
+end
+
+Omni.Frame.OpenCharacterSelectMenu = OpenCharacterSelectMenu
+
+function Frame:UpdateTitle()
+    if not mainFrame or not mainFrame.header or not mainFrame.header.title then return end
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local colorStr = "FFFFFFFF"
+        local realm = OmniInventoryDB.realm[Omni.Data.realmName]
+        local charData = realm and realm[viewedChar]
+        if charData and charData.class then
+            local colorTable = RAID_CLASS_COLORS[charData.class]
+            if colorTable then
+                colorStr = string.format("FF%02x%02x%02x", colorTable.r * 255, colorTable.g * 255, colorTable.b * 255)
+            end
+        end
+        mainFrame.header.title.text:SetText(string.format("|c%s%s|r's Bags", colorStr, viewedChar))
+    else
+        mainFrame.header.title.text:SetText("|cFF00FF00Omni|rInventory")
+    end
 end
 
 function Frame:ApplySearch(text)
@@ -5388,7 +5733,16 @@ end
 function Frame:UpdateMoney()
     if not mainFrame or not mainFrame.footer then return end
 
-    local money = GetMoney() or 0
+    local money = 0
+    local viewedChar = Omni.Data and Omni.Data.currentViewedChar
+    if viewedChar and viewedChar ~= Omni.Data.playerName then
+        local realm = OmniInventoryDB.realm[Omni.Data.realmName]
+        local charData = realm and realm[viewedChar]
+        money = charData and charData.gold or 0
+    else
+        money = GetMoney() or 0
+    end
+
     if Omni.Utils and Omni.Utils.FormatMoney then
         local text = Omni.Utils:FormatMoney(money)
         mainFrame.footer.money:SetText(text)

@@ -243,7 +243,7 @@ local function CreateSectionHeader(parent, text, y, color)
 end
 
 function Settings:CreateControls(parent)
-    local yOffset = -20
+    local yOffset = -15
     local SPACING = 40
     -- ʕ •ᴥ•ʔ✿ Vertical rhythm — SECTION_GAP lives above every category header, HEADER_GAP under it ✿ ʕ •ᴥ•ʔ
     local SECTION_GAP = 18
@@ -251,12 +251,51 @@ function Settings:CreateControls(parent)
     self.colorSwatches = {}
     self._syncingScaleControls = false
 
+    -- ʕ •ᴥ•ʔ✿ Frame Selector Tabs ✿ ʕ •ᴥ•ʔ
+    local bagTab = CreateFrame("Button", "OmniConfigTabBag", parent, "UIPanelButtonTemplate")
+    bagTab:SetSize(110, 22)
+    bagTab:SetPoint("TOPLEFT", 25, yOffset)
+    bagTab:SetText("Bag Frame")
+
+    local bankTab = CreateFrame("Button", "OmniConfigTabBank", parent, "UIPanelButtonTemplate")
+    bankTab:SetSize(110, 22)
+    bankTab:SetPoint("TOPRIGHT", -25, yOffset)
+    bankTab:SetText("Bank Frame")
+
+    local function UpdateTabHighlight()
+        local active = Settings.activeConfigTarget or "bag"
+        if active == "bag" then
+            bagTab:Disable()
+            bankTab:Enable()
+        else
+            bagTab:Enable()
+            bankTab:Disable()
+        end
+    end
+
+    bagTab:SetScript("OnClick", function()
+        Settings.activeConfigTarget = "bag"
+        UpdateTabHighlight()
+        Settings:UpdateValues()
+    end)
+
+    bankTab:SetScript("OnClick", function()
+        Settings.activeConfigTarget = "bank"
+        UpdateTabHighlight()
+        Settings:UpdateValues()
+    end)
+
+    self.configTabBag = bagTab
+    self.configTabBank = bankTab
+    UpdateTabHighlight()
+
+    yOffset = yOffset - 35
+
     -- 1. Frame Scale Slider
     local scaleSlider = CreateFrame("Slider", "OmniScaleSlider", parent, "OptionsSliderTemplate")
     scaleSlider:SetPoint("TOP", 0, yOffset)
     scaleSlider:SetMinMaxValues(0.5, 2.0)
     scaleSlider:SetValueStep(0.1)
-    -- Note: SetObeyStepOnDrag not available in WotLK 3.3.5a
     scaleSlider:SetWidth(200)
 
     _G[scaleSlider:GetName() .. "Low"]:SetText("50%")
@@ -268,7 +307,6 @@ function Settings:CreateControls(parent)
 
     scaleSlider:SetScript("OnValueChanged", function(self, value)
         if Settings._syncingScaleControls then return end
-        -- Round to 1 decimal
         value = math.floor(value * 10 + 0.5) / 10
         if IsSettingEditLocked() then
             Settings:UpdateValues()
@@ -276,7 +314,11 @@ function Settings:CreateControls(parent)
             return
         end
         scaleValueText:SetText("Current: " .. FormatScalePercent(value))
-        if Omni.Frame then
+        
+        local target = Settings.activeConfigTarget or "bag"
+        if target == "bank" and Omni.BankFrame then
+            Omni.BankFrame:SetScale(value)
+        elseif Omni.Frame then
             Omni.Frame:SetScale(value)
         end
     end)
@@ -308,7 +350,11 @@ function Settings:CreateControls(parent)
             return
         end
         itemScaleValueText:SetText("Current: " .. FormatScalePercent(value))
-        if Omni.Frame and Omni.Frame.SetItemScale then
+        
+        local target = Settings.activeConfigTarget or "bag"
+        if target == "bank" and Omni.BankFrame then
+            Omni.BankFrame:SetItemScale(value)
+        elseif Omni.Frame and Omni.Frame.SetItemScale then
             Omni.Frame:SetItemScale(value)
         end
     end)
@@ -339,7 +385,11 @@ function Settings:CreateControls(parent)
             return
         end
         itemGapValueText:SetText("Current: " .. FormatGapPixels(value))
-        if Omni.Frame and Omni.Frame.SetItemGap then
+        
+        local target = Settings.activeConfigTarget or "bag"
+        if target == "bank" and Omni.BankFrame then
+            Omni.BankFrame:SetItemGap(value)
+        elseif Omni.Frame and Omni.Frame.SetItemGap then
             Omni.Frame:SetItemGap(value)
         end
     end)
@@ -721,12 +771,23 @@ function Settings:CreateControls(parent)
     resetBtn:SetPoint("TOP", 0, yOffset)
     resetBtn:SetText("Reset Position & Scale")
     resetBtn:SetScript("OnClick", function()
-        if Omni.Frame then
+        local target = Settings.activeConfigTarget or "bag"
+        if target == "bank" and Omni.BankFrame then
+            local bFrame = Omni.BankFrame:GetFrame()
+            if bFrame then
+                bFrame:ClearAllPoints()
+                bFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+            end
+            Omni.BankFrame:SetScale(1.0)
+            Omni.BankFrame:SetItemScale(1.0)
+            Omni.BankFrame:SetItemGap(4)
+        elseif Omni.Frame then
             Omni.Frame:ResetPosition()
-            if self.scaleSlider then self.scaleSlider:SetValue(1.0) end
-            if self.itemScaleSlider then self.itemScaleSlider:SetValue(1.0) end
-            if self.itemGapSlider then self.itemGapSlider:SetValue(4) end
+            Omni.Frame:SetScale(1.0)
+            Omni.Frame:SetItemScale(1.0)
+            Omni.Frame:SetItemGap(4)
         end
+        Settings:UpdateValues()
     end)
 
     yOffset = yOffset - SPACING - SECTION_GAP
@@ -1213,22 +1274,32 @@ function Settings:UpdateValues()
     end
     self._syncingTooltipFixedSliders = false
     self:RefreshTooltipPlacementControls()
-    if Omni.Frame and self.scaleSlider then
-        local scale = Omni.Frame:GetScale()
+    local target = Settings.activeConfigTarget or "bag"
+    local scale, itemScale, itemGap
+
+    if target == "bank" and Omni.BankFrame then
+        scale = Omni.BankFrame:GetScale()
+        itemScale = Omni.BankFrame:GetItemScale()
+        itemGap = Omni.BankFrame:GetItemGap()
+    else
+        scale = Omni.Frame:GetScale()
+        itemScale = Omni.Frame:GetItemScale()
+        itemGap = Omni.Frame:GetItemGap()
+    end
+
+    if self.scaleSlider then
         self.scaleSlider:SetValue(scale)
         if self.scaleValueText then
             self.scaleValueText:SetText("Current: " .. FormatScalePercent(scale))
         end
     end
-    if Omni.Frame and self.itemScaleSlider and Omni.Frame.GetItemScale then
-        local itemScale = Omni.Frame:GetItemScale()
+    if self.itemScaleSlider then
         self.itemScaleSlider:SetValue(itemScale)
         if self.itemScaleValueText then
             self.itemScaleValueText:SetText("Current: " .. FormatScalePercent(itemScale))
         end
     end
-    if Omni.Frame and self.itemGapSlider and Omni.Frame.GetItemGap then
-        local itemGap = Omni.Frame:GetItemGap()
+    if self.itemGapSlider then
         self.itemGapSlider:SetValue(itemGap)
         if self.itemGapValueText then
             self.itemGapValueText:SetText("Current: " .. FormatGapPixels(itemGap))
@@ -1279,7 +1350,7 @@ function Settings:RefreshThemeLabel()
 end
 
 function Settings:Init()
-    -- Initialized
+    Settings.activeConfigTarget = "bag"
 end
 
 print("|cFF00FF00OmniInventory|r: Settings module loaded")
