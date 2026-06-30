@@ -412,7 +412,20 @@ function Categorizer:GetCategory(itemInfo)
         end
     end
 
-    -- ʕ ● ᴥ ●ʔ Custom Rules Engine disabled — module is no longer loaded (see OmniInventory.toc)
+    -- ʕ •ᴥ•ʔ✿ User-defined categories (A18): evaluate in sequence order
+    -- before the hardcoded pipeline. Each category has an optional item
+    -- list and/or a compiled rule expression. ✿ ʕ •ᴥ•ʔ
+    if Omni.Categories then
+        local userCats = Omni.Categories:GetAll()
+        for _, cat in ipairs(userCats or {}) do
+            if Omni.Categories:ItemMatchesCategory(itemInfo, cat.name) then
+                if Omni._perfEnabled and Omni.Perf then
+                    Omni.Perf:End("categorizer.GetCategory", perfToken)
+                end
+                return cat.name
+            end
+        end
+    end
 
     -- Priority 1.75: Perishable / time-limited turn-in items
     if self:IsPerishableItem(GetItemID(itemInfo)) then

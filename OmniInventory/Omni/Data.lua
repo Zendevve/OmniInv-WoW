@@ -196,6 +196,114 @@ function Data:GetPlayerMoney()
 end
 
 -- =============================================================================
+-- Per-Frame Settings (A13)
+-- =============================================================================
+-- Each frame ("bag", "bank", "keys") has independent visual/layout settings.
+-- Mirrors Bagnon's per-frame SavedFrameSettings model.
+
+local FRAME_DEFAULTS = {
+    bag = {
+        scale = 1.0,
+        opacity = 0.95,
+        columns = 10,
+        itemSize = 37,
+        itemScale = 1.0,
+        itemGap = 4,
+        position = nil,       -- { point, x, y }
+        color = { r = 0.08, g = 0.08, b = 0.08, a = 0.95 },
+        borderColor = { r = 0.4, g = 0.4, b = 0.4, a = 1.0 },
+        strata = "HIGH",
+        viewMode = "flow",
+        reverseSlotOrder = false,
+    },
+    bank = {
+        scale = 1.0,
+        opacity = 0.95,
+        columns = 10,
+        itemSize = 37,
+        itemScale = 1.0,
+        itemGap = 4,
+        position = nil,
+        color = { r = 0.08, g = 0.08, b = 0.08, a = 0.95 },
+        borderColor = { r = 0.4, g = 0.4, b = 0.4, a = 1.0 },
+        strata = "HIGH",
+        viewMode = "flow",
+        reverseSlotOrder = false,
+    },
+    keys = {
+        scale = 1.0,
+        opacity = 0.95,
+        columns = 8,
+        itemSize = 30,
+        itemScale = 1.0,
+        itemGap = 2,
+        position = nil,
+        color = { r = 0.08, g = 0.08, b = 0.08, a = 0.95 },
+        borderColor = { r = 0.4, g = 0.4, b = 0.4, a = 1.0 },
+        strata = "HIGH",
+        viewMode = "grid",
+        reverseSlotOrder = false,
+    },
+}
+
+function Data:GetFrameSetting(frameID, key, default)
+    if not frameID or not key then return default end
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.char = OmniInventoryDB.char or {}
+    OmniInventoryDB.char.frameSettings = OmniInventoryDB.char.frameSettings or {}
+    local frameData = OmniInventoryDB.char.frameSettings[frameID]
+    if frameData and frameData[key] ~= nil then
+        return frameData[key]
+    end
+    local frameDefault = FRAME_DEFAULTS[frameID]
+    if frameDefault and frameDefault[key] ~= nil then
+        return frameDefault[key]
+    end
+    return default
+end
+
+function Data:SetFrameSetting(frameID, key, value)
+    if not frameID or not key then return end
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.char = OmniInventoryDB.char or {}
+    OmniInventoryDB.char.frameSettings = OmniInventoryDB.char.frameSettings or {}
+    if not OmniInventoryDB.char.frameSettings[frameID] then
+        local fd = FRAME_DEFAULTS[frameID] or {}
+        local copy = {}
+        for k, v in pairs(fd) do
+            if type(v) == "table" then
+                copy[k] = {}
+                for k2, v2 in pairs(v) do copy[k][k2] = v2 end
+            else
+                copy[k] = v
+            end
+        end
+        OmniInventoryDB.char.frameSettings[frameID] = copy
+    end
+    OmniInventoryDB.char.frameSettings[frameID][key] = value
+end
+
+function Data:GetAllFrameSettings(frameID)
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.char = OmniInventoryDB.char or {}
+    OmniInventoryDB.char.frameSettings = OmniInventoryDB.char.frameSettings or {}
+    if not OmniInventoryDB.char.frameSettings[frameID] then
+        local fd = FRAME_DEFAULTS[frameID] or {}
+        local copy = {}
+        for k, v in pairs(fd) do
+            if type(v) == "table" then
+                copy[k] = {}
+                for k2, v2 in pairs(v) do copy[k][k2] = v2 end
+            else
+                copy[k] = v
+            end
+        end
+        OmniInventoryDB.char.frameSettings[frameID] = copy
+    end
+    return OmniInventoryDB.char.frameSettings[frameID]
+end
+
+-- =============================================================================
 -- Cross-Character Data
 -- =============================================================================
 
@@ -315,6 +423,60 @@ function Data:GetAllCharacters()
         end
     end
     return chars
+end
+
+-- =============================================================================
+-- Offline Inventory DB (A11) — Equipment + Cross-Character Viewing
+-- =============================================================================
+-- Bagnon_Forever-style: store equipped items so any character can view
+-- any other character's inventory. Also stores bank slot count.
+
+function Data:SaveEquipment()
+    local realm = OmniInventoryDB.realm[self.realmName]
+    local char = realm and realm[self.playerName]
+    if not char then return end
+
+    char.equipment = {}
+    -- WotLK equip slots: 1..19 (incl. bag, ranged, tabard, etc.)
+    for slot = 1, 19 do
+        local link = GetInventoryItemLink("player", slot)
+        if link then
+            local texture = GetInventoryItemTexture("player", slot)
+            local _, _, quality = GetItemInfo(link)
+            table.insert(char.equipment, {
+                slotID = slot,
+                link = link,
+                texture = texture,
+                quality = quality or 0,
+            })
+        end
+    end
+end
+
+function Data:SaveBankSlotCount()
+    local realm = OmniInventoryDB.realm[self.realmName]
+    local char = realm and realm[self.playerName]
+    if not char then return end
+
+    char.bankSlots = GetNumBankSlots and GetNumBankSlots() or 0
+end
+
+function Data:GetCharacterData(realmName, playerName)
+    if not realmName or not playerName then return nil end
+    local realm = OmniInventoryDB and OmniInventoryDB.realm and OmniInventoryDB.realm[realmName]
+    return realm and realm[playerName]
+end
+
+function Data:SetViewedCharacter(playerName)
+    self.currentViewedChar = playerName or self.playerName
+end
+
+function Data:ClearViewedCharacter()
+    self.currentViewedChar = self.playerName
+end
+
+function Data:IsViewingOwnCharacter()
+    return not self.currentViewedChar or self.currentViewedChar == self.playerName
 end
 
 -- =============================================================================

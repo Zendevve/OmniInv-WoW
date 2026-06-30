@@ -20,8 +20,10 @@ Omni\Pool.lua
 Omni\Utils.lua
 Omni\Data.lua
 Omni\Features.lua
+Omni\Rules.lua
 Omni\Categorizer.lua
 Omni\Sorter.lua
+Omni\PhysicalSort.lua
 
 # =============================================================================
 # UI Components

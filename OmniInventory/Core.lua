@@ -541,6 +541,53 @@ local function HandleSlashCommand(msg)
             Omni.Features:RunTidy()
         end
 
+    elseif msg == "sort" or msg == "physort" then
+        if Omni.PhysicalSort and Omni.PhysicalSort.Sort then
+            Omni.PhysicalSort:Sort({ consolidateStacks = true, routeSpecialized = true })
+        elseif Omni.Frame and Omni.Frame.PhysicalSortBags then
+            Omni.Frame:PhysicalSortBags()
+        end
+
+    elseif msg == "sortcancel" then
+        if Omni.PhysicalSort and Omni.PhysicalSort.Cancel then
+            Omni.PhysicalSort:Cancel()
+        end
+
+    elseif msg == "rules" or msg == "rule" then
+        if Omni.Rules then
+            local names = Omni.Rules:GetFunctionNames()
+            print("|cFF00FF00OmniInventory|r: Available rule functions (" .. #names .. "):")
+            local line = ""
+            for i, name in ipairs(names) do
+                line = line .. name
+                if i < #names then line = line .. ", " end
+                if string.len(line) > 70 then
+                    print("  " .. line)
+                    line = ""
+                end
+            end
+            if line ~= "" then print("  " .. line) end
+        end
+
+    elseif msg == "categories" or msg == "cats" then
+        if Omni.Categories then
+            local cats = Omni.Categories:GetAll()
+            if #cats == 0 then
+                print("|cFF00FF00OmniInventory|r: No user-defined categories.")
+            else
+                print("|cFF00FF00OmniInventory|r: User-defined categories (" .. #cats .. "):")
+                for _, cat in ipairs(cats) do
+                    local err = Omni.Categories:GetError(cat.name)
+                    local suffix = err and " |cFFFF4040[ERROR: " .. err .. "]|r" or ""
+                    local itemCount = cat.list and #cat.list or 0
+                    print(string.format("  |cFFFFFF00%s|r (seq:%d, items:%d, rule:%s)%s",
+                        cat.name, cat.sequence or 50, itemCount,
+                        (cat.rule and cat.rule ~= "") and "yes" or "no",
+                        suffix))
+                end
+            end
+        end
+
     elseif msg == "lock" then
         if Omni.Features and Omni.Features.SetGlobalLock then
             local locked = not Omni.Features:IsGlobalLocked()
@@ -566,6 +613,10 @@ local function HandleSlashCommand(msg)
         print("  |cFFFFFF00/oi currency|r - Toggle currency frame")
         print("  |cFFFFFF00/oi bankswitch|r - Cycle bank bag view")
         print("  |cFFFFFF00/oi tidy|r - Run auto-tidy (sort + compact)")
+        print("  |cFFFFFF00/oi sort|r - Physical bag sort (move items)")
+        print("  |cFFFFFF00/oi sortcancel|r - Cancel in-progress sort")
+        print("  |cFFFFFF00/oi rules|r - List available rule functions")
+        print("  |cFFFFFF00/oi categories|r - List user-defined categories")
         print("  |cFFFFFF00/oi lock|r - Toggle global lock (pause updates)")
 
     else

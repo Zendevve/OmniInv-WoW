@@ -17,6 +17,13 @@
     <Binding name="OMNIINVENTORY_CYCLE_SORT">
         if OmniInventory.Frame then OmniInventory.Frame:CycleSort() end
     </Binding>
+    <Binding name="OMNIINVENTORY_PHYSICAL_SORT">
+        if OmniInventory.PhysicalSort and OmniInventory.PhysicalSort.Sort then
+            OmniInventory.PhysicalSort:Sort({ consolidateStacks = true, routeSpecialized = true })
+        elseif OmniInventory.Frame and OmniInventory.Frame.PhysicalSortBags then
+            OmniInventory.Frame:PhysicalSortBags()
+        end
+    </Binding>
     <Binding name="OMNIINVENTORY_CLEAR_SEARCH">
         if OmniInventoryFrame and OmniInventoryFrame.searchBox then
             OmniInventoryFrame.searchBox:SetText("")

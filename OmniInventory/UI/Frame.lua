@@ -5488,8 +5488,11 @@ end
 -- =============================================================================
 
 function Frame:PhysicalSortBags()
-    -- Use Blizzard's native SortBags function (WoTLK 3.3.5a compatible)
-    if SortBags then
+    -- ʕ •ᴥ•ʔ✿ Use the multi-phase PhysicalSort engine (A14) when available;
+    -- fall back to Blizzard's native SortBags for compatibility. ✿ ʕ •ᴥ•ʔ
+    if Omni.PhysicalSort and Omni.PhysicalSort.Sort then
+        Omni.PhysicalSort:Sort({ consolidateStacks = true, routeSpecialized = true })
+    elseif SortBags then
         SortBags()
     end
 end

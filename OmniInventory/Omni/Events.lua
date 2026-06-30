@@ -626,6 +626,13 @@ function Events:Init()
         end
     end)
 
+    -- ʕ •ᴥ•ʔ✿ Equipment + bank slot count saving for offline inventory (A11). ✿ ʕ •ᴥ•ʔ
+    self:RegisterEvent("PLAYER_EQUIPMENT_CHANGED", function()
+        if Omni.Data and Omni.Data.SaveEquipment then
+            Omni.Data:SaveEquipment()
+        end
+    end)
+
     -- Save initial state on login
     if Omni.Data then
         if Omni.Data.SaveCharacterInventory then
@@ -633,6 +640,12 @@ function Events:Init()
         end
         if Omni.Data.SaveBankItems then
             Omni.Data:SaveBankItems()
+        end
+        if Omni.Data.SaveEquipment then
+            Omni.Data:SaveEquipment()
+        end
+        if Omni.Data.SaveBankSlotCount then
+            Omni.Data:SaveBankSlotCount()
         end
     end
 end
