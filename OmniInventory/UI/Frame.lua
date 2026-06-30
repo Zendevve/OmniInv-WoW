@@ -2251,6 +2251,7 @@ end
 local function CreateFooterMiniButton(parent, def)
     local btn = CreateFrame("Button", nil, parent, "SecureActionButtonTemplate")
     btn:RegisterForClicks("AnyUp")
+    btn:SetSize(DIM.FOOTER_BTN_SIZE, DIM.FOOTER_BTN_SIZE)
 
     if def.key == "hearthstone" then
         btn:SetAttribute("type1", "item")
