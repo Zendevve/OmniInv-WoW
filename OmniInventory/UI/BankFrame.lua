@@ -1390,23 +1390,58 @@ function BankFrame:RenderFlowView(items)
         end
     end
 
+    local collapseEmpty = false
+    if Omni.Data and Omni.Data.Get then
+        collapseEmpty = (Omni.Data:Get("collapseEmptySlots") == true)
+    end
+
+    local emptyGroups = {}
     for _, bagID in ipairs(activeBags) do
         local numSlots = GetContainerNumSlots(bagID) or 0
         for slotID = 1, numSlots do
             local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
             if not info then
                 local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
-                local emptyItem = {
+                emptyGroups[freeSpaceCat] = emptyGroups[freeSpaceCat] or {
                     bagID = bagID,
                     slotID = slotID,
                     __empty = true,
                     category = freeSpaceCat,
+                    emptyCount = 0,
                 }
-                if not categories[freeSpaceCat] then
-                    categories[freeSpaceCat] = {}
-                    table.insert(categoryOrder, freeSpaceCat)
+                emptyGroups[freeSpaceCat].emptyCount = emptyGroups[freeSpaceCat].emptyCount + 1
+            end
+        end
+    end
+
+    if collapseEmpty then
+        for catName, item in pairs(emptyGroups) do
+            if not categories[catName] then
+                categories[catName] = {}
+                table.insert(categoryOrder, catName)
+            end
+            table.insert(categories[catName], item)
+        end
+    else
+        for _, bagID in ipairs(activeBags) do
+            local numSlots = GetContainerNumSlots(bagID) or 0
+            for slotID = 1, numSlots do
+                local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+                if not info then
+                    local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
+                    local emptyItem = {
+                        bagID = bagID,
+                        slotID = slotID,
+                        __empty = true,
+                        category = freeSpaceCat,
+                        emptyCount = 1,
+                    }
+                    if not categories[freeSpaceCat] then
+                        categories[freeSpaceCat] = {}
+                        table.insert(categoryOrder, freeSpaceCat)
+                    end
+                    table.insert(categories[freeSpaceCat], emptyItem)
                 end
-                table.insert(categories[freeSpaceCat], emptyItem)
             end
         end
     end
@@ -1591,7 +1626,7 @@ function BankFrame:RenderGridView(items)
     local index = 0
     local rendered = false
 
-    local function renderSlot(bagID, slotID)
+    local function renderSlot(bagID, slotID, customItemInfo)
         index = index + 1
         local container = GetBankItemContainer(bagID) or scrollChild
         local btn = (not releasedPreviousToPool) and previousButtons[index] or nil
@@ -1630,7 +1665,7 @@ function BankFrame:RenderGridView(items)
         pcall(btn.SetPoint, btn, "TOPLEFT", scrollChild, "TOPLEFT", x, y)
         pcall(btn.SetAlpha, btn, 1)
 
-        local itemInfo = itemBySlot[bagID] and itemBySlot[bagID][slotID]
+        local itemInfo = customItemInfo or (itemBySlot[bagID] and itemBySlot[bagID][slotID])
         pcall(SetButtonItem, btn, itemInfo or { bagID = bagID, slotID = slotID, __empty = true })
         if btn:GetParent() ~= container then
             pcall(btn.SetParent, btn, container)
@@ -1643,23 +1678,72 @@ function BankFrame:RenderGridView(items)
         rendered = true
     end
 
-    if IsValidBankBagID(selectedBankBagID) then
-        local slots = GetContainerNumSlots(selectedBankBagID) or 0
-        for slotID = 1, slots do
-            renderSlot(selectedBankBagID, slotID)
-        end
-    else
-        local mainSlots = GetContainerNumSlots(-1) or 0
-        for slotID = 1, mainSlots do
-            renderSlot(-1, slotID)
-        end
+    local collapseEmpty = false
+    if Omni.Data and Omni.Data.Get then
+        collapseEmpty = (Omni.Data:Get("collapseEmptySlots") == true)
+    end
 
+    local activeBankBags = {}
+    if IsValidBankBagID(selectedBankBagID) then
+        table.insert(activeBankBags, selectedBankBankID or selectedBankBagID)
+    else
+        table.insert(activeBankBags, -1)
         for _, bagID in ipairs(BANK_BAG_IDS) do
+            table.insert(activeBankBags, bagID)
+        end
+    end
+
+    local slotsToRender = {}
+    if collapseEmpty then
+        for _, bagID in ipairs(activeBankBags) do
             local slots = GetContainerNumSlots(bagID) or 0
             for slotID = 1, slots do
-                renderSlot(bagID, slotID)
+                local itemInfo = itemBySlot[bagID] and itemBySlot[bagID][slotID]
+                if itemInfo then
+                    table.insert(slotsToRender, { bagID = bagID, slotID = slotID, itemInfo = itemInfo })
+                end
             end
         end
+
+        local emptyGroups = {}
+        for _, bagID in ipairs(activeBankBags) do
+            local slots = GetContainerNumSlots(bagID) or 0
+            for slotID = 1, slots do
+                local itemInfo = itemBySlot[bagID] and itemBySlot[bagID][slotID]
+                if not itemInfo then
+                    local grp = GetFreeSpaceCategoryName(bagID)
+                    emptyGroups[grp] = emptyGroups[grp] or {
+                        bagID = bagID,
+                        slotID = slotID,
+                        __empty = true,
+                        category = grp,
+                        emptyCount = 0,
+                    }
+                    emptyGroups[grp].emptyCount = emptyGroups[grp].emptyCount + 1
+                end
+            end
+        end
+
+        local sortedGrps = {}
+        for name, item in pairs(emptyGroups) do
+            table.insert(sortedGrps, { name = name, item = item })
+        end
+        table.sort(sortedGrps, function(a, b) return a.name < b.name end)
+        for _, grp in ipairs(sortedGrps) do
+            table.insert(slotsToRender, { bagID = grp.item.bagID, slotID = grp.item.slotID, itemInfo = grp.item })
+        end
+    else
+        for _, bagID in ipairs(activeBankBags) do
+            local slots = GetContainerNumSlots(bagID) or 0
+            for slotID = 1, slots do
+                local itemInfo = itemBySlot[bagID] and itemBySlot[bagID][slotID]
+                table.insert(slotsToRender, { bagID = bagID, slotID = slotID, itemInfo = itemInfo })
+            end
+        end
+    end
+
+    for _, slot in ipairs(slotsToRender) do
+        renderSlot(slot.bagID, slot.slotID, slot.itemInfo)
     end
 
     if not releasedPreviousToPool then

@@ -3972,11 +3972,50 @@ function Frame:RenderFlowView(items, layoutOpts)
             end
         end
 
+        local collapseEmpty = false
+        if Omni.Data and Omni.Data.Get then
+            collapseEmpty = (Omni.Data:Get("collapseEmptySlots") == true)
+        end
+
+        local emptyGroups = {}
         for _, bagID in ipairs(DIM.BAG_IDS) do
             local numSlots = GetContainerNumSlots(bagID) or 0
             for slotID = 1, numSlots do
                 local info = itemBySlot[bagID] and itemBySlot[bagID][slotID] or nil
-                table.insert(categories["All"], info or { bagID = bagID, slotID = slotID, __empty = true })
+                if not info then
+                    local grp = GetFreeSpaceCategoryName(bagID)
+                    emptyGroups[grp] = emptyGroups[grp] or {
+                        bagID = bagID,
+                        slotID = slotID,
+                        __empty = true,
+                        category = grp,
+                        emptyCount = 0,
+                    }
+                    emptyGroups[grp].emptyCount = emptyGroups[grp].emptyCount + 1
+                else
+                    table.insert(categories["All"], info)
+                end
+            end
+        end
+
+        if collapseEmpty then
+            local sortedGrps = {}
+            for name, item in pairs(emptyGroups) do
+                table.insert(sortedGrps, { name = name, item = item })
+            end
+            table.sort(sortedGrps, function(a, b) return a.name < b.name end)
+            for _, grp in ipairs(sortedGrps) do
+                table.insert(categories["All"], grp.item)
+            end
+        else
+            for _, bagID in ipairs(DIM.BAG_IDS) do
+                local numSlots = GetContainerNumSlots(bagID) or 0
+                for slotID = 1, numSlots do
+                    local info = itemBySlot[bagID] and itemBySlot[bagID][slotID] or nil
+                    if not info then
+                        table.insert(categories["All"], { bagID = bagID, slotID = slotID, __empty = true, emptyCount = 1 })
+                    end
+                end
             end
         end
     elseif currentView == "bag" then
@@ -4043,25 +4082,62 @@ function Frame:RenderFlowView(items, layoutOpts)
             end
         end
 
+        local collapseEmpty = false
+        if Omni.Data and Omni.Data.Get then
+            collapseEmpty = (Omni.Data:Get("collapseEmptySlots") == true)
+        end
+
+        local emptyGroups = {}
         for _, bagID in ipairs(activeBags) do
             local numSlots = GetContainerNumSlots(bagID) or 0
             for slotID = 1, numSlots do
                 local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
                 if not info then
                     local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
-                    local emptyItem = {
+                    emptyGroups[freeSpaceCat] = emptyGroups[freeSpaceCat] or {
                         bagID = bagID,
                         slotID = slotID,
                         __empty = true,
                         category = freeSpaceCat,
+                        emptyCount = 0,
                     }
-                    if not seenCategoryThisPass[freeSpaceCat] then
-                        categories[freeSpaceCat] = categories[freeSpaceCat] or {}
-                        seenCategoryThisPass[freeSpaceCat] = true
-                        usedCategoryKeys[#usedCategoryKeys + 1] = freeSpaceCat
-                        table.insert(categoryOrder, freeSpaceCat)
+                    emptyGroups[freeSpaceCat].emptyCount = emptyGroups[freeSpaceCat].emptyCount + 1
+                end
+            end
+        end
+
+        if collapseEmpty then
+            for catName, item in pairs(emptyGroups) do
+                if not seenCategoryThisPass[catName] then
+                    categories[catName] = categories[catName] or {}
+                    seenCategoryThisPass[catName] = true
+                    usedCategoryKeys[#usedCategoryKeys + 1] = catName
+                    table.insert(categoryOrder, catName)
+                end
+                table.insert(categories[catName], item)
+            end
+        else
+            for _, bagID in ipairs(activeBags) do
+                local numSlots = GetContainerNumSlots(bagID) or 0
+                for slotID = 1, numSlots do
+                    local info = OmniC_Container.GetContainerItemInfo(bagID, slotID)
+                    if not info then
+                        local freeSpaceCat = GetFreeSpaceCategoryName(bagID)
+                        local emptyItem = {
+                            bagID = bagID,
+                            slotID = slotID,
+                            __empty = true,
+                            category = freeSpaceCat,
+                            emptyCount = 1,
+                        }
+                        if not seenCategoryThisPass[freeSpaceCat] then
+                            categories[freeSpaceCat] = categories[freeSpaceCat] or {}
+                            seenCategoryThisPass[freeSpaceCat] = true
+                            usedCategoryKeys[#usedCategoryKeys + 1] = freeSpaceCat
+                            table.insert(categoryOrder, freeSpaceCat)
+                        end
+                        table.insert(categories[freeSpaceCat], emptyItem)
                     end
-                    table.insert(categories[freeSpaceCat], emptyItem)
                 end
             end
         end

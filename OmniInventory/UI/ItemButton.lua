@@ -23,6 +23,23 @@ local TEXTURE_QUEST_DAILY = "Interface\\GossipFrame\\DailyQuestIcon"
 local QUEST_STARTER_ICON_SIZE = 20
 local ConfigureSecureItemUse
 
+local function GetBagDisplayName(bagID)
+    if bagID == 0 then
+        return BACKPACK_CONTAINER or "Backpack"
+    elseif bagID == -1 then
+        return BANK_CONTAINER or "Bank"
+    elseif bagID == -2 then
+        return KEYRING or "Keyring"
+    elseif bagID and bagID >= 1 and bagID <= 11 then
+        local name = GetBagName(bagID)
+        if name and name ~= "" then
+            return name
+        end
+        return string.format("Bag %d", bagID)
+    end
+    return ""
+end
+
 local function GetSpecialtyBagColor(bagID)
     if not bagID or bagID < 1 or bagID > 11 then
         return nil
@@ -731,8 +748,14 @@ function ItemButton:SetItem(button, itemInfo)
         end
 
         button.icon:SetTexture(nil)
-        button.count:SetText("")
-        button.count:Hide()
+        local count = tonumber(itemInfo.emptyCount) or 1
+        if count > 1 then
+            button.count:SetText(tostring(count))
+            button.count:Show()
+        else
+            button.count:SetText("")
+            button.count:Hide()
+        end
         pcall(button.EnableMouse, button, true)
         local r, g, b = 0.3, 0.3, 0.3
         local sr, sg, sb = GetSpecialtyBagColor(itemInfo.bagID)
@@ -1100,6 +1123,29 @@ function ItemButton:OnEnter(button)
     ItemButton.SetOmniItemTooltipOwner(button)
     if GameTooltip.ClearLines then
         GameTooltip:ClearLines()
+    end
+
+    if info.__empty then
+        local count = tonumber(info.emptyCount) or 1
+        if count > 1 then
+            GameTooltip:SetText(string.format("Empty Slots (%d)", count), 1, 1, 1)
+            local bagType = GetBagDisplayName(bagID)
+            if bagType and bagType ~= "" then
+                GameTooltip:AddLine(bagType, 0.9, 0.8, 0.4)
+            end
+            GameTooltip:AddLine("Empty space collapsed to save space.", 0.6, 0.6, 0.6, true)
+        else
+            GameTooltip:SetText("Empty Slot", 1, 1, 1)
+            local bagType = GetBagDisplayName(bagID)
+            if bagType and bagType ~= "" then
+                GameTooltip:AddLine(bagType, 0.9, 0.8, 0.4)
+            end
+        end
+        GameTooltip:Show()
+        ItemButton.FinalizeOmniItemTooltipLayout()
+        button.__emptyDropHighlightHovering = true
+        UpdateEmptyDropHighlight(button)
+        return
     end
 
     local shown = false

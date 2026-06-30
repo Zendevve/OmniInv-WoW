@@ -601,6 +601,29 @@ function Settings:CreateControls(parent)
     end)
     self.vendorDoubleRightClickCb = sellProtectionCb
 
+    yOffset = yOffset - 22
+
+    local collapseEmptyCb = CreateFrame("CheckButton", "OmniCollapseEmptySlots", parent, "UICheckButtonTemplate")
+    collapseEmptyCb:SetSize(24, 24)
+    collapseEmptyCb:SetPoint("TOPLEFT", 14, yOffset)
+    local collapseEmptyLabel = collapseEmptyCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    collapseEmptyLabel:SetPoint("LEFT", collapseEmptyCb, "RIGHT", 2, 1)
+    collapseEmptyLabel:SetText("Collapse empty slots")
+    collapseEmptyCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Collapse Empty Slots", 1, 0.82, 0)
+        GameTooltip:AddLine("Collapses all empty slots in Grid and Flow views into a single slot button per bag type, displaying a count of the total empty spaces.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    collapseEmptyCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    collapseEmptyCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            Omni.Data:Set("collapseEmptySlots", self:GetChecked() and true or false)
+            RefreshAllInventory()
+        end
+    end)
+    self.collapseEmptySlotsCb = collapseEmptyCb
+
     yOffset = yOffset - SPACING - 4
 
     local tipPlacementHeader = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -866,6 +889,9 @@ function Settings:UpdateValues()
     end
     if self.vendorDoubleRightClickCb and Omni.Data then
         self.vendorDoubleRightClickCb:SetChecked(Omni.Data:Get("vendorDoubleRightClick") ~= false)
+    end
+    if self.collapseEmptySlotsCb and Omni.Data then
+        self.collapseEmptySlotsCb:SetChecked(Omni.Data:Get("collapseEmptySlots") == true)
     end
     self._syncingTooltipFixedSliders = true
     if Omni.Data and self.tooltipFixedXSlider and self.tooltipFixedYSlider then
