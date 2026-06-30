@@ -2333,7 +2333,7 @@ local function CreateFooterMiniButton(parent, def)
 
     if type(def.onClick) == "function" then
         btn:SetScript("OnClick", def.onClick)
-    else
+    elseif type(def.fn) == "string" then
         btn.__openFn = def.fn
         btn.__closeFn = def.fn:gsub("^Open", "Close")
         btn.__toggleFrame = def.toggleFrame
