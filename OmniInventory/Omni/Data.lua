@@ -15,6 +15,7 @@ local Data = Omni.Data
 
 local defaults = {
     global = {
+        dbVersion = 2,
         viewMode = "flow",      -- "grid", "flow", "list"
         sortMode = "category",  -- "category", "quality", "name", "ilvl", "usage"
         columns = 10,
@@ -123,11 +124,52 @@ local function MergeDefaults(target, source)
 end
 
 -- =============================================================================
+-- Database Migrations
+-- =============================================================================
+
+local migrations = {
+    [2] = function(db)
+        if db.global then
+            local pl = db.global.itemTooltipPlacement
+            if pl == "addon" then
+                db.global.itemTooltipPlacement = "right"
+            elseif pl == "fixed" then
+                db.global.itemTooltipPlacement = "fixed_br"
+            end
+            db.global.tooltipAddonCompatibility = nil
+        end
+    end
+}
+
+local function MigrateDB()
+    OmniInventoryDB = OmniInventoryDB or {}
+    OmniInventoryDB.global = OmniInventoryDB.global or {}
+
+    local currentVersion = OmniInventoryDB.global.dbVersion or 1
+    local targetVersion = defaults.global.dbVersion or 2
+
+    if currentVersion < targetVersion then
+        for v = currentVersion + 1, targetVersion do
+            if migrations[v] then
+                local ok, err = pcall(migrations[v], OmniInventoryDB)
+                if not ok then
+                    print("|cFF00FF00OmniInventory|r: DB migration to version " .. v .. " failed: " .. tostring(err))
+                else
+                    print("|cFF00FF00OmniInventory|r: DB migrated to version " .. v)
+                end
+            end
+        end
+        OmniInventoryDB.global.dbVersion = targetVersion
+    end
+end
+
+-- =============================================================================
 -- Initialization
 -- =============================================================================
 
 function Data:Init()
-    OmniInventoryDB = OmniInventoryDB or {}
+    -- Run database migrations
+    MigrateDB()
 
     -- Ensure all default keys exist
     OmniInventoryDB.global = OmniInventoryDB.global or {}
@@ -138,17 +180,6 @@ function Data:Init()
     MergeDefaults(OmniInventoryDB.char, defaults.char)
     MergeDefaults(OmniInventoryDB.realm, defaults.realm)
 
-    -- ʕ •ᴥ•ʔ✿ One-shot: retire addon-hook placement + legacy compat flag ✿ ʕ •ᴥ•ʔ
-    do
-        local g = OmniInventoryDB.global
-        local pl = g.itemTooltipPlacement
-        if pl == nil or pl == "addon" then
-            g.itemTooltipPlacement = "right"
-        elseif pl == "fixed" then
-            g.itemTooltipPlacement = "fixed_br"
-        end
-        g.tooltipAddonCompatibility = nil
-    end
 
 
 

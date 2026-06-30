@@ -215,8 +215,21 @@ end
 
 ruleFunctions.Bag = function(item, character, arg)
     if not item or not item.bagID then return false end
-    local num = tonumber(arg)
-    if num then return item.bagID == num end
+    local bagStr = tostring(arg)
+    for part in string.gmatch(bagStr, "[^,]+") do
+        local minB, maxB = string.match(part, "^%s*(%-?%d+)%s*-%s*(%-?%d+)%s*$")
+        if minB and maxB then
+            local bagID = item.bagID
+            if bagID >= tonumber(minB) and bagID <= tonumber(maxB) then
+                return true
+            end
+        else
+            local num = tonumber(part)
+            if num and item.bagID == num then
+                return true
+            end
+        end
+    end
     return false
 end
 
@@ -276,9 +289,21 @@ end
 
 ruleFunctions.Location = function(item, character, arg)
     if not item or not arg then return false end
+    local lowerArg = string.lower(tostring(arg))
+    -- Support inventory locations
+    if lowerArg == "bag" or lowerArg == "bags" then
+        return item.bagID ~= nil and item.bagID >= 0 and item.bagID <= 4
+    elseif lowerArg == "bank" then
+        return item.bagID == -1 or (item.bagID ~= nil and item.bagID >= 5 and item.bagID <= 11)
+    elseif lowerArg == "keyring" then
+        return item.bagID == -2
+    elseif lowerArg == "guild" or lowerArg == "vault" or lowerArg == "guildbank" then
+        return item.guildBankTab ~= nil
+    end
+
+    -- Default: Fallback to zone text matching
     local zone = GetZoneText() or ""
     local subZone = GetSubZoneText() or ""
-    local lowerArg = string.lower(tostring(arg))
     return string.find(string.lower(zone), lowerArg, 1, true) ~= nil
         or string.find(string.lower(subZone), lowerArg, 1, true) ~= nil
 end
@@ -358,6 +383,54 @@ ruleFunctions.ProfessionReagent = function(item, character, arg)
     return false
 end
 
+local function GetItemVendorPrice(item)
+    if not item then return 0 end
+    if item.vendorPrice then return item.vendorPrice end
+    if item.hyperlink then
+        local _, _, _, _, _, _, _, _, _, _, price = GetItemInfo(item.hyperlink)
+        return price or 0
+    end
+    return 0
+end
+
+local function ParseMoneyString(val)
+    if type(val) == "number" then return val end
+    local valStr = tostring(val)
+    local g = tonumber(string.match(valStr, "(%d+)%s*[gG]")) or 0
+    local s = tonumber(string.match(valStr, "(%d+)%s*[sS]")) or 0
+    local c = tonumber(string.match(valStr, "(%d+)%s*[cC]")) or 0
+    if g > 0 or s > 0 or c > 0 then
+        return g * 10000 + s * 100 + c
+    end
+    return tonumber(valStr) or 0
+end
+
+ruleFunctions.VendorPriceUnder = function(item, character, arg)
+    if not item or not arg then return false end
+    local price = GetItemVendorPrice(item)
+    local target = ParseMoneyString(arg)
+    return price < target
+end
+
+ruleFunctions.VendorPriceOver = function(item, character, arg)
+    if not item or not arg then return false end
+    local price = GetItemVendorPrice(item)
+    local target = ParseMoneyString(arg)
+    return price > target
+end
+
+-- Aliases / Shorthands matching ArkInventory
+ruleFunctions.q = ruleFunctions.Quality
+ruleFunctions.tt = ruleFunctions.Tooltip
+ruleFunctions.ilvl = ruleFunctions.ItemLevel
+ruleFunctions.ireq = ruleFunctions.MinLevel
+ruleFunctions.loc = ruleFunctions.Location
+ruleFunctions.sb = ruleFunctions.Soulbound
+ruleFunctions.vpu = ruleFunctions.VendorPriceUnder
+ruleFunctions.vpo = ruleFunctions.VendorPriceOver
+ruleFunctions.bag = ruleFunctions.Bag
+
+
 -- MatchCategory: recursive category matching with loop prevention
 ruleFunctions.MatchCategory = function(item, character, arg)
     if not item or not arg then return false end
@@ -381,20 +454,23 @@ end
 -- =============================================================================
 
 -- Build a sandbox environment for compiled rules
-local function buildRuleEnv(character)
+local function buildRuleEnv(item, character)
     local env = {}
     -- Add all rule functions as callable
     for name, func in pairs(ruleFunctions) do
-        env[name] = function(...) return func(..., character) end
+        env[name] = function(...) return func(item, character, ...) end
     end
-    -- Add boolean operators (Lua native and/or/not work already)
-    -- Add helper for string matching
+    -- Add native Lua math, string, table libraries
+    env.math = math
     env.string = string
+    env.table = table
     env.tonumber = tonumber
     env.tostring = tostring
     env.type = type
     env.pairs = pairs
     env.ipairs = ipairs
+    env.next = next
+    env.select = select
     return env
 end
 
@@ -435,7 +511,7 @@ function Rules:Compile(ruleString)
 
     -- Wrap in a closure that builds the env per-call and sets it
     local function compiledFunc(item, character)
-        local env = buildRuleEnv(character)
+        local env = buildRuleEnv(item, character)
         setfenv(ruleFunc, env)
         local ok2, result = pcall(ruleFunc, item, character)
         if not ok2 then
@@ -686,6 +762,21 @@ end
 -- =============================================================================
 -- Initialization
 -- =============================================================================
+
+--- Register a custom rule function from a third-party addon.
+--- @param name string Name of the rule function (will be exposed in the sandbox)
+--- @param func function Function that receives (item, character, ...) and returns boolean
+function Rules:Register(name, func)
+    if type(name) ~= "string" or type(func) ~= "function" then
+        return false, "invalid arguments"
+    end
+    ruleFunctions[name] = func
+    -- Clear compiled rules cache to allow custom rule to be evaluated in new compilations
+    for k in pairs(compiledRules) do
+        compiledRules[k] = nil
+    end
+    return true
+end
 
 function Rules:Init()
     -- Compile all user-defined categories on load
