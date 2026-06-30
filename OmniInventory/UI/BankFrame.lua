@@ -1575,6 +1575,7 @@ function BankFrame:RenderFlowView(items)
 
             laneY = laneY - sectionHeaderHeight
 
+            local layoutIndex = 0
             for i, itemInfo in ipairs(catItems) do
                 local btn
                 if Omni.Pool then
@@ -1584,8 +1585,9 @@ function BankFrame:RenderFlowView(items)
                 end
 
                 if btn then
-                    local col = ((i - 1) % columns)
-                    local row = math.floor((i - 1) / columns)
+                    layoutIndex = layoutIndex + 1
+                    local col = ((layoutIndex - 1) % columns)
+                    local row = math.floor((layoutIndex - 1) / columns)
                     local x = laneX + col * itemStep
                     local y = laneY - row * itemStep
 
@@ -1608,11 +1610,6 @@ function BankFrame:RenderFlowView(items)
                         if itemInfo.slotID and btn.SetID then
                             pcall(btn.SetID, btn, itemInfo.slotID)
                         end
-                        if itemInfo.__empty then
-                            pcall(btn.SetAlpha, btn, 1)
-                        else
-                            pcall(btn.SetAlpha, btn, 1)
-                        end
                     end
                     if not ok then
                         pcall(SetButtonItem, btn, nil)
@@ -1624,7 +1621,7 @@ function BankFrame:RenderFlowView(items)
                 end
             end
 
-            local catRows = math.ceil(#catItems / columns)
+            local catRows = math.ceil(layoutIndex / columns)
             laneY = laneY - (catRows * itemStep) - sectionSpacing
 
             if dualCategoryLanes then

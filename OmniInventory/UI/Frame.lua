@@ -4666,6 +4666,7 @@ function Frame:RenderFlowView(items, layoutOpts)
 
             local collapsed = IsCategoryCollapsed(catName)
             if not collapsed then
+                local layoutIndex = 0
                 for i, itemInfo in ipairs(catItems) do
                     -- ʕ •ᴥ•ʔ✿ Look up the persistent slot button for this item's
                     -- (bag, slot). It was created, parented to the bag's
@@ -4677,9 +4678,10 @@ function Frame:RenderFlowView(items, layoutOpts)
                     local btn = (bagID and slotID) and GetSlotButton(bagID, slotID) or nil
 
                     if btn then
+                        layoutIndex = layoutIndex + 1
                         flowSlotPaintIndex = flowSlotPaintIndex + 1
-                        local col = ((i - 1) % columns)
-                        local row = math.floor((i - 1) / columns)
+                        local col = ((layoutIndex - 1) % columns)
+                        local row = math.floor((layoutIndex - 1) / columns)
                         local x = laneX + col * itemStep
                         local y = laneY - row * itemStep
 
@@ -4780,7 +4782,7 @@ function Frame:RenderFlowView(items, layoutOpts)
                     end
                 end
 
-                local catRows = math.ceil(#catItems / columns)
+                local catRows = math.ceil(layoutIndex / columns)
                 local itemsBottomY = laneY - (catRows * itemStep)
                 laneY = itemsBottomY - sectionSpacing
             else
