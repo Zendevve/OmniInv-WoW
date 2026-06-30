@@ -33,6 +33,7 @@ local defaults = {
         enableBoundCategories = true,
         enableUnusableOverlay = true,
         autoSellJunk = true,
+        vendorDoubleRightClick = true,
         autoRepair = false,
         autoRepairGuild = false,
         -- ʕ •ᴥ•ʔ✿ Footer: larger outlined gold + slot count; slots tint blue→red by fill ✿ ʕ •ᴥ•ʔ

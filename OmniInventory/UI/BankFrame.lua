@@ -815,7 +815,36 @@ function BankFrame:EquipBankBagFromCursor(bagID)
     if not inv or not PutItemInBag then
         return
     end
-    PutItemInBag(inv)
+
+    local targetHasBag = (GetContainerNumSlots(bagID) or 0) > 0
+    if not targetHasBag then
+        PutItemInBag(inv)
+        return
+    end
+
+    local tempBagID, tempSlotID
+    for _, bID in ipairs(BANK_BAG_IDS) do
+        if bID ~= bagID then
+            local slots = GetContainerNumSlots(bID) or 0
+            for slotID = 1, slots do
+                local texture = GetContainerItemInfo(bID, slotID)
+                if not texture then
+                    tempBagID = bID
+                    tempSlotID = slotID
+                    break
+                end
+            end
+        end
+        if tempBagID then break end
+    end
+
+    if not tempBagID or not tempSlotID then
+        print("|cFF00FF00OmniInventory|r: No free bank slot available to perform bank bag swap.")
+        return
+    end
+
+    PickupContainerItem(tempBagID, tempSlotID)
+    BankFrame:StartBankBagSwap(tempBagID, tempSlotID, bagID)
 end
 
 local function CanBankSlotAcceptItem(bagID, itemFamily)
@@ -851,6 +880,41 @@ local function FindFirstOpenBankSlotExcluding(excludedBagID, itemFamily)
     return nil, nil
 end
 
+local function FindFirstOpenBankSlotExcludingSwap(excludedBagID, newBagBagID, newBagSlotID, itemFamily)
+    for _, bid in ipairs(BANK_BAG_IDS) do
+        if bid ~= excludedBagID and CanBankSlotAcceptItem(bid, itemFamily) then
+            local slots = GetContainerNumSlots(bid) or 0
+            for slotID = 1, slots do
+                if not (bid == newBagBagID and slotID == newBagSlotID) then
+                    local texture = GetContainerItemInfo(bid, slotID)
+                    if not texture then
+                        return bid, slotID
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function CountFreeBankSlotsExcluding(excludedBagID, newBagBagID, newBagSlotID)
+    local count = 0
+    for _, bid in ipairs(BANK_BAG_IDS) do
+        if bid ~= excludedBagID then
+            local slots = GetContainerNumSlots(bid) or 0
+            for slotID = 1, slots do
+                if not (bid == newBagBagID and slotID == newBagSlotID) then
+                    local texture = GetContainerItemInfo(bid, slotID)
+                    if not texture then
+                        count = count + 1
+                    end
+                end
+            end
+        end
+    end
+    return count
+end
+
 local function StopBankForceEmptyJob()
     if bankForceEmptyFrame then
         bankForceEmptyFrame:SetScript("OnUpdate", nil)
@@ -866,12 +930,14 @@ local function FinishBankForceEmptyJob()
     if not bankForceEmptyJob then
         return
     end
-    print(string.format(
-        "|cFF00FF00OmniInventory|r: Bank clear bag %s moved %d, blocked %d.",
-        tostring(bankForceEmptyJob.sourceBagID),
-        bankForceEmptyJob.movedCount,
-        bankForceEmptyJob.blockedCount
-    ))
+    if bankForceEmptyJob.type == "empty" then
+        print(string.format(
+            "|cFF00FF00OmniInventory|r: Bank clear bag %s moved %d, blocked %d.",
+            tostring(bankForceEmptyJob.sourceBagID),
+            bankForceEmptyJob.movedCount,
+            bankForceEmptyJob.blockedCount
+        ))
+    end
     StopBankForceEmptyJob()
     if BankFrame and BankFrame.UpdateLayout then
         BankFrame:UpdateLayout()
@@ -882,56 +948,279 @@ local function RunBankForceEmptyStep()
     if not bankForceEmptyJob then
         return
     end
-    if #bankForceEmptyJob.slots == 0 then
-        FinishBankForceEmptyJob()
-        return
-    end
-    local source = bankForceEmptyJob.sourceBagID
-    local entry = table.remove(bankForceEmptyJob.slots, 1)
-    local slotID = entry.slotID
-    local attempts = entry.attempts or 0
 
-    local texture, _, isLocked = GetContainerItemInfo(source, slotID)
-    if not texture then
-        return
-    end
-    if isLocked then
-        attempts = attempts + 1
-        if attempts >= BANK_FORCE_EMPTY_MAX_LOCK then
-            bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
-        else
-            entry.attempts = attempts
-            table.insert(bankForceEmptyJob.slots, entry)
+    if bankForceEmptyJob.type == "empty" then
+        if #bankForceEmptyJob.slots == 0 then
+            FinishBankForceEmptyJob()
+            return
         end
-        return
-    end
-    local itemLink = GetContainerItemLink(source, slotID)
-    local fam = (itemLink and GetItemFamily(itemLink)) or 0
-    local tBag, tSlot = FindFirstOpenBankSlotExcluding(source, fam)
-    if not tBag or not tSlot then
-        bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
-        return
-    end
-    if PickupContainerItem then
-        PickupContainerItem(source, slotID)
-    end
-    if CursorHasItem and CursorHasItem() and PickupContainerItem then
-        PickupContainerItem(tBag, tSlot)
-    end
-    if CursorHasItem and CursorHasItem() and ClearCursor then
-        ClearCursor()
-        attempts = attempts + 1
-        if attempts >= BANK_FORCE_EMPTY_MAX_MOVE then
-            bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
-        else
-            entry.attempts = attempts
-            table.insert(bankForceEmptyJob.slots, entry)
+        local source = bankForceEmptyJob.sourceBagID
+        local entry = table.remove(bankForceEmptyJob.slots, 1)
+        local slotID = entry.slotID
+        local attempts = entry.attempts or 0
+
+        local texture, _, isLocked = GetContainerItemInfo(source, slotID)
+        if not texture then
+            RunBankForceEmptyStep()
+            return
         end
-    else
-        bankForceEmptyJob.movedCount = bankForceEmptyJob.movedCount + 1
-        bankForceEmptyJob.awaitingEvent = true
-        bankForceEmptyJob.awaitElapsed = 0
+        if isLocked then
+            attempts = attempts + 1
+            if attempts >= BANK_FORCE_EMPTY_MAX_LOCK then
+                bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                RunBankForceEmptyStep()
+            else
+                entry.attempts = attempts
+                table.insert(bankForceEmptyJob.slots, entry)
+            end
+            return
+        end
+        local itemLink = GetContainerItemLink(source, slotID)
+        local fam = (itemLink and GetItemFamily(itemLink)) or 0
+        local tBag, tSlot = FindFirstOpenBankSlotExcluding(source, fam)
+        if not tBag or not tSlot then
+            bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+            RunBankForceEmptyStep()
+            return
+        end
+        if PickupContainerItem then
+            PickupContainerItem(source, slotID)
+        end
+        if CursorHasItem and CursorHasItem() and PickupContainerItem then
+            PickupContainerItem(tBag, tSlot)
+        end
+        if CursorHasItem and CursorHasItem() and ClearCursor then
+            ClearCursor()
+            attempts = attempts + 1
+            if attempts >= BANK_FORCE_EMPTY_MAX_MOVE then
+                bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                RunBankForceEmptyStep()
+            else
+                entry.attempts = attempts
+                table.insert(bankForceEmptyJob.slots, entry)
+            end
+        else
+            bankForceEmptyJob.movedCount = bankForceEmptyJob.movedCount + 1
+            bankForceEmptyJob.awaitingEvent = true
+            bankForceEmptyJob.awaitElapsed = 0
+        end
+
+    elseif bankForceEmptyJob.type == "swap" then
+        if bankForceEmptyJob.phase == 1 then
+            -- Phase 1: Empty targetBagID
+            if #bankForceEmptyJob.slots > 0 then
+                local source = bankForceEmptyJob.targetBagID
+                local entry = table.remove(bankForceEmptyJob.slots, 1)
+                local slotID = entry.slotID
+                local attempts = entry.attempts or 0
+
+                local texture, _, isLocked = GetContainerItemInfo(source, slotID)
+                if not texture then
+                    RunBankForceEmptyStep()
+                    return
+                end
+                if isLocked then
+                    attempts = attempts + 1
+                    if attempts >= BANK_FORCE_EMPTY_MAX_LOCK then
+                        bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                        RunBankForceEmptyStep()
+                    else
+                        entry.attempts = attempts
+                        table.insert(bankForceEmptyJob.slots, entry)
+                    end
+                    return
+                end
+
+                local itemLink = GetContainerItemLink(source, slotID)
+                local fam = (itemLink and GetItemFamily(itemLink)) or 0
+                local tBag, tSlot = FindFirstOpenBankSlotExcludingSwap(bankForceEmptyJob.targetBagID, bankForceEmptyJob.sourceBagID, bankForceEmptyJob.sourceSlotID, fam)
+                if not tBag or not tSlot then
+                    print("|cFF00FF00OmniInventory|r: Aborting swap - out of free bank space.")
+                    StopBankForceEmptyJob()
+                    return
+                end
+
+                if PickupContainerItem then
+                    PickupContainerItem(source, slotID)
+                end
+                if CursorHasItem and CursorHasItem() and PickupContainerItem then
+                    PickupContainerItem(tBag, tSlot)
+                end
+
+                if CursorHasItem and CursorHasItem() and ClearCursor then
+                    ClearCursor()
+                    attempts = attempts + 1
+                    if attempts >= BANK_FORCE_EMPTY_MAX_MOVE then
+                        bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                        RunBankForceEmptyStep()
+                    else
+                        entry.attempts = attempts
+                        table.insert(bankForceEmptyJob.slots, entry)
+                    end
+                else
+                    bankForceEmptyJob.movedCount = bankForceEmptyJob.movedCount + 1
+                    bankForceEmptyJob.awaitingEvent = true
+                    bankForceEmptyJob.awaitElapsed = 0
+                    table.insert(bankForceEmptyJob.shuffledItems, {
+                        originalSlotID = slotID,
+                        tempBagID = tBag,
+                        tempSlotID = tSlot,
+                    })
+                end
+            else
+                bankForceEmptyJob.phase = 2
+                bankForceEmptyJob.awaitingEvent = true
+                bankForceEmptyJob.awaitElapsed = 0
+            end
+
+        elseif bankForceEmptyJob.phase == 2 then
+            -- Phase 2: Equip new bag
+            local texture, _, isLocked = GetContainerItemInfo(bankForceEmptyJob.sourceBagID, bankForceEmptyJob.sourceSlotID)
+            if isLocked then
+                return
+            end
+
+            PickupContainerItem(bankForceEmptyJob.sourceBagID, bankForceEmptyJob.sourceSlotID)
+            if CursorHasItem and CursorHasItem() then
+                local invSlot = ContainerIDToInventoryID(bankForceEmptyJob.targetBagID)
+                if invSlot and PutItemInBag then
+                    PutItemInBag(invSlot)
+                end
+            end
+
+            bankForceEmptyJob.phase = 3
+            bankForceEmptyJob.awaitingEvent = true
+            bankForceEmptyJob.awaitElapsed = 0
+
+        elseif bankForceEmptyJob.phase == 3 then
+            -- Phase 3: Store old bag
+            if CursorHasItem and CursorHasItem() then
+                PickupContainerItem(bankForceEmptyJob.sourceBagID, bankForceEmptyJob.sourceSlotID)
+            end
+
+            if CursorHasItem and CursorHasItem() then
+                local tempBag, tempSlot = FindFirstOpenBankSlotExcludingSwap(bankForceEmptyJob.targetBagID, nil, nil, 0)
+                if tempBag and tempSlot then
+                    PickupContainerItem(tempBag, tempSlot)
+                end
+            end
+
+            if CursorHasItem and CursorHasItem() and ClearCursor then
+                ClearCursor()
+            end
+
+            bankForceEmptyJob.phase = 4
+            bankForceEmptyJob.slots = {}
+            for _, info in ipairs(bankForceEmptyJob.shuffledItems) do
+                table.insert(bankForceEmptyJob.slots, {
+                    slotID = info.originalSlotID,
+                    tempBagID = info.tempBagID,
+                    tempSlotID = info.tempSlotID,
+                    attempts = 0,
+                })
+            end
+            bankForceEmptyJob.awaitingEvent = true
+            bankForceEmptyJob.awaitElapsed = 0
+
+        elseif bankForceEmptyJob.phase == 4 then
+            -- Phase 4: Refill items
+            if #bankForceEmptyJob.slots > 0 then
+                local entry = table.remove(bankForceEmptyJob.slots, 1)
+                local targetSlotID = entry.slotID
+                local tempBagID = entry.tempBagID
+                local tempSlotID = entry.tempSlotID
+                local attempts = entry.attempts or 0
+
+                local texture, _, isLocked = GetContainerItemInfo(tempBagID, tempSlotID)
+                if not texture then
+                    RunBankForceEmptyStep()
+                    return
+                end
+                if isLocked then
+                    attempts = attempts + 1
+                    if attempts >= BANK_FORCE_EMPTY_MAX_LOCK then
+                        bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                        RunBankForceEmptyStep()
+                    else
+                        entry.attempts = attempts
+                        table.insert(bankForceEmptyJob.slots, entry)
+                    end
+                    return
+                end
+
+                PickupContainerItem(tempBagID, tempSlotID)
+                if CursorHasItem and CursorHasItem() and PickupContainerItem then
+                    PickupContainerItem(bankForceEmptyJob.targetBagID, targetSlotID)
+                end
+
+                if CursorHasItem and CursorHasItem() and ClearCursor then
+                    ClearCursor()
+                    attempts = attempts + 1
+                    if attempts >= BANK_FORCE_EMPTY_MAX_MOVE then
+                        bankForceEmptyJob.blockedCount = bankForceEmptyJob.blockedCount + 1
+                        RunBankForceEmptyStep()
+                    else
+                        entry.attempts = attempts
+                        table.insert(bankForceEmptyJob.slots, entry)
+                    end
+                else
+                    bankForceEmptyJob.movedCount = bankForceEmptyJob.movedCount + 1
+                    bankForceEmptyJob.awaitingEvent = true
+                    bankForceEmptyJob.awaitElapsed = 0
+                end
+            else
+                print(string.format("|cFF00FF00OmniInventory|r: Successfully swapped bank bag %d.", bankForceEmptyJob.targetBagID))
+                StopBankForceEmptyJob()
+                if BankFrame and BankFrame.UpdateLayout then
+                    BankFrame:UpdateLayout()
+                end
+            end
+        end
     end
+end
+
+local function ensureBankForceEmptyFrame()
+    if bankForceEmptyFrame then return end
+    bankForceEmptyFrame = CreateFrame("Frame")
+    bankForceEmptyFrame:RegisterEvent("BAG_UPDATE")
+    bankForceEmptyFrame:RegisterEvent("ITEM_LOCK_CHANGED")
+    bankForceEmptyFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+    bankForceEmptyFrame:SetScript("OnEvent", function(_, event, arg1)
+        if not bankForceEmptyJob then
+            return
+        end
+        if event == "BAG_UPDATE" and arg1 ~= nil then
+            if bankForceEmptyJob.type == "empty" and arg1 ~= bankForceEmptyJob.sourceBagID then
+                bankForceEmptyJob.awaitingEvent = false
+            elseif bankForceEmptyJob.type == "swap" then
+                bankForceEmptyJob.awaitingEvent = false
+            end
+            return
+        end
+        bankForceEmptyJob.awaitingEvent = false
+    end)
+    bankForceEmptyFrame:SetScript("OnUpdate", function(self, elapsed)
+        if not bankForceEmptyJob then
+            return
+        end
+        if bankForceEmptyJob.awaitingEvent then
+            bankForceEmptyJob.awaitElapsed = bankForceEmptyJob.awaitElapsed + (elapsed or 0)
+            if bankForceEmptyJob.awaitElapsed < BANK_FORCE_EMPTY_EVENT_TIMEOUT then
+                return
+            end
+            bankForceEmptyJob.awaitingEvent = false
+        end
+        if CursorHasItem and CursorHasItem() then
+            if bankForceEmptyJob.type == "empty" or (bankForceEmptyJob.type == "swap" and bankForceEmptyJob.phase ~= 2 and bankForceEmptyJob.phase ~= 3) then
+                return
+            end
+        end
+        if InCombat() then
+            StopBankForceEmptyJob()
+            return
+        end
+        RunBankForceEmptyStep()
+    end)
 end
 
 function BankFrame:ForceEmptyBankBag(sourceBagID)
@@ -940,7 +1229,7 @@ function BankFrame:ForceEmptyBankBag(sourceBagID)
         print("|cFF00FF00OmniInventory|r: Clear cursor before force-empty.")
         return
     end
-    if InCombatLockdown and InCombatLockdown() then
+    if InCombat() then
         print("|cFF00FF00OmniInventory|r: Bank force-empty is unavailable during combat.")
         return
     end
@@ -964,6 +1253,7 @@ function BankFrame:ForceEmptyBankBag(sourceBagID)
         StopBankForceEmptyJob()
     end
     bankForceEmptyJob = {
+        type = "empty",
         sourceBagID = sourceBagID,
         slots = slots,
         movedCount = 0,
@@ -971,42 +1261,72 @@ function BankFrame:ForceEmptyBankBag(sourceBagID)
         awaitingEvent = false,
         awaitElapsed = 0,
     }
-    bankForceEmptyFrame = bankForceEmptyFrame or CreateFrame("Frame")
-    bankForceEmptyFrame:RegisterEvent("BAG_UPDATE")
-    bankForceEmptyFrame:RegisterEvent("ITEM_LOCK_CHANGED")
-    bankForceEmptyFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
-    bankForceEmptyFrame:SetScript("OnEvent", function(_, event, arg1)
-        if not bankForceEmptyJob then
-            return
+    ensureBankForceEmptyFrame()
+end
+
+function BankFrame:StartBankBagSwap(sourceBagID, sourceSlotID, targetBagID)
+    if not IsValidBankBagID(targetBagID) or not IsValidBankBagID(sourceBagID) then return end
+
+    if InCombat() then
+        print("|cFF00FF00OmniInventory|r: Cannot swap bank bags during combat.")
+        return
+    end
+
+    local filledCount = 0
+    local targetSlots = GetContainerNumSlots(targetBagID) or 0
+    local slotsToEmpty = {}
+    for slotID = 1, targetSlots do
+        local texture = GetContainerItemInfo(targetBagID, slotID)
+        if texture then
+            filledCount = filledCount + 1
+            table.insert(slotsToEmpty, { slotID = slotID, attempts = 0 })
         end
-        if event == "BAG_UPDATE" and arg1 ~= nil then
-            if arg1 ~= bankForceEmptyJob.sourceBagID then
-                bankForceEmptyJob.awaitingEvent = false
-            end
-            return
+    end
+
+    if filledCount == 0 then
+        if ClearCursor then ClearCursor() end
+        PickupContainerItem(sourceBagID, sourceSlotID)
+        if CursorHasItem() then
+            local invSlot = ContainerIDToInventoryID(targetBagID)
+            if invSlot and PutItemInBag then PutItemInBag(invSlot) end
         end
-        bankForceEmptyJob.awaitingEvent = false
-    end)
-    bankForceEmptyFrame:SetScript("OnUpdate", function(self, elapsed)
-        if not bankForceEmptyJob then
-            return
+        if CursorHasItem() then
+            PickupContainerItem(sourceBagID, sourceSlotID)
         end
-        if bankForceEmptyJob.awaitingEvent then
-            bankForceEmptyJob.awaitElapsed = bankForceEmptyJob.awaitElapsed + (elapsed or 0)
-            if bankForceEmptyJob.awaitElapsed < BANK_FORCE_EMPTY_EVENT_TIMEOUT then
-                return
-            end
-            bankForceEmptyJob.awaitingEvent = false
+        if CursorHasItem() and ClearCursor then ClearCursor() end
+        print(string.format("|cFF00FF00OmniInventory|r: Successfully swapped empty bank bag slot %d.", targetBagID))
+        if BankFrame and BankFrame.UpdateLayout then
+            BankFrame:UpdateLayout()
         end
-        if CursorHasItem and CursorHasItem() then
-            return
-        end
-        if InCombatLockdown and InCombatLockdown() then
-            StopBankForceEmptyJob()
-            return
-        end
-        RunBankForceEmptyStep()
-    end)
+        return
+    end
+
+    local freeSlots = CountFreeBankSlotsExcluding(targetBagID, sourceBagID, sourceSlotID)
+    if freeSlots < filledCount then
+        print(string.format("|cFF00FF00OmniInventory|r: Not enough free bank slots to swap this bag. Need %d slots, have %d.", filledCount, freeSlots))
+        return
+    end
+
+    if bankForceEmptyJob then
+        StopBankForceEmptyJob()
+    end
+
+    bankForceEmptyJob = {
+        type = "swap",
+        phase = 1,
+        targetBagID = targetBagID,
+        sourceBagID = sourceBagID,
+        sourceSlotID = sourceSlotID,
+        slots = slotsToEmpty,
+        movedCount = 0,
+        blockedCount = 0,
+        awaitingEvent = false,
+        awaitElapsed = 0,
+        shuffledItems = {},
+    }
+
+    ensureBankForceEmptyFrame()
+    print(string.format("|cFF00FF00OmniInventory|r: Swapping bank bag %d (moving %d items)...", targetBagID, filledCount))
 end
 
 function BankFrame:RenderFlowView(items)

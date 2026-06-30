@@ -1052,9 +1052,38 @@ function Frame:EquipBagFromCursor(bagID)
 
     local inventoryID = ContainerIDToInventoryID and ContainerIDToInventoryID(bagID)
     if not inventoryID then return end
-    if PutItemInBag then
-        PutItemInBag(inventoryID)
+
+    local targetHasBag = (GetContainerNumSlots(bagID) or 0) > 0
+    if not targetHasBag then
+        if PutItemInBag then
+            PutItemInBag(inventoryID)
+        end
+        return
     end
+
+    local tempBagID, tempSlotID
+    for _, bID in ipairs(DIM.BAG_IDS) do
+        if bID ~= bagID then
+            local slots = GetContainerNumSlots(bID) or 0
+            for slotID = 1, slots do
+                local texture = GetContainerItemInfo(bID, slotID)
+                if not texture then
+                    tempBagID = bID
+                    tempSlotID = slotID
+                    break
+                end
+            end
+        end
+        if tempBagID then break end
+    end
+
+    if not tempBagID or not tempSlotID then
+        print("|cFF00FF00OmniInventory|r: No free slot available to perform bag swap.")
+        return
+    end
+
+    PickupContainerItem(tempBagID, tempSlotID)
+    Frame:StartBagSwap(tempBagID, tempSlotID, bagID)
 end
 
 function Frame:CreateHeader()
@@ -2297,6 +2326,70 @@ end
 -- =============================================================================
 
 -- ʕ •ᴥ•ʔ✿ Footer custom launcher buttons ✿ ʕ •ᴥ•ʔ
+local function FindHearthstone()
+    for bagID = 0, 4 do
+        local slots = GetContainerNumSlots(bagID) or 0
+        for slotID = 1, slots do
+            local link = GetContainerItemLink(bagID, slotID)
+            if link then
+                local itemID = tonumber(string.match(link, "item:(%d+)"))
+                if itemID == 6948 then
+                    return bagID, slotID
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function FindFirstOpenableContainer()
+    local tooltip = CreateFrame("GameTooltip", "OmniOpenableScanTooltip", nil, "GameTooltipTemplate")
+    tooltip:SetOwner(WorldFrame, "ANCHOR_NONE")
+
+    local RIGHT_CLICK_TO_OPEN = ITEM_OPENABLE or "Right Click to Open"
+    local lowerOpenPattern = string.lower(RIGHT_CLICK_TO_OPEN)
+    local fallbackPattern = "right click to open"
+    local fallbackPattern2 = "right-click to open"
+
+    for bagID = 0, 4 do
+        local slots = GetContainerNumSlots(bagID) or 0
+        for slotID = 1, slots do
+            local link = GetContainerItemLink(bagID, slotID)
+            if link then
+                tooltip:ClearLines()
+                tooltip:SetBagItem(bagID, slotID)
+                for i = 2, tooltip:NumLines() do
+                    local leftText = _G["OmniOpenableScanTooltipTextLeft" .. i]
+                    if leftText then
+                        local text = leftText:GetText()
+                        if text then
+                            local textLower = string.lower(text)
+                            if string.find(textLower, lowerOpenPattern) or string.find(textLower, fallbackPattern) or string.find(textLower, fallbackPattern2) then
+                                return bagID, slotID, link
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil, nil, nil
+end
+
+local function HasSpell(spellName)
+    local i = 1
+    while true do
+        local sName = GetSpellName(i, BOOKTYPE_SPELL)
+        if not sName then break end
+        if sName == spellName then
+            return true
+        end
+        i = i + 1
+    end
+    return false
+end
+
+-- ʕ •ᴥ•ʔ✿ Footer custom launcher buttons ✿ ʕ •ᴥ•ʔ
 local FOOTER_CUSTOM_BUTTONS = {
     {
         key     = "resetInstances",
@@ -2310,6 +2403,97 @@ local FOOTER_CUSTOM_BUTTONS = {
             if type(_G.ResetInstances) == "function" then
                 _G.ResetInstances()
             end
+        end,
+    },
+    {
+        key     = "hearthstone",
+        icon    = "Interface\\Icons\\INV_Misc_Rune_01",
+        title   = "Hearthstone",
+        sub     = "Left-click to cast Hearthstone. Right-click to pick up.",
+        onClick = function()
+            local bagID, slotID = FindHearthstone()
+            if bagID and slotID then
+                UseContainerItem(bagID, slotID)
+            else
+                print("|cFF00FF00OmniInventory|r: Hearthstone not found in bags.")
+            end
+        end,
+        onDragStart = function(self)
+            local bagID, slotID = FindHearthstone()
+            if bagID and slotID then
+                PickupContainerItem(bagID, slotID)
+            end
+        end,
+        onEnter = function(self)
+            self:SetBackdropBorderColor(0.9, 0.8, 0.2, 1)
+            local bagID, slotID = FindHearthstone()
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            if bagID and slotID then
+                GameTooltip:SetBagItem(bagID, slotID)
+            else
+                GameTooltip:SetHyperlink("item:6948")
+                GameTooltip:AddLine(" ")
+                GameTooltip:AddLine("Not found in bags", 1, 0, 0)
+            end
+            GameTooltip:Show()
+        end,
+        onLeave = function(self)
+            self:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.6)
+            GameTooltip:Hide()
+        end,
+    },
+    {
+        key     = "openables",
+        icon    = "Interface\\Icons\\INV_Misc_Clam_01",
+        title   = "Openable Opener",
+        sub     = "Uses the first openable container found (clams, lockboxes, crates).",
+        onClick = function()
+            local bagID, slotID = FindFirstOpenableContainer()
+            if bagID and slotID then
+                UseContainerItem(bagID, slotID)
+            else
+                print("|cFF00FF00OmniInventory|r: No openable containers found in bags.")
+            end
+        end,
+        onEnter = function(self)
+            self:SetBackdropBorderColor(0.9, 0.8, 0.2, 1)
+            local bagID, slotID = FindFirstOpenableContainer()
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            if bagID and slotID then
+                GameTooltip:SetBagItem(bagID, slotID)
+            else
+                GameTooltip:SetText("Openable Opener", 1, 0.82, 0)
+                GameTooltip:AddLine("No openable containers (clams, lockboxes) found.", 1, 1, 1, true)
+            end
+            GameTooltip:Show()
+        end,
+        onLeave = function(self)
+            self:SetBackdropBorderColor(0.4, 0.4, 0.4, 0.6)
+            GameTooltip:Hide()
+        end,
+    },
+    {
+        key     = "disenchant",
+        icon    = "Interface\\Icons\\Spell_Holy_RemoveCurse",
+        title   = "Disenchant",
+        sub     = "Changes cursor to disenchant an item in your bags.",
+        isAvailable = function()
+            return HasSpell("Disenchant")
+        end,
+        onClick = function()
+            CastSpellByName("Disenchant")
+        end,
+    },
+    {
+        key     = "picklock",
+        icon    = "Interface\\Icons\\Spell_Nature_RogueProgress",
+        title   = "Pick Lock",
+        sub     = "Changes cursor to pick a lockbox in your bags.",
+        isAvailable = function()
+            return HasSpell("Pick Lock")
+        end,
+        onClick = function()
+            CastSpellByName("Pick Lock")
         end,
     },
 }
@@ -2418,8 +2602,16 @@ local function CreateFooterMiniButton(parent, def)
 
     StyleFooterMiniButton(btn)
 
-    btn._tooltipTitle = def.title
-    btn._tooltipSub = def.sub
+    if not def.onEnter then
+        btn._tooltipTitle = def.title
+        btn._tooltipSub = def.sub
+    else
+        btn:SetScript("OnEnter", def.onEnter)
+    end
+    if type(def.onLeave) == "function" then
+        btn:SetScript("OnLeave", def.onLeave)
+    end
+
     btn:SetScript("OnMouseDown", function(self)
         local tex = self:GetNormalTexture()
         if tex then tex:SetVertexColor(0.75, 0.75, 0.75) end
@@ -2458,6 +2650,10 @@ local function CreateFooterMiniButton(parent, def)
         end)
     end
 
+    if type(def.onDragStart) == "function" then
+        btn:RegisterForDrag("LeftButton")
+        btn:SetScript("OnDragStart", def.onDragStart)
+    end
     if type(def.onReceiveDrag) == "function" then
         btn:RegisterForDrag("LeftButton")
         btn:SetScript("OnReceiveDrag", def.onReceiveDrag)
@@ -5296,6 +5492,123 @@ do
         return nil, nil
     end
 
+    local function findFirstOpenSlotExcludingSwap(excludedBagID, newBagBagID, newBagSlotID, itemFamily)
+        for _, bagID in ipairs(DIM.BAG_IDS) do
+            if bagID ~= excludedBagID and canBagAcceptItem(bagID, itemFamily) then
+                local slots = GetContainerNumSlots(bagID) or 0
+                for slotID = 1, slots do
+                    if not (bagID == newBagBagID and slotID == newBagSlotID) then
+                        local texture = GetContainerItemInfo(bagID, slotID)
+                        if not texture then
+                            return bagID, slotID
+                        end
+                    end
+                end
+            end
+        end
+        return nil, nil
+    end
+
+    local function CountFreeSlotsExcluding(excludedBagID, newBagBagID, newBagSlotID)
+        local count = 0
+        for _, bagID in ipairs(DIM.BAG_IDS) do
+            if bagID ~= excludedBagID then
+                local slots = GetContainerNumSlots(bagID) or 0
+                for slotID = 1, slots do
+                    if not (bagID == newBagBagID and slotID == newBagSlotID) then
+                        local texture = GetContainerItemInfo(bagID, slotID)
+                        if not texture then
+                            count = count + 1
+                        end
+                    end
+                end
+            end
+        end
+        return count
+    end
+
+    local function FindLockedSwappingBags()
+        local sourceBagID, sourceSlotID, targetBagID
+        local bankBagIDs = { 5, 6, 7, 8, 9, 10, 11 }
+
+        -- 1. Scan player bag slots to find locked equipped bag slot
+        for _, bagID in ipairs(DIM.BAG_IDS) do
+            if bagID > 0 then
+                local invID = ContainerIDToInventoryID(bagID)
+                if invID and IsInventoryItemLocked(invID) then
+                    targetBagID = bagID
+                    break
+                end
+            end
+        end
+
+        -- If bank is open, check bank bag slots too
+        if not targetBagID and _G.BankFrame and _G.BankFrame:IsShown() then
+            for _, bagID in ipairs(bankBagIDs) do
+                local invID = ContainerIDToInventoryID(bagID)
+                if invID and IsInventoryItemLocked(invID) then
+                    targetBagID = bagID
+                    break
+                end
+            end
+        end
+
+        if not targetBagID then return nil end
+
+        -- 2. Scan all bags to find the locked container item (the new bag)
+        for _, bagID in ipairs(DIM.BAG_IDS) do
+            local slots = GetContainerNumSlots(bagID) or 0
+            for slotID = 1, slots do
+                local _, _, isLocked = GetContainerItemInfo(bagID, slotID)
+                if isLocked then
+                    local link = GetContainerItemLink(bagID, slotID)
+                    local itemEquipLoc
+                    if link then
+                        local _, _, _, _, _, _, _, _, eqLoc = GetItemInfo(link)
+                        itemEquipLoc = eqLoc
+                    end
+                    if itemEquipLoc == "INVTYPE_BAG" then
+                        sourceBagID = bagID
+                        sourceSlotID = slotID
+                        break
+                    end
+                end
+            end
+            if sourceBagID then break end
+        end
+
+        -- Check bank bags too if bank is open
+        if not sourceBagID and _G.BankFrame and _G.BankFrame:IsShown() then
+            for _, bagID in ipairs(bankBagIDs) do
+                local slots = GetContainerNumSlots(bagID) or 0
+                for slotID = 1, slots do
+                    local _, _, isLocked = GetContainerItemInfo(bagID, slotID)
+                    if isLocked then
+                        local link = GetContainerItemLink(bagID, slotID)
+                        local itemEquipLoc
+                        if link then
+                            local _, _, _, _, _, _, _, _, eqLoc = GetItemInfo(link)
+                            itemEquipLoc = eqLoc
+                        end
+                        if itemEquipLoc == "INVTYPE_BAG" then
+                            sourceBagID = bagID
+                            sourceSlotID = slotID
+                            break
+                        end
+                    end
+                end
+                if sourceBagID then break end
+            end
+        end
+
+        if sourceBagID and sourceSlotID and targetBagID then
+            return sourceBagID, sourceSlotID, targetBagID
+        end
+        return nil
+    end
+
+    Frame.FindLockedSwappingBags = FindLockedSwappingBags
+
     local function stopForceEmptyJob()
         if forceEmptyFrame then
             forceEmptyFrame:SetScript("OnUpdate", nil)
@@ -5311,8 +5624,10 @@ do
             return
         end
 
-        print(string.format("|cFF00FF00OmniInventory|r: Force-empty bag %d moved %d, blocked %d.",
-            forceEmptyJob.sourceBagID, forceEmptyJob.movedCount, forceEmptyJob.blockedCount))
+        if forceEmptyJob.type == "empty" then
+            print(string.format("|cFF00FF00OmniInventory|r: Force-empty bag %d moved %d, blocked %d.",
+                forceEmptyJob.sourceBagID, forceEmptyJob.movedCount, forceEmptyJob.blockedCount))
+        end
 
         stopForceEmptyJob()
         if Frame and Frame.UpdateLayout then
@@ -5325,58 +5640,273 @@ do
             return
         end
 
-        if #forceEmptyJob.slots == 0 then
-            finishForceEmptyJob()
-            return
-        end
-
-        local sourceBagID = forceEmptyJob.sourceBagID
-        local slotEntry = table.remove(forceEmptyJob.slots, 1)
-        local slotID = slotEntry.slotID
-        local attempts = slotEntry.attempts or 0
-
-        local texture, _, isLocked = GetContainerItemInfo(sourceBagID, slotID)
-        if not texture then
-            return
-        end
-        if isLocked then
-            attempts = attempts + 1
-            if attempts >= DIM.FORCE_EMPTY_MAX_LOCK_RETRIES then
-                forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
-            else
-                slotEntry.attempts = attempts
-                table.insert(forceEmptyJob.slots, slotEntry)
+        if forceEmptyJob.type == "empty" then
+            if #forceEmptyJob.slots == 0 then
+                finishForceEmptyJob()
+                return
             end
-            return
-        end
 
-        local itemLink = GetContainerItemLink(sourceBagID, slotID)
-        local itemFamily = (itemLink and GetItemFamily(itemLink)) or 0
-        local targetBagID, targetSlotID = findFirstOpenSlotExcludingBag(sourceBagID, itemFamily)
-        if not targetBagID or not targetSlotID then
-            forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
-            return
-        end
+            local sourceBagID = forceEmptyJob.sourceBagID
+            local slotEntry = table.remove(forceEmptyJob.slots, 1)
+            local slotID = slotEntry.slotID
+            local attempts = slotEntry.attempts or 0
 
-        PickupContainerItem(sourceBagID, slotID)
-        if CursorHasItem and CursorHasItem() then
-            PickupContainerItem(targetBagID, targetSlotID)
-        end
-
-        if CursorHasItem and CursorHasItem() then
-            ClearCursor()
-            attempts = attempts + 1
-            if attempts >= DIM.FORCE_EMPTY_MAX_MOVE_RETRIES then
-                forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
-            else
-                slotEntry.attempts = attempts
-                table.insert(forceEmptyJob.slots, slotEntry)
+            local texture, _, isLocked = GetContainerItemInfo(sourceBagID, slotID)
+            if not texture then
+                runForceEmptyStep()
+                return
             end
-        else
-            forceEmptyJob.movedCount = forceEmptyJob.movedCount + 1
-            forceEmptyJob.awaitingEvent = true
-            forceEmptyJob.awaitElapsed = 0
+            if isLocked then
+                attempts = attempts + 1
+                if attempts >= DIM.FORCE_EMPTY_MAX_LOCK_RETRIES then
+                    forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                    runForceEmptyStep()
+                else
+                    slotEntry.attempts = attempts
+                    table.insert(forceEmptyJob.slots, slotEntry)
+                end
+                return
+            end
+
+            local itemLink = GetContainerItemLink(sourceBagID, slotID)
+            local itemFamily = (itemLink and GetItemFamily(itemLink)) or 0
+            local targetBagID, targetSlotID = findFirstOpenSlotExcludingBag(sourceBagID, itemFamily)
+            if not targetBagID or not targetSlotID then
+                forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                runForceEmptyStep()
+                return
+            end
+
+            PickupContainerItem(sourceBagID, slotID)
+            if CursorHasItem and CursorHasItem() then
+                PickupContainerItem(targetBagID, targetSlotID)
+            end
+
+            if CursorHasItem and CursorHasItem() then
+                ClearCursor()
+                attempts = attempts + 1
+                if attempts >= DIM.FORCE_EMPTY_MAX_MOVE_RETRIES then
+                    forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                    runForceEmptyStep()
+                else
+                    slotEntry.attempts = attempts
+                    table.insert(forceEmptyJob.slots, slotEntry)
+                end
+            else
+                forceEmptyJob.movedCount = forceEmptyJob.movedCount + 1
+                forceEmptyJob.awaitingEvent = true
+                forceEmptyJob.awaitElapsed = 0
+            end
+
+        elseif forceEmptyJob.type == "swap" then
+            if forceEmptyJob.phase == 1 then
+                -- Phase 1: Empty targetBagID
+                if #forceEmptyJob.slots > 0 then
+                    local sourceBagID = forceEmptyJob.targetBagID
+                    local slotEntry = table.remove(forceEmptyJob.slots, 1)
+                    local slotID = slotEntry.slotID
+                    local attempts = slotEntry.attempts or 0
+
+                    local texture, _, isLocked = GetContainerItemInfo(sourceBagID, slotID)
+                    if not texture then
+                        runForceEmptyStep()
+                        return
+                    end
+                    if isLocked then
+                        attempts = attempts + 1
+                        if attempts >= DIM.FORCE_EMPTY_MAX_LOCK_RETRIES then
+                            forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                            runForceEmptyStep()
+                        else
+                            slotEntry.attempts = attempts
+                            table.insert(forceEmptyJob.slots, slotEntry)
+                        end
+                        return
+                    end
+
+                    local itemLink = GetContainerItemLink(sourceBagID, slotID)
+                    local itemFamily = (itemLink and GetItemFamily(itemLink)) or 0
+                    local targetBagID, targetSlotID = findFirstOpenSlotExcludingSwap(forceEmptyJob.targetBagID, forceEmptyJob.sourceBagID, forceEmptyJob.sourceSlotID, itemFamily)
+                    if not targetBagID or not targetSlotID then
+                        print("|cFF00FF00OmniInventory|r: Aborting swap - out of free space.")
+                        stopForceEmptyJob()
+                        return
+                    end
+
+                    PickupContainerItem(sourceBagID, slotID)
+                    if CursorHasItem and CursorHasItem() then
+                        PickupContainerItem(targetBagID, targetSlotID)
+                    end
+
+                    if CursorHasItem and CursorHasItem() then
+                        ClearCursor()
+                        attempts = attempts + 1
+                        if attempts >= DIM.FORCE_EMPTY_MAX_MOVE_RETRIES then
+                            forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                            runForceEmptyStep()
+                        else
+                            slotEntry.attempts = attempts
+                            table.insert(forceEmptyJob.slots, slotEntry)
+                        end
+                    else
+                        forceEmptyJob.movedCount = forceEmptyJob.movedCount + 1
+                        forceEmptyJob.awaitingEvent = true
+                        forceEmptyJob.awaitElapsed = 0
+                        table.insert(forceEmptyJob.shuffledItems, {
+                            originalSlotID = slotID,
+                            tempBagID = targetBagID,
+                            tempSlotID = targetSlotID,
+                        })
+                    end
+                else
+                    forceEmptyJob.phase = 2
+                    forceEmptyJob.awaitingEvent = true
+                    forceEmptyJob.awaitElapsed = 0
+                end
+
+            elseif forceEmptyJob.phase == 2 then
+                -- Phase 2: Equip the new bag
+                local texture, _, isLocked = GetContainerItemInfo(forceEmptyJob.sourceBagID, forceEmptyJob.sourceSlotID)
+                if isLocked then
+                    return
+                end
+
+                PickupContainerItem(forceEmptyJob.sourceBagID, forceEmptyJob.sourceSlotID)
+                if CursorHasItem and CursorHasItem() then
+                    local invSlot = ContainerIDToInventoryID(forceEmptyJob.targetBagID)
+                    if invSlot then
+                        PutItemInBag(invSlot)
+                    end
+                end
+
+                forceEmptyJob.phase = 3
+                forceEmptyJob.awaitingEvent = true
+                forceEmptyJob.awaitElapsed = 0
+
+            elseif forceEmptyJob.phase == 3 then
+                -- Phase 3: Store the old bag (now empty and on the cursor)
+                if CursorHasItem and CursorHasItem() then
+                    PickupContainerItem(forceEmptyJob.sourceBagID, forceEmptyJob.sourceSlotID)
+                end
+
+                if CursorHasItem and CursorHasItem() then
+                    local tempBag, tempSlot = findFirstOpenSlotExcludingSwap(forceEmptyJob.targetBagID, nil, nil, 0)
+                    if tempBag and tempSlot then
+                        PickupContainerItem(tempBag, tempSlot)
+                    end
+                end
+
+                if CursorHasItem and CursorHasItem() then
+                    ClearCursor()
+                end
+
+                forceEmptyJob.phase = 4
+                forceEmptyJob.slots = {}
+                for _, info in ipairs(forceEmptyJob.shuffledItems) do
+                    table.insert(forceEmptyJob.slots, {
+                        slotID = info.originalSlotID,
+                        tempBagID = info.tempBagID,
+                        tempSlotID = info.tempSlotID,
+                        attempts = 0,
+                    })
+                end
+                forceEmptyJob.awaitingEvent = true
+                forceEmptyJob.awaitElapsed = 0
+
+            elseif forceEmptyJob.phase == 4 then
+                -- Phase 4: Refill items
+                if #forceEmptyJob.slots > 0 then
+                    local entry = table.remove(forceEmptyJob.slots, 1)
+                    local targetSlotID = entry.slotID
+                    local tempBagID = entry.tempBagID
+                    local tempSlotID = entry.tempSlotID
+                    local attempts = entry.attempts or 0
+
+                    local texture, _, isLocked = GetContainerItemInfo(tempBagID, tempSlotID)
+                    if not texture then
+                        runForceEmptyStep()
+                        return
+                    end
+                    if isLocked then
+                        attempts = attempts + 1
+                        if attempts >= DIM.FORCE_EMPTY_MAX_LOCK_RETRIES then
+                            forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                            runForceEmptyStep()
+                        else
+                            entry.attempts = attempts
+                            table.insert(forceEmptyJob.slots, entry)
+                        end
+                        return
+                    end
+
+                    PickupContainerItem(tempBagID, tempSlotID)
+                    if CursorHasItem and CursorHasItem() then
+                        PickupContainerItem(forceEmptyJob.targetBagID, targetSlotID)
+                    end
+
+                    if CursorHasItem and CursorHasItem() then
+                        ClearCursor()
+                        attempts = attempts + 1
+                        if attempts >= DIM.FORCE_EMPTY_MAX_MOVE_RETRIES then
+                            forceEmptyJob.blockedCount = forceEmptyJob.blockedCount + 1
+                            runForceEmptyStep()
+                        else
+                            entry.attempts = attempts
+                            table.insert(forceEmptyJob.slots, entry)
+                        end
+                    else
+                        forceEmptyJob.movedCount = forceEmptyJob.movedCount + 1
+                        forceEmptyJob.awaitingEvent = true
+                        forceEmptyJob.awaitElapsed = 0
+                    end
+                else
+                    print(string.format("|cFF00FF00OmniInventory|r: Successfully swapped bag %d.", forceEmptyJob.targetBagID))
+                    stopForceEmptyJob()
+                    if Frame and Frame.UpdateLayout then
+                        Frame:UpdateLayout()
+                    end
+                end
+            end
         end
+    end
+
+    local function ensureForceEmptyFrame()
+        if forceEmptyFrame then return end
+        forceEmptyFrame = CreateFrame("Frame")
+        forceEmptyFrame:RegisterEvent("BAG_UPDATE")
+        forceEmptyFrame:RegisterEvent("ITEM_LOCK_CHANGED")
+        forceEmptyFrame:SetScript("OnEvent", function(_, event, arg1)
+            if not forceEmptyJob then return end
+            if event == "BAG_UPDATE" and arg1 ~= nil then
+                if forceEmptyJob.type == "empty" and arg1 ~= forceEmptyJob.sourceBagID then
+                    forceEmptyJob.awaitingEvent = false
+                elseif forceEmptyJob.type == "swap" then
+                    forceEmptyJob.awaitingEvent = false
+                end
+                return
+            end
+            forceEmptyJob.awaitingEvent = false
+        end)
+        forceEmptyFrame:SetScript("OnUpdate", function(_, elapsed)
+            if not forceEmptyJob then return end
+            if forceEmptyJob.awaitingEvent then
+                forceEmptyJob.awaitElapsed = forceEmptyJob.awaitElapsed + (elapsed or 0)
+                if forceEmptyJob.awaitElapsed < DIM.FORCE_EMPTY_EVENT_TIMEOUT then
+                    return
+                end
+                forceEmptyJob.awaitingEvent = false
+            end
+            if CursorHasItem and CursorHasItem() then
+                if forceEmptyJob.type == "empty" or (forceEmptyJob.type == "swap" and forceEmptyJob.phase ~= 2 and forceEmptyJob.phase ~= 3) then
+                    return
+                end
+            end
+            if InCombat() then
+                stopForceEmptyJob()
+                return
+            end
+            runForceEmptyStep()
+        end)
     end
 
 function Frame:ForceEmptyBag(sourceBagID)
@@ -5411,6 +5941,7 @@ function Frame:ForceEmptyBag(sourceBagID)
     end
 
     forceEmptyJob = {
+        type = "empty",
         sourceBagID = sourceBagID,
         slots = slots,
         movedCount = 0,
@@ -5419,36 +5950,73 @@ function Frame:ForceEmptyBag(sourceBagID)
         awaitElapsed = 0,
     }
 
-    forceEmptyFrame = forceEmptyFrame or CreateFrame("Frame")
-    forceEmptyFrame:RegisterEvent("BAG_UPDATE")
-    forceEmptyFrame:RegisterEvent("ITEM_LOCK_CHANGED")
-    forceEmptyFrame:SetScript("OnEvent", function(_, event, arg1)
-        if not forceEmptyJob then
-            return
+    ensureForceEmptyFrame()
+end
+
+function Frame:StartBagSwap(sourceBagID, sourceSlotID, targetBagID)
+    if not IsValidBagID(targetBagID) or not IsValidBagID(sourceBagID) then return end
+    if targetBagID == 0 then return end -- Backpack cannot be swapped
+
+    if InCombat() then
+        print("|cFF00FF00OmniInventory|r: Cannot swap bags during combat.")
+        return
+    end
+
+    local filledCount = 0
+    local targetSlots = GetContainerNumSlots(targetBagID) or 0
+    local slotsToEmpty = {}
+    for slotID = 1, targetSlots do
+        local texture = GetContainerItemInfo(targetBagID, slotID)
+        if texture then
+            filledCount = filledCount + 1
+            table.insert(slotsToEmpty, { slotID = slotID, attempts = 0 })
         end
-        if event == "BAG_UPDATE" and arg1 ~= nil then
-            if arg1 ~= forceEmptyJob.sourceBagID then
-                forceEmptyJob.awaitingEvent = false
-            end
-            return
+    end
+
+    if filledCount == 0 then
+        ClearCursor()
+        PickupContainerItem(sourceBagID, sourceSlotID)
+        if CursorHasItem() then
+            local invSlot = ContainerIDToInventoryID(targetBagID)
+            PutItemInBag(invSlot)
         end
-        if event == "ITEM_LOCK_CHANGED" then
-            forceEmptyJob.awaitingEvent = false
+        if CursorHasItem() then
+            PickupContainerItem(sourceBagID, sourceSlotID)
         end
-    end)
-    forceEmptyFrame:SetScript("OnUpdate", function(_, elapsed)
-        if not forceEmptyJob then
-            return
+        if CursorHasItem() then ClearCursor() end
+        print(string.format("|cFF00FF00OmniInventory|r: Successfully swapped empty bag slot %d.", targetBagID))
+        if Frame and Frame.UpdateLayout then
+            Frame:UpdateLayout()
         end
-        if forceEmptyJob.awaitingEvent then
-            forceEmptyJob.awaitElapsed = forceEmptyJob.awaitElapsed + (elapsed or 0)
-            if forceEmptyJob.awaitElapsed < DIM.FORCE_EMPTY_EVENT_TIMEOUT then
-                return
-            end
-            forceEmptyJob.awaitingEvent = false
-        end
-        runForceEmptyStep()
-    end)
+        return
+    end
+
+    local freeSlots = CountFreeSlotsExcluding(targetBagID, sourceBagID, sourceSlotID)
+    if freeSlots < filledCount then
+        print(string.format("|cFF00FF00OmniInventory|r: Not enough free slots to swap this bag. Need %d slots, have %d.", filledCount, freeSlots))
+        return
+    end
+
+    if forceEmptyJob then
+        stopForceEmptyJob()
+    end
+
+    forceEmptyJob = {
+        type = "swap",
+        phase = 1,
+        targetBagID = targetBagID,
+        sourceBagID = sourceBagID,
+        sourceSlotID = sourceSlotID,
+        slots = slotsToEmpty,
+        movedCount = 0,
+        blockedCount = 0,
+        awaitingEvent = false,
+        awaitElapsed = 0,
+        shuffledItems = {},
+    }
+
+    ensureForceEmptyFrame()
+    print(string.format("|cFF00FF00OmniInventory|r: Swapping bag %d (moving %d items)...", targetBagID, filledCount))
 end
 
 end -- force-empty inner scope
@@ -5495,6 +6063,25 @@ function Frame:Init()
     self:_RefreshViewButtonLabel()
     pcall(function()
         Frame:UpdateLayout(nil, { forceFull = true, reason = "init_prewarm", immediate = true })
+    end)
+
+    local errorFrame = CreateFrame("Frame")
+    errorFrame:RegisterEvent("UI_ERROR_MESSAGE")
+    errorFrame:SetScript("OnEvent", function(_, event, msg)
+        if msg == ERR_DESTROY_NONEMPTY_BAG then
+            if Frame.FindLockedSwappingBags then
+                local sourceBagID, sourceSlotID, targetBagID = Frame.FindLockedSwappingBags()
+                if sourceBagID and sourceSlotID and targetBagID then
+                    if type(targetBagID) == "number" and targetBagID >= 1 and targetBagID <= 4 then
+                        Frame:StartBagSwap(sourceBagID, sourceSlotID, targetBagID)
+                    elseif type(targetBagID) == "number" and targetBagID >= 5 and targetBagID <= 11 then
+                        if BankFrame and BankFrame.StartBankBagSwap then
+                            BankFrame:StartBankBagSwap(sourceBagID, sourceSlotID, targetBagID)
+                        end
+                    end
+                end
+            end
+        end
     end)
 end
 

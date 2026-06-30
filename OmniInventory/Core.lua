@@ -536,4 +536,81 @@ end
 SlashCmdList["OMNIINVENTORY"] = HandleSlashCommand
 SlashCmdList["ZENBAGS"] = HandleSlashCommand
 
+-- =============================================================================
+-- Vendor Sell Protection (Double-Right-Click)
+-- =============================================================================
+
+local original_UseContainerItem = UseContainerItem
+local lastClickedItem = nil
+local lastClickTime = 0
+local DOUBLE_CLICK_TIMEOUT = 1.5
+
+local function IsValuableItem(bagID, slotID)
+    local link = GetContainerItemLink(bagID, slotID)
+    if not link then return false end
+
+    local _, _, quality, _, _, _, _, _, _, _, itemSellPrice = GetItemInfo(link)
+    quality = quality or 0
+    itemSellPrice = itemSellPrice or 0
+
+    if itemSellPrice <= 0 then
+        return false
+    end
+
+    if quality >= 3 then
+        return true
+    end
+
+    if Omni.API and Omni.API.IsItemSoulbound then
+        if Omni.API:IsItemSoulbound(bagID, slotID) then
+            return true
+        end
+    end
+
+    if GetContainerItemQuestInfo then
+        local isQuestItem, _, isActive = GetContainerItemQuestInfo(bagID, slotID)
+        if isQuestItem or isActive then
+            return true
+        end
+    end
+
+    return false
+end
+
+_G.UseContainerItem = function(bagID, slotID)
+    if MerchantFrame and MerchantFrame:IsShown() and MerchantFrame.selectedTab == 1 then
+        if not (InCombatLockdown and InCombatLockdown()) then
+            local protectionEnabled = true
+            if Omni.Data and Omni.Data.Get then
+                protectionEnabled = (Omni.Data:Get("vendorDoubleRightClick") ~= false)
+            end
+
+            if protectionEnabled and IsValuableItem(bagID, slotID) then
+                local now = GetTime()
+                local itemLink = GetContainerItemLink(bagID, slotID)
+                
+                if lastClickedItem == itemLink and (now - lastClickTime) <= DOUBLE_CLICK_TIMEOUT then
+                    lastClickedItem = nil
+                    lastClickTime = 0
+                    return original_UseContainerItem(bagID, slotID)
+                else
+                    lastClickedItem = itemLink
+                    lastClickTime = now
+                    
+                    PlaySound("igQuestLogAbandonQuest")
+                    print(string.format("|cFFFF4040OmniInventory|r: Double right-click to sell valuable item: %s", itemLink))
+                    
+                    if UIErrorsFrame then
+                        UIErrorsFrame:AddMessage("Double right-click to sell valuable item!", 1.0, 0.25, 0.25, 1.0, 5)
+                    end
+                    
+                    return
+                end
+            end
+        end
+    end
+
+    return original_UseContainerItem(bagID, slotID)
+end
+
 print("|cFF00FF00OmniInventory|r: Core module loaded")

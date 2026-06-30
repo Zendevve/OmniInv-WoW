@@ -116,6 +116,10 @@ local SECTION_COLORS = {
 
 local FOOTER_BUTTON_OPTIONS = {
     { key = "resetInstances", label = "Reset Instances" },
+    { key = "hearthstone",    label = "Hearthstone" },
+    { key = "openables",      label = "Clam Opener" },
+    { key = "disenchant",     label = "Disenchant" },
+    { key = "picklock",       label = "Pick Lock" },
 }
 
 local ADDON_BUTTON_OPTIONS = {
@@ -575,6 +579,28 @@ function Settings:CreateControls(parent)
     end)
     self.showItemLevelCb = showItemLevelCb
 
+    yOffset = yOffset - 22
+
+    local sellProtectionCb = CreateFrame("CheckButton", "OmniVendorDoubleRightClick", parent, "UICheckButtonTemplate")
+    sellProtectionCb:SetSize(24, 24)
+    sellProtectionCb:SetPoint("TOPLEFT", 14, yOffset)
+    local sellProtectionLabel = sellProtectionCb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    sellProtectionLabel:SetPoint("LEFT", sellProtectionCb, "RIGHT", 2, 1)
+    sellProtectionLabel:SetText("Double-click sell protection")
+    sellProtectionCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Vendor Sell Protection", 1, 0.82, 0)
+        GameTooltip:AddLine("Requires a double-right-click to sell valuable items (Soulbound gear, active quest items, rare/epic loot) at vendors.", 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    sellProtectionCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    sellProtectionCb:SetScript("OnClick", function(self)
+        if Omni.Data then
+            Omni.Data:Set("vendorDoubleRightClick", self:GetChecked() and true or false)
+        end
+    end)
+    self.vendorDoubleRightClickCb = sellProtectionCb
+
     yOffset = yOffset - SPACING - 4
 
     local tipPlacementHeader = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -837,6 +863,9 @@ function Settings:UpdateValues()
     end
     if self.showItemLevelCb and Omni.Data then
         self.showItemLevelCb:SetChecked(Omni.Data:Get("showItemLevel") ~= false)
+    end
+    if self.vendorDoubleRightClickCb and Omni.Data then
+        self.vendorDoubleRightClickCb:SetChecked(Omni.Data:Get("vendorDoubleRightClick") ~= false)
     end
     self._syncingTooltipFixedSliders = true
     if Omni.Data and self.tooltipFixedXSlider and self.tooltipFixedYSlider then
