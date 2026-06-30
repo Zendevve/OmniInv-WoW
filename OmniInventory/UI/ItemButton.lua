@@ -671,6 +671,14 @@ function ItemButton:Create(parent)
         ItemButton:OnClick(self, mouseButton)
     end)
 
+    button:SetScript("PreClick", function(self, mouseButton)
+        ItemButton:OnPreClick(self, mouseButton)
+    end)
+
+    button:SetScript("PostClick", function(self, mouseButton)
+        ItemButton:OnPostClick(self, mouseButton)
+    end)
+
     button:HookScript("OnEnter", function(self)
         ItemButton:OnEnter(self)
     end)
@@ -1110,7 +1118,91 @@ function ItemButton:OnMouseDown(button)
     button.__omniActionStateKey = Omni.Frame:SnapshotBagSlotState(bagID, slotID)
 end
 
-function ItemButton:OnPreClick() end
+local function IsValuableItem(bagID, slotID)
+    local link = GetContainerItemLink(bagID, slotID)
+    if not link then return false end
+
+    local _, _, quality, _, _, _, _, _, _, _, itemSellPrice = GetItemInfo(link)
+    quality = quality or 0
+    itemSellPrice = itemSellPrice or 0
+
+    if itemSellPrice <= 0 then
+        return false
+    end
+
+    if quality >= 3 then
+        return true
+    end
+
+    if Omni.API and Omni.API.IsItemSoulbound then
+        if Omni.API:IsItemSoulbound(bagID, slotID) then
+            return true
+        end
+    end
+
+    if GetContainerItemQuestInfo then
+        local isQuestItem, _, isActive = GetContainerItemQuestInfo(bagID, slotID)
+        if isQuestItem or isActive then
+            return true
+        end
+    end
+
+    return false
+end
+
+local lastClickedItem = nil
+local lastClickTime = 0
+local DOUBLE_CLICK_TIMEOUT = 1.5
+
+function ItemButton:OnPreClick(button, mouseButton)
+    if not button then return end
+    mouseButton = NormalizeMouseButton(mouseButton) or mouseButton
+
+    button._realID = button:GetID()
+
+    if mouseButton == "RightButton" and MerchantFrame and MerchantFrame:IsShown() and MerchantFrame.selectedTab == 1 then
+        local bagID = button.bagID
+        local slotID = button.slotID
+        if bagID and slotID and bagID >= 0 and bagID <= 4 and slotID >= 1 then
+            local protectionEnabled = true
+            if Omni.Data and Omni.Data.Get then
+                protectionEnabled = (Omni.Data:Get("vendorDoubleRightClick") ~= false)
+            end
+
+            if protectionEnabled and IsValuableItem(bagID, slotID) then
+                local now = GetTime()
+                local itemLink = GetContainerItemLink(bagID, slotID)
+
+                if lastClickedItem == itemLink and (now - lastClickTime) <= DOUBLE_CLICK_TIMEOUT then
+                    lastClickedItem = nil
+                    lastClickTime = 0
+                    -- Allow the click to proceed
+                else
+                    lastClickedItem = itemLink
+                    lastClickTime = now
+
+                    PlaySound("igQuestLogAbandonQuest")
+                    print(string.format("|cFFFF4040OmniInventory|r: Double right-click to sell valuable item: %s", itemLink))
+
+                    if UIErrorsFrame then
+                        UIErrorsFrame:AddMessage("Double right-click to sell valuable item!", 1.0, 0.25, 0.25, 1.0, 5)
+                    end
+
+                    -- Temporarily set ID to 0 to block the use/sell action
+                    button:SetID(0)
+                end
+            end
+        end
+    end
+end
+
+function ItemButton:OnPostClick(button, mouseButton)
+    if not button then return end
+    if button._realID then
+        button:SetID(button._realID)
+        button._realID = nil
+    end
+end
 
 -- ʕ •ᴥ•ʔ✿ ContainerFrameItemButtonTemplate's XML OnClick already invokes
 -- ContainerFrameItemButton_OnClick which handles use / pickup / equip /
