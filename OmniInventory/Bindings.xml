@@ -1,5 +1,5 @@
 <Bindings>
-    <Binding name="OMNIINVENTORY_TOGGLE" Header="OMNIINVENTORY">
+    <Binding name="OMNIINVENTORY_TOGGLE">
         OmniInventory:Toggle()
     </Binding>
     <Binding name="OMNIINVENTORY_TOGGLE_BANK">
