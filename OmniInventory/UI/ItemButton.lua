@@ -534,10 +534,21 @@ function ItemButton:Create(parent)
     button.cooldown:SetPoint("BOTTOMRIGHT", button.icon, "BOTTOMRIGHT", 0, 0)
     button.cooldown:Hide()
 
-    local questIcon = _G[name .. "IconQuestTexture"]
+    -- Hide all potential default Blizzard template textures and overlays
+    local questIcon = _G[name .. "IconQuestTexture"] or button.IconQuestTexture
     if questIcon then questIcon:Hide() end
-    local stockTex = _G[name .. "Stock"]
+    local stockTex = _G[name .. "Stock"] or button.Stock
     if stockTex then stockTex:Hide() end
+    local junkIcon = _G[name .. "JunkIcon"] or button.JunkIcon
+    if junkIcon then junkIcon:Hide() end
+    local iconBorder = _G[name .. "IconBorder"] or button.IconBorder
+    if iconBorder then iconBorder:Hide() end
+    local upgradeIcon = _G[name .. "UpgradeIcon"] or button.UpgradeIcon
+    if upgradeIcon then upgradeIcon:Hide() end
+    local newItemTex = _G[name .. "NewItemTexture"] or button.NewItemTexture
+    if newItemTex then newItemTex:Hide() end
+    local flash = _G[name .. "Flash"] or button.Flash
+    if flash then flash:Hide() end
 
     -- Quality border (our custom colored border)
     button.border = button:CreateTexture(nil, "OVERLAY")
