@@ -626,6 +626,3 @@ end
 
 SlashCmdList["OMNIINVENTORY"] = HandleSlashCommand
 SlashCmdList["ZENBAGS"] = HandleSlashCommand
-
--- =============================================================================
-print("|cFF00FF00OmniInventory|r: Core module loaded")

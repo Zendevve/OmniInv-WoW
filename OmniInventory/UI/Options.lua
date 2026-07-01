@@ -1352,5 +1352,3 @@ end
 function Settings:Init()
     Settings.activeConfigTarget = "bag"
 end
-
-print("|cFF00FF00OmniInventory|r: Settings module loaded")

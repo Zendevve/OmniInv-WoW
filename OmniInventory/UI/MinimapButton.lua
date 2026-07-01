@@ -183,5 +183,3 @@ end
 function MinimapButton:Init()
     self:Create()
 end
-
-print("|cFF00FF00OmniInventory|r: Minimap Button loaded")

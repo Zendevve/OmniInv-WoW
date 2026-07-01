@@ -256,5 +256,3 @@ function Utils:ConfigureSecureActionForBagSlot(frame, bagID, slotID)
 
     return ok and true or false
 end
-
-print("|cFF00FF00OmniInventory|r: Utilities loaded")

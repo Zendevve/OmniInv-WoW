@@ -57,5 +57,3 @@ function FlowView:GetCategoryOrder(categorizedItems)
 
     return order
 end
-
-print("|cFF00FF00OmniInventory|r: FlowView loaded")

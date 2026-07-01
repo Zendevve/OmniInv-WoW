@@ -38,5 +38,3 @@ end
 function ListView:GetColumns()
     return COLUMNS
 end
-
-print("|cFF00FF00OmniInventory|r: ListView loaded")

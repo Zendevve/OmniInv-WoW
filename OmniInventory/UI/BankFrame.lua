@@ -2051,5 +2051,3 @@ function BankFrame:SetItemGap(gap)
     self:UpdateLayout()
     return true
 end
-
-print("|cFF00FF00OmniInventory|r: BankFrame loaded")

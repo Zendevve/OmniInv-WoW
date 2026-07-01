@@ -2363,5 +2363,3 @@ end
 function GuildBankFrame:Init()
     self:InstallSetGuildBankTabInfoShim()
 end
-
-print("|cFF00FF00OmniInventory|r: GuildBankFrame loaded")

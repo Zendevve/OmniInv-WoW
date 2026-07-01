@@ -649,5 +649,3 @@ function Events:Init()
         end
     end
 end
-
-print("|cFF00FF00OmniInventory|r: Event Bucketing system loaded")

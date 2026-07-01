@@ -628,5 +628,3 @@ function Categorizer:Init()
     OmniInventoryDB.categoryOverrides = OmniInventoryDB.categoryOverrides or {}
     OmniInventoryDB.perishableItems = OmniInventoryDB.perishableItems or {}
 end
-
-print("|cFF00FF00OmniInventory|r: Categorizer loaded")

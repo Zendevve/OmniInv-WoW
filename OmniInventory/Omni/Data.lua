@@ -541,5 +541,3 @@ function Data:TogglePin(itemID)
         return true
     end
 end
-
-print("|cFF00FF00OmniInventory|r: Data module loaded")

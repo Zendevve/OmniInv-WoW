@@ -566,5 +566,3 @@ function PhysicalSort:SortBank()
         if SortAuctionHouseBags then SortAuctionHouseBags() end
     end
 end
-
-print("|cFF00FF00OmniInventory|r: Physical Sort engine loaded")

@@ -784,5 +784,3 @@ function Rules:Init()
         Omni.Categories:CompileAll()
     end
 end
-
-print("|cFF00FF00OmniInventory|r: Rules + Categories engine loaded")

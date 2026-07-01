@@ -243,5 +243,3 @@ function Pool:Init()
         end
     )
 end
-
-print("|cFF00FF00OmniInventory|r: Object Pool system loaded")

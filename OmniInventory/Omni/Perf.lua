@@ -266,5 +266,3 @@ function Perf:Reset()
     stackByTag = {}
     bucketCounters = {}
 end
-
-print("|cFF00FF00OmniInventory|r: Perf profiler loaded")

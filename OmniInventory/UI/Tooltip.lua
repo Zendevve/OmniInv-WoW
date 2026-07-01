@@ -142,5 +142,3 @@ end
 -- Hook default tooltips
 HookTooltip(GameTooltip)
 HookTooltip(ItemRefTooltip)
-
-print("|cFF00FF00OmniInventory|r: Tooltip counts loaded")

@@ -6210,5 +6210,3 @@ function Frame:Init()
         end
     end)
 end
-
-print("|cFF00FF00OmniInventory|r: Frame loaded")

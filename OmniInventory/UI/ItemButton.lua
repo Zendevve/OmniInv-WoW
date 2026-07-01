@@ -1421,5 +1421,3 @@ local function RegisterOmniFixedTooltipReanchorHooks()
 end
 
 RegisterOmniFixedTooltipReanchorHooks()
-
-print("|cFF00FF00OmniInventory|r: ItemButton loaded")

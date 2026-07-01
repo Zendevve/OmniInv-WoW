@@ -669,5 +669,3 @@ function Features:Init()
     self:InitLDB()
     self:InitAutoLoot()
 end
-
-print("|cFF00FF00OmniInventory|r: Features module loaded")

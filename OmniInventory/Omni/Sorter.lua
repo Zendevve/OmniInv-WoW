@@ -311,5 +311,3 @@ end
 function Sorter:Init()
     -- Nothing to initialize, but maintain interface consistency
 end
-
-print("|cFF00FF00OmniInventory|r: Sorter loaded (stable table.sort)")
