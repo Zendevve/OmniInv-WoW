@@ -172,8 +172,6 @@ local function SuppressBlizzardBagFrames()
         if containerFrame then
             pcall(containerFrame.Hide, containerFrame)
             pcall(containerFrame.UnregisterAllEvents, containerFrame)
-            pcall(containerFrame.SetScript, containerFrame, "OnShow",
-                function(self) if not InCombatLockdown() then pcall(self.Hide, self) end end)
             pcall(containerFrame.HookScript, containerFrame, "OnShow",
                 function()
                     if InCombatLockdown() and Omni.Frame and Omni.Frame.Show then
