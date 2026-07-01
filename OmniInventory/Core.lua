@@ -322,8 +322,7 @@ SLASH_OMNIINVENTORY1 = "/omniinventory"
 SLASH_OMNIINVENTORY2 = "/omni"
 SLASH_OMNIINVENTORY3 = "/oi"
 
-SLASH_ZENBAGS1 = "/zb"
-SLASH_ZENBAGS2 = "/zenbags"
+
 
 local clamOpenerFrame = CreateFrame("Frame")
 local CLAM_IDS = {
@@ -633,4 +632,3 @@ local function HandleSlashCommand(msg)
 end
 
 SlashCmdList["OMNIINVENTORY"] = HandleSlashCommand
-SlashCmdList["ZENBAGS"] = HandleSlashCommand
