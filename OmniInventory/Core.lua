@@ -263,9 +263,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             Omni.Data:Init()
         end
 
-        print("|cFF00FF00Omni|r |cFFFFFFFFInventory|r v" .. Omni.version .. " loaded. By |cFF00FFFF" .. Omni.author .. "|r")
-        print("  Type |cFFFFFF00/omni|r or |cFFFFFF00/oi|r to toggle.")
-        print("  |cFFFF8000♥ Loving the clean bags & new features? ♥|r Support future updates and show some love at: |cFF00FFFFhttps://buymeacoffee.com/zendevve|r")
+
 
     elseif event == "PLAYER_LOGIN" then
         if Omni.Pool then Omni.Pool:Init() end
