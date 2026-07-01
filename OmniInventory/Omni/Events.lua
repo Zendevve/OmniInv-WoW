@@ -598,6 +598,12 @@ function Events:Init()
         if Omni.Frame and Omni.Frame.UpdateLayout then
             pcall(Omni.Frame.UpdateLayout, Omni.Frame, nil, { reason = "player_regen" })
         end
+        -- Flush a deferred footer-button reflow that was skipped during
+        -- combat lockdown (secure buttons can't be repositioned in combat).
+        if Omni.Frame and Omni.Frame._pendingFooterUpdate
+                and Omni.Frame.UpdateFooterCustomButtons then
+            pcall(Omni.Frame.UpdateFooterCustomButtons, Omni.Frame)
+        end
         if Omni.BankFrame and Omni.BankFrame.UpdateLayout
                 and Omni.BankFrame:IsShown() then
             pcall(Omni.BankFrame.UpdateLayout, Omni.BankFrame)

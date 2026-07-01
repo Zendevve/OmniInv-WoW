@@ -2844,10 +2844,27 @@ local function CollectRibbonItems(footer)
     return items
 end
 
+-- Footer custom buttons use SecureActionButtonTemplate so right-click
+-- works in combat, but that means ClearAllPoints / SetParent / SetPoint /
+-- Show / Hide on them are protected and blocked during combat lockdown.
+-- If the first layout pass happens while in combat (e.g. login mid-fight),
+-- the buttons never get positioned and stay invisible.  We combat-gate
+-- the whole reflow and defer it to PLAYER_REGEN_ENABLED.
+Frame._pendingFooterUpdate = false
+
 function Frame:UpdateFooterCustomButtons()
     if not mainFrame or not mainFrame.footer then return end
     local footer = mainFrame.footer
     if not footer.customButtons or not footer.addonButtons then return end
+
+    -- Secure buttons can't be repositioned in combat; defer and retry
+    -- once combat ends (Events.lua PLAYER_REGEN_ENABLED -> UpdateLayout
+    -- -> UpdateSlotCount -> UpdateFooterCustomButtons).
+    if InCombatLockdown and InCombatLockdown() then
+        self._pendingFooterUpdate = true
+        return
+    end
+    self._pendingFooterUpdate = false
 
     if footer.customButtons.openables then
         local btn = footer.customButtons.openables
@@ -5512,11 +5529,10 @@ function Frame:Show()
 
     if not mainFrame then return end
 
-    -- ContainerFrameItemButtonTemplate keeps mainFrame insecure, so
-    -- a plain Show() works in combat just like AdiBags. UpdateLayout is
-    -- still combat-gated; the buttons keep their last OOC (bag, slot,
-    -- position) and remain clickable through Blizzard's secure path.
-    pcall(mainFrame.Show, mainFrame)
+    -- Direct call (no pcall) – required for combat toggle.
+    -- pcall in a tainted binding context breaks the secure execution
+    -- environment, causing this Show() to fail silently.
+    mainFrame:Show()
 
     pcall(function()
         local sig = ComputeShowSignature()
@@ -5545,7 +5561,8 @@ end
 function Frame:Hide()
     if not mainFrame then return end
 
-    pcall(mainFrame.Hide, mainFrame)
+    -- Direct call (no pcall) – required for combat toggle.
+    mainFrame:Hide()
 
     pcall(function()
         vendorFlowLayoutFreeze = nil

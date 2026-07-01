@@ -20,7 +20,10 @@ Omni.author = "Zendevve"
 -- OmniInventory:Toggle() without reaching into the Frame module.
 function Omni:Toggle()
     if self.Frame then
-        pcall(self.Frame.Toggle, self.Frame)
+        -- Direct call (no pcall) – critical for combat toggle.
+        -- pcall in a tainted binding context breaks the secure execution
+        -- environment, causing mainFrame:Show() to fail silently.
+        self.Frame:Toggle()
     end
 end
 
@@ -104,14 +107,12 @@ local function SafeToggle(reason)
         local shownBefore = Omni._toggleStats.shownBefore
         if shownBefore then
             Omni._toggleStats.hideCalls = Omni._toggleStats.hideCalls + 1
-            local ok, err = pcall(Omni.Frame.Hide, Omni.Frame)
-            if ok then Omni._toggleStats.hideOK = Omni._toggleStats.hideOK + 1
-            else Omni._toggleStats.lastHideErr = tostring(err) end
+            Omni.Frame:Hide()
+            Omni._toggleStats.hideOK = Omni._toggleStats.hideOK + 1
         else
             Omni._toggleStats.showCalls = Omni._toggleStats.showCalls + 1
-            local ok, err = pcall(Omni.Frame.Show, Omni.Frame)
-            if ok then Omni._toggleStats.showOK = Omni._toggleStats.showOK + 1
-            else Omni._toggleStats.lastShowErr = tostring(err) end
+            Omni.Frame:Show()
+            Omni._toggleStats.showOK = Omni._toggleStats.showOK + 1
         end
     end
     recordExit()
@@ -121,9 +122,8 @@ local function SafeShow(reason)
     recordEntry(reason or "show")
     if Omni.Frame then
         Omni._toggleStats.showCalls = Omni._toggleStats.showCalls + 1
-        local ok, err = pcall(Omni.Frame.Show, Omni.Frame)
-        if ok then Omni._toggleStats.showOK = Omni._toggleStats.showOK + 1
-        else Omni._toggleStats.lastShowErr = tostring(err) end
+        Omni.Frame:Show()
+        Omni._toggleStats.showOK = Omni._toggleStats.showOK + 1
     end
     recordExit()
 end
@@ -132,9 +132,8 @@ local function SafeHide(reason)
     recordEntry(reason or "hide")
     if Omni.Frame then
         Omni._toggleStats.hideCalls = Omni._toggleStats.hideCalls + 1
-        local ok, err = pcall(Omni.Frame.Hide, Omni.Frame)
-        if ok then Omni._toggleStats.hideOK = Omni._toggleStats.hideOK + 1
-        else Omni._toggleStats.lastHideErr = tostring(err) end
+        Omni.Frame:Hide()
+        Omni._toggleStats.hideOK = Omni._toggleStats.hideOK + 1
     end
     recordExit()
 end
@@ -167,32 +166,41 @@ local function SuppressBlizzardBagFrames()
     if blizzardSuppressionDone then return end
     if InCombatLockdown and InCombatLockdown() then return end
 
+    -- IMPORTANT: We must NOT call Hide(), UnregisterAllEvents(), or
+    -- SetScript() on the Blizzard ContainerFrames from addon code.  Those
+    -- are protected-frame operations and calling them from outside a
+    -- secure context TAINTS the frames.  Once tainted, the binding system
+    -- cannot interact with them in combat, which prevents our global
+    -- overrides (ToggleBackpack, etc.) from ever being called.
+    --
+    -- Instead, we hook OnShow from WITHIN the frame's secure context.
+    -- The hook hides the Blizzard frame and shows our frame instead.
+    -- The hook function receives `self` as the ContainerFrame, so
+    -- calling self:Hide() runs in the frame's own secure context.
     for i = 1, 13 do
         local containerFrame = _G["ContainerFrame" .. i]
         if containerFrame then
-            pcall(containerFrame.Hide, containerFrame)
-            pcall(containerFrame.UnregisterAllEvents, containerFrame)
             pcall(containerFrame.HookScript, containerFrame, "OnShow",
-                function()
-                    if InCombatLockdown() and Omni.Frame and Omni.Frame.Show then
+                function(self)
+                    -- Hide the Blizzard frame from its own secure context
+                    -- (self:Hide() is a protected call on a protected frame,
+                    -- but we are inside the frame's own OnShow secure handler)
+                    pcall(self.Hide, self)
+                    -- Show our frame
+                    if Omni.Frame and Omni.Frame.Show then
                         Omni.Frame:Show()
-                    end
-                end)
-            pcall(containerFrame.HookScript, containerFrame, "OnHide",
-                function()
-                    if InCombatLockdown() and Omni.Frame and Omni.Frame.Hide then
-                        Omni.Frame:Hide()
                     end
                 end)
         end
     end
 
     if _G.BankFrame then
-        pcall(_G.BankFrame.UnregisterAllEvents, _G.BankFrame)
-        pcall(_G.BankFrame.Hide, _G.BankFrame)
-        pcall(_G.BankFrame.SetScript, _G.BankFrame, "OnShow",
-            function(self) if not InCombatLockdown() then pcall(self.Hide, self) end end)
-        pcall(_G.BankFrame.SetScript, _G.BankFrame, "OnEvent", nil)
+        pcall(_G.BankFrame.HookScript, _G.BankFrame, "OnShow",
+            function(self)
+                if not InCombatLockdown() then
+                    pcall(self.Hide, self)
+                end
+            end)
     end
 
     blizzardSuppressionDone = true
