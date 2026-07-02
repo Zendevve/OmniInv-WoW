@@ -186,8 +186,12 @@ local function SuppressBlizzardBagFrames()
                     -- (self:Hide() is a protected call on a protected frame,
                     -- but we are inside the frame's own OnShow secure handler)
                     pcall(self.Hide, self)
-                    -- Show our frame
-                    if Omni.Frame and Omni.Frame.Show then
+                    -- Show our frame — guarded: calling Frame:Show() from an
+                    -- insecure hook context is blocked during combat lockdown.
+                    -- The main toggle path via OMNIINVENTORY_TOGGLE binding
+                    -- already handles combat correctly; this is only needed
+                    -- to redirect Blizzard frame shows to ours out of combat.
+                    if Omni.Frame and Omni.Frame.Show and not (InCombatLockdown and InCombatLockdown()) then
                         Omni.Frame:Show()
                     end
                 end)
@@ -245,28 +249,6 @@ local function SuppressBlizzardGuildBank()
     guildBankSuppressionDone = true
 end
 
--- Remap B / Shift-B to the addon binding so the keypress reaches
--- OmniInventory:Toggle() directly through the secure binding system,
--- bypassing the Blizzard ContainerFrame show/hide which is blocked in
--- combat.  SetBinding is protected and can only run out of combat.
--- We only remap keys that are still on a default Blizzard bag binding
--- so we never clobber a user's custom keybind.
-local function RemapBagKeybindings()
-    if InCombatLockdown and InCombatLockdown() then return end
-
-    local bBinding = GetBindingAction and GetBindingAction("B")
-    if bBinding and (bBinding == "TOGGLEBACKPACK" or bBinding == "TOGGLEBAGS") then
-        SetBinding("B", "OMNIINVENTORY_TOGGLE")
-    end
-
-    local shiftBBinding = GetBindingAction and GetBindingAction("SHIFT-B")
-    if shiftBBinding and (shiftBBinding == "TOGGLEBACKPACK"
-        or shiftBBinding == "TOGGLEBAGS"
-        or shiftBBinding == "OPENALLBAGS") then
-        SetBinding("SHIFT-B", "OMNIINVENTORY_TOGGLE")
-    end
-end
-
 local function OverrideBags()
     ToggleAllBags  = OmniToggleAll
     OpenAllBags    = OmniOpenAll
@@ -280,7 +262,6 @@ local function OverrideBags()
 
     SuppressBlizzardBagFrames()
     SuppressBlizzardGuildBank()
-    RemapBagKeybindings()
 end
 
 Omni._OverrideBags = OverrideBags

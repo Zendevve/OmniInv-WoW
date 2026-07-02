@@ -168,11 +168,13 @@ local forceEmptyFrame = nil
 local forceEmptyJob = nil
 
 -- Combat-safety state
--- ContainerFrameItemButtonTemplate (the AdiBags / Bagnon template) does
--- NOT promote OmniInventoryFrame to "protected by association", so
--- mainFrame:Show() and mainFrame:Hide() work normally in combat -- no
--- alpha-toggle / EnableMouse trickery required, and the entire bag UI
--- can disappear cleanly when closed.
+-- ContainerFrameItemButtonTemplate children may make OmniInventoryFrame
+-- protected in 3.3.5a (IsProtected returns true). Show/Hide on a
+-- protected frame are blocked from insecure/tainted code during combat.
+-- If the player's key binding is CLEAN (set via Key Binding UI or via
+-- our SecureHandler binding fix), the binding's execution context is
+-- clean and Show/Hide work even in combat. If the binding is TAINTED
+-- (from old SetBinding from addon code), Show/Hide are blocked in combat.
 -- The protected-child operations that ARE still forbidden in combat
 -- are the structural ones on the ItemButtons themselves: SetParent,
 -- SetID, SetPoint, ClearAllPoints. UpdateLayout is therefore combat-
@@ -183,6 +185,7 @@ local forceEmptyJob = nil
 -- secure OnClick (use / pickup / equip / swap) still routes correctly.
 local hasRenderedOnce = false
 local pendingCombatRender = false
+
 local burstRefreshFrame = nil
 local burstRefreshElapsed = 0
 local burstRefreshPending = false
@@ -5529,9 +5532,6 @@ function Frame:Show()
 
     if not mainFrame then return end
 
-    -- Direct call (no pcall) – required for combat toggle.
-    -- pcall in a tainted binding context breaks the secure execution
-    -- environment, causing this Show() to fail silently.
     mainFrame:Show()
 
     pcall(function()
@@ -5561,7 +5561,6 @@ end
 function Frame:Hide()
     if not mainFrame then return end
 
-    -- Direct call (no pcall) – required for combat toggle.
     mainFrame:Hide()
 
     pcall(function()
@@ -5603,21 +5602,17 @@ function Frame:Hide()
     end)
 end
 
+function Frame:IsShown()
+    return mainFrame and mainFrame:IsShown() or false
+end
+
 function Frame:Toggle()
-    if mainFrame and mainFrame:IsShown() then
+    if self:IsShown() then
         self:Hide()
     else
         self:Show()
     end
 end
-
-function Frame:IsShown()
-    return mainFrame and mainFrame:IsShown() and true or false
-end
-
--- =============================================================================
--- Auto-Sort Physical Bags
--- =============================================================================
 
 function Frame:PhysicalSortBags()
     -- Use the multi-phase PhysicalSort engine (A14) when available;

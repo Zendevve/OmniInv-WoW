@@ -684,11 +684,17 @@ function ItemButton:Create(parent)
         ItemButton:OnClick(self, mouseButton)
     end)
 
-    button:SetScript("PreClick", function(self, mouseButton)
+    -- Use HookScript (not SetScript) for PreClick/PostClick to avoid
+    -- tainting the ContainerFrameItemButtonTemplate's secure click chain.
+    -- SetScript from insecure addon code taints the button, which blocks
+    -- the whitelisted secure OnClick (UseContainerItem / PickupContainerItem)
+    -- during combat lockdown.  HookScript adds a post-hook without touching
+    -- the frame's own script handlers, so the secure path stays clean.
+    button:HookScript("PreClick", function(self, mouseButton)
         ItemButton:OnPreClick(self, mouseButton)
     end)
 
-    button:SetScript("PostClick", function(self, mouseButton)
+    button:HookScript("PostClick", function(self, mouseButton)
         ItemButton:OnPostClick(self, mouseButton)
     end)
 
@@ -835,10 +841,16 @@ function ItemButton:SetItem(button, itemInfo)
         return
     end
 
-    if itemInfo.__offline then
-        button:RegisterForClicks()
-    else
-        button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    -- RegisterForClicks is a protected API call; skip during combat
+    -- lockdown to avoid ADDON_ACTION_BLOCKED.  The button's click
+    -- registration was already set when the button was created OOC;
+    -- deferring the change is safe since the render path is combat-gated.
+    if not (InCombatLockdown and InCombatLockdown()) then
+        if itemInfo.__offline then
+            button:RegisterForClicks()
+        else
+            button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        end
     end
     pcall(button.EnableMouse, button, true)
 
@@ -1169,6 +1181,7 @@ local DOUBLE_CLICK_TIMEOUT = 1.5
 
 function ItemButton:OnPreClick(button, mouseButton)
     if not button then return end
+    if InCombatLockdown and InCombatLockdown() then return end
     mouseButton = NormalizeMouseButton(mouseButton) or mouseButton
 
     button._realID = button:GetID()
@@ -1201,8 +1214,10 @@ function ItemButton:OnPreClick(button, mouseButton)
                         UIErrorsFrame:AddMessage("Double right-click to sell valuable item!", 1.0, 0.25, 0.25, 1.0, 5)
                     end
 
-                    -- Temporarily set ID to 0 to block the use/sell action
-                    button:SetID(0)
+                    -- Temporarily set ID to 0 to block the use/sell action.
+                    -- SetID is a protected API on ContainerFrameItemButtonTemplate;
+                    -- wrap in pcall so it never errors during combat lockdown.
+                    pcall(button.SetID, button, 0)
                 end
             end
         end
@@ -1211,8 +1226,9 @@ end
 
 function ItemButton:OnPostClick(button, mouseButton)
     if not button then return end
+    if InCombatLockdown and InCombatLockdown() then return end
     if button._realID then
-        button:SetID(button._realID)
+        pcall(button.SetID, button, button._realID)
         button._realID = nil
     end
 end
